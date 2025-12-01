@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="ISroilov's python — dasturlash, Python uchun online muharrir. Kodingizni yozing, ishga tushiring va natijalarni ko'ring!, siz ilovaga kirishingiz shart emas online yordamchingiz ">
+    <title>Isroilov's Online Editor</title>
+    <link rel="icon" type="image/png" href="image_icon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/python-hint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/anyword-hint.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="real.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span class="status-indicator"><img class="fa-python" src="image.png" alt="Anu python logosi bor "></span>
+                Python Online Editor
+            </h1>
+            <div class="header-buttons">
+                <button class="btn-run" onclick="runCode()">▶ Run</button>
+                <button class="btn-clear" onclick="clearOutput()">✖ Clear</button>
+                <button class="btn-save" onclick="saveCode()">💾 Save</button>
+                <button class="btn-load" onclick="loadCode()">📂 Load</button>
+                <button class="btn-download" onclick="downloadCode()">⬇ Download</button>
+                <button class="btn-upload" onclick="document.getElementById('fileInput').click()">📤 Upload</button>
+                <button class="btn-theme" onclick="toggleTheme()" id="themeBtn">🌙 Dark</button>
+                <input type="file" id="fileInput" accept=".py,.txt" onchange="uploadFile(event)">
+            </div>
+        </div>
+
+        <div class="loading" id="loading">⏳ Python muhiti yuklanmoqda...</div>
+
+        <div class="editor-container">
+            <div class="editor-panel">
+                <div class="panel-header">📝 Kod Muharriri</div>
+                <textarea id="code-editor">print("Salom, Python!")
+for i in range(5):
+    print("*" *i) 
+</textarea>
+            </div>
+
+            <div class="output-panel">
+                <div class="panel-header">📊 Natija</div>
+                <div class="output-content" id="output">Natija bu yerda ko'rsatiladi...</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
