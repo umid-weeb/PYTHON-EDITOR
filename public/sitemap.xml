@@ -3,7 +3,10 @@
    <url>
       <loc>https://www.pyzone.uz/</loc>
    </url>
+     <url>
+    <loc>https://www.pyzone.uz/index.html</loc>
+  </url>
    <!-- Agar boshqa HTML fayllar bo‘lsa, ularni ham qo‘shing -->
    <!-- <url><loc>https://www.pyzone.uz/test.html</loc></url> -->
-   
+
 </urlset>
