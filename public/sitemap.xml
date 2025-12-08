@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-
    <url>
-      <loc>https://pyzone.uz/</loc>
+      <loc>https://www.pyzone.uz/</loc>
    </url>
-
-   <url>
-      <loc>https://pyzone.uz/index.html</loc>
-   </url>
-
+   <!-- Agar boshqa HTML fayllar bo‘lsa, ularni ham qo‘shing -->
+   <!-- <url><loc>https://www.pyzone.uz/test.html</loc></url> -->
+   
 </urlset>

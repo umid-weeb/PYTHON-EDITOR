@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://pyzone.uz/sitemap.xml
+Sitemap: https://www.pyzone.uz/sitemap.xml
+
