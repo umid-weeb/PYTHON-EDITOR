@@ -468,21 +468,50 @@ function setupAutoClose() {
     
     };
 
+    // editor.on('keydown', function (cm, event) {
+    //     const char = event.key;
+
+    //     if (pairs[char] && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    //         event.preventDefault();
+
+    //         const cursor = cm.getCursor();
+    //         const selection = cm.getSelection();
+
+    //         if (selection) {
+    //             cm.replaceSelection(char + selection + pairs[char]);
+    //             cm.setCursor({ line: cursor.line, ch: cursor.ch + selection.length + 1 });
+    //         } else {
+    //             const nextChar = cm.getRange(cursor, { line: cursor.line, ch: cursor.ch + 1 });
+
+    //             if (nextChar === pairs[char] && (char === '"' || char === "'")) {
+    //                 cm.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
+    //             } else {
+    //                 cm.replaceRange(char + pairs[char], cursor);
+    //                 cm.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
+    //             }
+    //         }
+    //     }
     editor.on('keydown', function (cm, event) {
         const char = event.key;
-
+        const cursor = cm.getCursor();
+        const nextChar = cm.getRange(cursor, { line: cursor.line, ch: cursor.ch + 1 });
+    
+        // Agar yopuvchi bracket bosilsa va u allaqachon mavjud bo'lsa, o'ngga o't
+        if (Object.values(pairs).includes(char) && nextChar === char && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            event.preventDefault();
+            cm.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
+            return;
+        }
+    
         if (pairs[char] && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
-
-            const cursor = cm.getCursor();
+    
             const selection = cm.getSelection();
-
+    
             if (selection) {
                 cm.replaceSelection(char + selection + pairs[char]);
                 cm.setCursor({ line: cursor.line, ch: cursor.ch + selection.length + 1 });
             } else {
-                const nextChar = cm.getRange(cursor, { line: cursor.line, ch: cursor.ch + 1 });
-
                 if (nextChar === pairs[char] && (char === '"' || char === "'")) {
                     cm.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
                 } else {
@@ -490,7 +519,8 @@ function setupAutoClose() {
                     cm.setCursor({ line: cursor.line, ch: cursor.ch + 1 });
                 }
             }
-        } else if (event.key === 'Backspace') {
+        }
+           else if (event.key === 'Backspace') {
             const cursor = cm.getCursor();
             const charBefore = cm.getRange({ line: cursor.line, ch: cursor.ch - 1 }, cursor);
             const charAfter = cm.getRange(cursor, { line: cursor.line, ch: cursor.ch + 1 });
@@ -699,7 +729,7 @@ class LoopIterationError(Exception):
     pass
 
 class SafeExecutor:
-    def __init__(self, max_iterations=1000):
+    def __init__(self, max_iterations=10000):
         self.max_iterations = max_iterations
         self.loop_counters = {}
 
