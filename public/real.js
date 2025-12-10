@@ -699,127 +699,270 @@ async function initPyodide() {
   }
 }
 
+// async function setupSafeExecutionEnvironment() {
+//   const pyodideVersion = pyodide.version;
+//   if (!pyodideVersion || parseFloat(pyodideVersion) < 0.23) {
+//     console.warn(
+//       "Pyodide versiyasi eski. Ba'zi funksiyalar ishlamasligi mumkin."
+//     );
+//   }
+
+//   await pyodide.runPythonAsync(`
+// import sys
+// import ast
+// import builtins
+// from io import StringIO
+// import time
+
+// class LoopIterationError(Exception):
+//     pass
+
+// class SafeExecutor:
+//     def __init__(self, max_execution_time=5):
+//         self.max_execution_time = max_execution_time  # Maximum execution time in seconds
+//         self.start_time = None
+
+//     def transform_code(self, code):
+//         try:
+//             tree = ast.parse(code)
+//             transformer = LoopTransformer()
+//             new_tree = transformer.visit(tree)
+//             ast.fix_missing_locations(new_tree)
+//             return ast.unparse(new_tree) if hasattr(ast, 'unparse') else code
+//         except:
+//             return code
+
+//     def execute(self, code):
+//         sys.stdout = StringIO()
+//         result = {"output": "", "success": True}
+
+//         try:
+//             transformed_code = self.transform_code(code)
+//             self.start_time = time.time()
+
+//             exec_globals = {
+//                 "__builtins__": builtins,
+//                 "_check_execution_time": self._check_execution_time,
+//             }
+
+//             try:
+//                 exec(transformed_code, exec_globals)
+//             except LoopIterationError as e:
+//                 result["output"] = str(e)
+//                 result["success"] = False
+//             except Exception as e:
+//                 result["output"] = str(e)
+//                 result["success"] = False
+
+//             result["output"] += sys.stdout.getvalue()
+//         except Exception as e:
+//             result["success"] = False
+//             result["output"] = str(e)
+
+//         return result
+
+//     def _check_execution_time(self):
+//         if time.time() - self.start_time > self.max_execution_time:
+//             raise LoopIterationError("⏳ Loop execution time exceeded the limit!")
+
+// class LoopTransformer(ast.NodeTransformer):
+//     def visit_For(self, node):
+//         self.generic_visit(node)
+//         guard_call = ast.Expr(
+//             value=ast.Call(
+//                 func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
+//                 args=[],
+//                 keywords=[]
+//             )
+//         )
+//         node.body.insert(0, guard_call)
+//         return node
+
+//     def visit_While(self, node):
+//         self.generic_visit(node)
+//         guard_call = ast.Expr(
+//             value=ast.Call(
+//                 func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
+//                 args=[],
+//                 keywords=[]
+//             )
+//         )
+//         node.body.insert(0, guard_call)
+//         return node
+
+// _safe_executor = SafeExecutor(max_execution_time=5)  # Set max execution time to 5 seconds
+
+// def safe_execute(code):
+//     return _safe_executor.execute(code)
+//   `);
+// }
+
+// async function runCode() {
+//   if (!pyodide) {
+//     showOutput("❌ Python hali yuklanmagan. Iltimos, kuting...", "error");
+//     return;
+//   }
+
+//   const code = editor.getValue();
+
+//   if (!code.trim()) {
+//     showOutput("⚠️ Kod kiritilmagan!", "error");
+//     return;
+//   }
+
+//   showOutput("⏳ Bajarilmoqda...", "");
+
+//   try {
+//     const startTime = performance.now();
+
+//     const result = await pyodide.runPythonAsync(`
+// import json
+// result = safe_execute(${JSON.stringify(code)})
+// json.dumps(result)
+//     `);
 async function setupSafeExecutionEnvironment() {
-  const pyodideVersion = pyodide.version;
-  if (!pyodideVersion || parseFloat(pyodideVersion) < 0.23) {
-    console.warn(
-      "Pyodide versiyasi eski. Ba'zi funksiyalar ishlamasligi mumkin."
-    );
-  }
-
-  await pyodide.runPythonAsync(`
-import sys
-import ast
-import builtins
-from io import StringIO
-import time
-
-class LoopIterationError(Exception):
-    pass
-
-class SafeExecutor:
-    def __init__(self, max_execution_time=5):
-        self.max_execution_time = max_execution_time  # Maximum execution time in seconds
-        self.start_time = None
-
-    def transform_code(self, code):
-        try:
-            tree = ast.parse(code)
-            transformer = LoopTransformer()
-            new_tree = transformer.visit(tree)
-            ast.fix_missing_locations(new_tree)
-            return ast.unparse(new_tree) if hasattr(ast, 'unparse') else code
-        except:
-            return code
-
-    def execute(self, code):
-        sys.stdout = StringIO()
-        result = {"output": "", "success": True}
-
-        try:
-            transformed_code = self.transform_code(code)
-            self.start_time = time.time()
-
-            exec_globals = {
-                "__builtins__": builtins,
-                "_check_execution_time": self._check_execution_time,
-            }
-
-            try:
-                exec(transformed_code, exec_globals)
-            except LoopIterationError as e:
-                result["output"] = str(e)
-                result["success"] = False
-            except Exception as e:
-                result["output"] = str(e)
-                result["success"] = False
-
-            result["output"] += sys.stdout.getvalue()
-        except Exception as e:
-            result["success"] = False
-            result["output"] = str(e)
-
-        return result
-
-    def _check_execution_time(self):
-        if time.time() - self.start_time > self.max_execution_time:
-            raise LoopIterationError("⏳ Loop execution time exceeded the limit!")
-
-class LoopTransformer(ast.NodeTransformer):
-    def visit_For(self, node):
-        self.generic_visit(node)
-        guard_call = ast.Expr(
-            value=ast.Call(
-                func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
-                args=[],
-                keywords=[]
-            )
-        )
-        node.body.insert(0, guard_call)
-        return node
-
-    def visit_While(self, node):
-        self.generic_visit(node)
-        guard_call = ast.Expr(
-            value=ast.Call(
-                func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
-                args=[],
-                keywords=[]
-            )
-        )
-        node.body.insert(0, guard_call)
-        return node
-
-_safe_executor = SafeExecutor(max_execution_time=5)  # Set max execution time to 5 seconds
-
-def safe_execute(code):
-    return _safe_executor.execute(code)
-  `);
-}
-
-async function runCode() {
-  if (!pyodide) {
-    showOutput("❌ Python hali yuklanmagan. Iltimos, kuting...", "error");
-    return;
-  }
-
-  const code = editor.getValue();
-
-  if (!code.trim()) {
-    showOutput("⚠️ Kod kiritilmagan!", "error");
-    return;
-  }
-
-  showOutput("⏳ Bajarilmoqda...", "");
-
-  try {
-    const startTime = performance.now();
-
-    const result = await pyodide.runPythonAsync(`
-import json
-result = safe_execute(${JSON.stringify(code)})
-json.dumps(result)
+    const pyodideVersion = pyodide.version;
+    if (!pyodideVersion || parseFloat(pyodideVersion) < 0.23) {
+      console.warn(
+        "Pyodide versiyasi eski. Ba'zi funksiyalar ishlamasligi mumkin."
+      );
+    }
+  
+    await pyodide.runPythonAsync(`
+  import sys
+  import ast
+  import builtins
+  from io import StringIO
+  import time
+  
+  class LoopIterationError(Exception):
+      pass
+  
+  class SafeExecutor:
+      def __init__(self, max_execution_time=5):
+          self.max_execution_time = max_execution_time
+          self.start_time = None
+  
+      def transform_code(self, code):
+          try:
+              tree = ast.parse(code)
+              transformer = LoopTransformer()
+              new_tree = transformer.visit(tree)
+              ast.fix_missing_locations(new_tree)
+              return ast.unparse(new_tree) if hasattr(ast, 'unparse') else code
+          except:
+              return code
+  
+      def execute(self, code):
+          sys.stdout = StringIO()
+          result = {"output": "", "success": True}
+  
+          try:
+              transformed_code = self.transform_code(code)
+              self.start_time = time.time()
+  
+              exec_globals = {
+                  "__builtins__": builtins,
+                  "_check_execution_time": self._check_execution_time,
+              }
+  
+              try:
+                  exec(transformed_code, exec_globals)
+              except LoopIterationError as e:
+                  result["output"] = str(e)
+                  result["success"] = False
+              except Exception as e:
+                  result["output"] = str(e)
+                  result["success"] = False
+  
+              result["output"] += sys.stdout.getvalue()
+          except Exception as e:
+              result["success"] = False
+              result["output"] = str(e)
+  
+          return result
+  
+      def _check_execution_time(self):
+          if time.time() - self.start_time > self.max_execution_time:
+              raise LoopIterationError("⏳ Kod juda uzoq vaqt ishladi (5 soniyadan oshdi) va to'xtatildi.")
+  
+  class LoopTransformer(ast.NodeTransformer):
+      def visit_For(self, node):
+          self.generic_visit(node)
+          # For tsikllari uchun faqat vaqt chegarasini qo'yamiz.
+          # Agar foydalanuvchi range(1000000) yozsa, u ishlashi kerak.
+          guard_call = ast.Expr(
+              value=ast.Call(
+                  func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
+                  args=[],
+                  keywords=[]
+              )
+          )
+          node.body.insert(0, guard_call)
+          return node
+  
+      def visit_While(self, node):
+          self.generic_visit(node)
+          
+          # Vaqtni tekshirish funksiyasi (qotib qolishdan himoya)
+          guard_call = ast.Expr(
+              value=ast.Call(
+                  func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
+                  args=[],
+                  keywords=[]
+              )
+          )
+  
+          # 'while True' yoki 'while 1' ekanligini tekshirish
+          is_infinite_loop = False
+          try:
+              # Python 3.8+ uchun Constant, eskilar uchun NameConstant/Num
+              if isinstance(node.test, ast.Constant) and (node.test.value is True or node.test.value == 1):
+                  is_infinite_loop = True
+              elif isinstance(node.test, ast.NameConstant) and node.test.value is True:
+                  is_infinite_loop = True
+              elif isinstance(node.test, ast.Num) and node.test.n == 1:
+                  is_infinite_loop = True
+          except:
+              pass
+  
+          if is_infinite_loop:
+              # Agar cheksiz tsikl bo'lsa, maxsus hisoblagich (counter) qo'shamiz
+              counter_name = f"_safety_counter_{node.lineno}_{node.col_offset}"
+              
+              # 1. Tsikldan oldin counterni 0 ga tenglash: _safety_counter = 0
+              init_node = ast.Assign(
+                  targets=[ast.Name(id=counter_name, ctx=ast.Store())],
+                  value=ast.Constant(value=0)
+              )
+  
+              # 2. Tsikl ichiga tekshiruv kodini qo'shish
+              check_code_str = f"""
+  {counter_name} += 1
+  if {counter_name} > 10000:
+      print(f"\\n🛑 Dastur to'xtatildi: Cheksiz 'while' tsikli aniqlandi.\\nℹ️ Sabab: To'xtash sharti berilmaganligi uchun 10,000 martadan so'ng avtomatik to'xtatildi.")
+      break
+  """
+              check_nodes = ast.parse(check_code_str).body
+              
+              # Kodlarni tsikl boshiga qo'shish (Vaqt tekshiruvi + 10k limit tekshiruvi)
+              node.body = check_nodes + node.body
+              node.body.insert(0, guard_call)
+              
+              # AST da bitta tugun o'rniga [init, while] qaytarish mumkin
+              return [init_node, node]
+          else:
+              # Agar oddiy shartli while bo'lsa (masalan: while i < 100000), 
+              # unga tegmaymiz, faqat vaqt chegarasi (time limit) qo'yamiz.
+              node.body.insert(0, guard_call)
+              return node
+  
+  _safe_executor = SafeExecutor(max_execution_time=5)
+  
+  def safe_execute(code):
+      return _safe_executor.execute(code)
     `);
+  }
 
     const endTime = performance.now();
     const executionTime = ((endTime - startTime) / 1000).toFixed(3);
