@@ -601,7 +601,6 @@ body.dark-mode .output-content.success {
 body.dark-mode .output-content.error {
   color: #f87171;
 }
-/* FIND & REPLACE DIALOG */
 .find-replace-dialog {
   position: fixed;
   top: 50%;
@@ -675,7 +674,6 @@ body.dark-mode .output-content.error {
   background: #da190b;
 }
 
-/* CODE FOLDING */
 .CodeMirror-foldmarker {
   color: #4caf50;
   text-shadow: 0 0 2px #4caf50;
@@ -707,12 +705,10 @@ body.dark-mode .output-content.error {
   content: "▶";
 }
 
-/* BREAKPOINTS GUTTER */
 .breakpoints {
   width: 20px;
 }
 
-/* ACTIVE LINE HIGHLIGHT */
 .CodeMirror-activeline-background {
   background: rgba(76, 175, 80, 0.1);
 }
@@ -721,7 +717,6 @@ body.dark-mode .output-content.error {
   background: rgba(76, 175, 80, 0.15);
 }
 
-/* BRACKET MATCHING */
 .CodeMirror-matchingbracket {
   background: rgba(76, 175, 80, 0.3);
   color: inherit !important;
@@ -733,7 +728,6 @@ body.dark-mode .output-content.error {
   color: inherit !important;
 }
 
-/* SELECTION STYLING */
 .CodeMirror-selected {
   background: rgba(76, 175, 80, 0.2) !important;
 }
@@ -742,7 +736,6 @@ body.dark-mode .output-content.error {
   background: rgba(76, 175, 80, 0.25) !important;
 }
 
-/* MULTIPLE CURSORS */
 .CodeMirror-cursor {
   border-left: 2px solid #4caf50;
 }
@@ -751,7 +744,6 @@ body.dark-mode .output-content.error {
   border-left-color: #66bb6a;
 }
 
-/* SEARCH HIGHLIGHT */
 .cm-searching {
   background-color: rgba(255, 235, 59, 0.5);
 }
@@ -760,7 +752,7 @@ body.dark-mode .output-content.error {
   background-color: rgba(255, 235, 59, 0.3);
 }
 
-/* LINE NUMBERS STYLING */
+
 .CodeMirror-linenumber {
   color: #999;
   padding: 0 5px;
@@ -772,7 +764,7 @@ body.dark-mode .output-content.error {
   color: #666;
 }
 
-/* GUTTER BACKGROUND */
+
 .CodeMirror-gutters {
   background-color: #f5f5f5;
   border-right: 1px solid #ddd;
@@ -783,14 +775,12 @@ body.dark-mode .output-content.error {
   border-right-color: #444;
 }
 
-/* SNIPPET PLACEHOLDER HIGHLIGHT */
 .cm-snippet-placeholder {
   background: rgba(76, 175, 80, 0.2);
   border: 1px dashed #4caf50;
   padding: 0 2px;
 }
 
-/* TOOLTIP STYLING */
 .CodeMirror-hint {
   padding: 4px 8px;
   border-radius: 3px;
@@ -803,7 +793,6 @@ body.dark-mode .output-content.error {
   color: white;
 }
 
-/* ERROR LINE HIGHLIGHT */
 .error-line {
   background: rgba(244, 67, 54, 0.1);
   border-left: 3px solid #f44336;
@@ -813,14 +802,12 @@ body.dark-mode .output-content.error {
   background: rgba(244, 67, 54, 0.15);
 }
 
-/* INDENT GUIDES */
 .cm-tab {
   background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQImWNgYGBgAAAABQABh6FO1AAAAABJRU5ErkJggg==)
     repeat-x 0 50%;
   opacity: 0.3;
 }
 
-/* ANIMATION FOR NOTIFICATIONS */
 @keyframes slideIn {
   from {
     opacity: 0;
@@ -837,7 +824,6 @@ body.dark-mode .output-content.error {
   animation: slideIn 0.3s ease-out;
 }
 
-/* SCROLLBAR STYLING */
 .CodeMirror-vscrollbar,
 .CodeMirror-hscrollbar {
   background: transparent;
@@ -870,7 +856,6 @@ body.dark-mode .output-content.error {
   background: #555;
 }
 
-/* RESPONSIVE FIND DIALOG */
 @media (max-width: 768px) {
   .find-replace-dialog {
     min-width: 90%;
