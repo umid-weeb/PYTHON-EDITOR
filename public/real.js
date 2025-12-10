@@ -463,7 +463,9 @@ function setupAutoClose() {
         '[': ']',
         '{': '}',
         '"': '"',
-        "'": "'"
+        "'": "'",
+        "`": "`"
+    
     };
 
     editor.on('keydown', function (cm, event) {
