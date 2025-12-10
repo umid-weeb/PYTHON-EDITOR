@@ -712,19 +712,20 @@ import sys
 import ast
 import builtins
 from io import StringIO
+import time
 
 class LoopIterationError(Exception):
     pass
 
 class SafeExecutor:
-    def __init__(self, max_iterations=10000):
-        self.max_iterations = max_iterations
-        self.loop_counters = {}
+    def __init__(self, max_execution_time=5):
+        self.max_execution_time = max_execution_time  # Maximum execution time in seconds
+        self.start_time = None
 
     def transform_code(self, code):
         try:
             tree = ast.parse(code)
-            transformer = LoopTransformer(self.max_iterations)
+            transformer = LoopTransformer()
             new_tree = transformer.visit(tree)
             ast.fix_missing_locations(new_tree)
             return ast.unparse(new_tree) if hasattr(ast, 'unparse') else code
@@ -737,86 +738,59 @@ class SafeExecutor:
 
         try:
             transformed_code = self.transform_code(code)
+            self.start_time = time.time()
 
             exec_globals = {
                 "__builtins__": builtins,
-                "_loop_guard": self._loop_guard,
-                "_loop_counters": {}
+                "_check_execution_time": self._check_execution_time,
             }
 
             try:
                 exec(transformed_code, exec_globals)
-            except LoopIterationError:
-                pass
-            except ImportError:
-                pass
-            except ModuleNotFoundError:
-                pass
-            except Exception:
-                pass
+            except LoopIterationError as e:
+                result["output"] = str(e)
+                result["success"] = False
+            except Exception as e:
+                result["output"] = str(e)
+                result["success"] = False
 
-            result["output"] = sys.stdout.getvalue()
-            result["success"] = True
-
-        except Exception:
+            result["output"] += sys.stdout.getvalue()
+        except Exception as e:
             result["success"] = False
-            result["output"] = ""
+            result["output"] = str(e)
 
         return result
 
-    def _loop_guard(self, loop_id, counters, max_iter):
-        if loop_id not in counters:
-            counters[loop_id] = 0
-        counters[loop_id] += 1
-        if counters[loop_id] > max_iter:
-            raise LoopIterationError(f"Loop exceeded {max_iter} iterations")
+    def _check_execution_time(self):
+        if time.time() - self.start_time > self.max_execution_time:
+            raise LoopIterationError("⏳ Loop execution time exceeded the limit!")
 
 class LoopTransformer(ast.NodeTransformer):
-    def __init__(self, max_iterations):
-        self.max_iterations = max_iterations
-        self.loop_counter = 0
-
     def visit_For(self, node):
         self.generic_visit(node)
-        loop_id = self.loop_counter
-        self.loop_counter += 1
-
         guard_call = ast.Expr(
             value=ast.Call(
-                func=ast.Name(id='_loop_guard', ctx=ast.Load()),
-                args=[
-                    ast.Constant(value=loop_id),
-                    ast.Name(id='_loop_counters', ctx=ast.Load()),
-                    ast.Constant(value=self.max_iterations)
-                ],
+                func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
+                args=[],
                 keywords=[]
             )
         )
-
         node.body.insert(0, guard_call)
         return node
 
     def visit_While(self, node):
         self.generic_visit(node)
-        loop_id = self.loop_counter
-        self.loop_counter += 1
-
         guard_call = ast.Expr(
             value=ast.Call(
-                func=ast.Name(id='_loop_guard', ctx=ast.Load()),
-                args=[
-                    ast.Constant(value=loop_id),
-                    ast.Name(id='_loop_counters', ctx=ast.Load()),
-                    ast.Constant(value=self.max_iterations)
-                ],
+                func=ast.Name(id='_check_execution_time', ctx=ast.Load()),
+                args=[],
                 keywords=[]
             )
         )
-
         node.body.insert(0, guard_call)
         return node
 
-_safe_executor = SafeExecutor()
+_safe_executor = SafeExecutor(max_execution_time=5)  # Set max execution time to 5 seconds
 
 def safe_execute(code):
     return _safe_executor.execute(code)
