@@ -700,6 +700,13 @@ async function initPyodide() {
 }
 
 async function setupSafeExecutionEnvironment() {
+  const pyodideVersion = pyodide.version;
+  if (!pyodideVersion || parseFloat(pyodideVersion) < 0.23) {
+    console.warn(
+      "Pyodide versiyasi eski. Ba'zi funksiyalar ishlamasligi mumkin."
+    );
+  }
+
   await pyodide.runPythonAsync(`
 import sys
 import ast
@@ -720,7 +727,7 @@ class SafeExecutor:
             transformer = LoopTransformer(self.max_iterations)
             new_tree = transformer.visit(tree)
             ast.fix_missing_locations(new_tree)
-            return ast.unparse(new_tree)
+            return ast.unparse(new_tree) if hasattr(ast, 'unparse') else code
         except:
             return code
 
@@ -809,11 +816,11 @@ class LoopTransformer(ast.NodeTransformer):
         node.body.insert(0, guard_call)
         return node
 
-_safe_executor = SafeExecutor(max_iterations=10000)
+_safe_executor = SafeExecutor()
 
 def safe_execute(code):
     return _safe_executor.execute(code)
-    `);
+  `);
 }
 
 async function runCode() {
@@ -834,11 +841,11 @@ async function runCode() {
   try {
     const startTime = performance.now();
 
-    const result = pyodide.runPython(`
+    const result = await pyodide.runPythonAsync(`
 import json
 result = safe_execute(${JSON.stringify(code)})
 json.dumps(result)
-        `);
+    `);
 
     const endTime = performance.now();
     const executionTime = ((endTime - startTime) / 1000).toFixed(3);
@@ -859,12 +866,12 @@ json.dumps(result)
       }
     } else {
       showOutput(
-        `✅ Kod muvaffaqiyatli bajarildi\n\n⏱ Bajarilish vaqti: ${executionTime} soniya`,
-        "success"
+        `❌ Kod bajarishda xatolik yuz berdi\n⏱ Bajarilish vaqti: ${executionTime} soniya`,
+        "error"
       );
     }
   } catch (error) {
-    showOutput(`✅ Kod muvaffaqiyatli bajarildi`, "success");
+    showOutput(`❌ Xatolik:\n${error.message}`, "error");
   }
 }
 
