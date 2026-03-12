@@ -2,6 +2,483 @@ let pyodide;
 let editor;
 let autoSaveInterval;
 let defaultCode = "";
+let activeErrorLineNumber = null;
+let activeErrorTextMarker = null;
+
+const PYTHON_KEYWORDS = [
+  "False",
+  "None",
+  "True",
+  "and",
+  "as",
+  "assert",
+  "async",
+  "await",
+  "break",
+  "class",
+  "continue",
+  "def",
+  "del",
+  "elif",
+  "else",
+  "except",
+  "finally",
+  "for",
+  "from",
+  "global",
+  "if",
+  "import",
+  "in",
+  "is",
+  "lambda",
+  "nonlocal",
+  "not",
+  "or",
+  "pass",
+  "raise",
+  "return",
+  "try",
+  "while",
+  "with",
+  "yield",
+  "print",
+  "input",
+  "len",
+  "range",
+  "str",
+  "int",
+  "float",
+  "list",
+  "dict",
+  "set",
+  "tuple",
+  "bool",
+  "type",
+  "open",
+  "file",
+  "round",
+  "abs",
+  "all",
+  "any",
+  "sum",
+  "min",
+  "max",
+  "sorted",
+  "reversed",
+  "enumerate",
+  "zip",
+  "map",
+  "filter",
+  "help",
+];
+
+const MATH_FUNCTIONS = [
+  "math.sqrt",
+  "math.pow",
+  "math.floor",
+  "math.ceil",
+  "math.round",
+  "math.sin",
+  "math.cos",
+  "math.tan",
+  "math.asin",
+  "math.acos",
+  "math.atan",
+  "math.log",
+  "math.log10",
+  "math.exp",
+  "math.pi",
+  "math.e",
+  "math.degrees",
+  "math.radians",
+  "math.factorial",
+];
+
+const COMMON_PYTHON_NAMES = [...new Set([...PYTHON_KEYWORDS, "math"])];
+
+function extractUserDefinedNames(code) {
+  const names = new Set();
+  const funcRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  const classRegex = /class\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  const varRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*=/g;
+  const loopVarRegex = /for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in/g;
+  const importRegex =
+    /^\s*import\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s+as\s+([a-zA-Z_][a-zA-Z0-9_]*))?/gm;
+  const fromImportRegex =
+    /^\s*from\s+[a-zA-Z_][a-zA-Z0-9_.]*\s+import\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s+as\s+([a-zA-Z_][a-zA-Z0-9_]*))?/gm;
+  const paramRegex = /def\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(([^)]*)\)/g;
+  let match;
+
+  while ((match = funcRegex.exec(code)) !== null) {
+    names.add(match[1]);
+  }
+
+  while ((match = classRegex.exec(code)) !== null) {
+    names.add(match[1]);
+  }
+
+  while ((match = varRegex.exec(code)) !== null) {
+    names.add(match[1]);
+  }
+
+  while ((match = loopVarRegex.exec(code)) !== null) {
+    names.add(match[1]);
+  }
+
+  while ((match = importRegex.exec(code)) !== null) {
+    names.add(match[2] || match[1]);
+  }
+
+  while ((match = fromImportRegex.exec(code)) !== null) {
+    names.add(match[2] || match[1]);
+  }
+
+  while ((match = paramRegex.exec(code)) !== null) {
+    const params = match[1]
+      .split(",")
+      .map((param) => param.trim())
+      .map((param) => param.replace(/[:=].*$/, "").replace(/^\*+/, "").trim())
+      .filter(Boolean);
+
+    params.forEach((param) => names.add(param));
+  }
+
+  return Array.from(names);
+}
+
+function levenshteinDistance(left, right) {
+  const rows = left.length + 1;
+  const cols = right.length + 1;
+  const matrix = Array.from({ length: rows }, () => Array(cols).fill(0));
+
+  for (let row = 0; row < rows; row++) {
+    matrix[row][0] = row;
+  }
+
+  for (let col = 0; col < cols; col++) {
+    matrix[0][col] = col;
+  }
+
+  for (let row = 1; row < rows; row++) {
+    for (let col = 1; col < cols; col++) {
+      const cost = left[row - 1] === right[col - 1] ? 0 : 1;
+      matrix[row][col] = Math.min(
+        matrix[row - 1][col] + 1,
+        matrix[row][col - 1] + 1,
+        matrix[row - 1][col - 1] + cost
+      );
+    }
+  }
+
+  return matrix[left.length][right.length];
+}
+
+function findClosestNameSuggestion(targetName, code) {
+  if (!targetName) {
+    return null;
+  }
+
+  const candidates = [
+    ...new Set([...extractUserDefinedNames(code), ...COMMON_PYTHON_NAMES]),
+  ].filter((candidate) => candidate && candidate !== targetName);
+
+  const loweredTarget = targetName.toLowerCase();
+  let bestCandidate = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of candidates) {
+    const distance = levenshteinDistance(
+      loweredTarget,
+      candidate.toLowerCase()
+    );
+    const maxLength = Math.max(candidate.length, targetName.length);
+    const threshold = Math.max(1, Math.ceil(maxLength / 3));
+
+    if (distance > threshold) {
+      continue;
+    }
+
+    if (
+      distance < bestDistance ||
+      bestCandidate === null ||
+      (distance === bestDistance && candidate.length < bestCandidate.length)
+    ) {
+      bestCandidate = candidate;
+      bestDistance = distance;
+    }
+  }
+
+  return bestCandidate;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizePositiveInteger(value) {
+  const parsedValue = Number.parseInt(value, 10);
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null;
+}
+
+function extractUndefinedName(errorInfo) {
+  if (!errorInfo) {
+    return null;
+  }
+
+  if (errorInfo.undefinedName) {
+    return errorInfo.undefinedName;
+  }
+
+  const match = (errorInfo.message || "").match(/name '([^']+)' is not defined/i);
+  return match ? match[1] : null;
+}
+
+function extractSuggestionFromMessage(message) {
+  const match = (message || "").match(/Did you mean:\s*['"]([^'"]+)['"]/i);
+  return match ? match[1] : null;
+}
+
+function stripInlineSuggestion(message) {
+  return (message || "")
+    .replace(/\s*Did you mean:\s*['"][^'"]+['"]\??/i, "")
+    .trim();
+}
+
+function findColumnForName(lineText, targetName) {
+  if (!lineText || !targetName) {
+    return null;
+  }
+
+  const pattern = new RegExp(`\\b${escapeRegExp(targetName)}\\b`);
+  const match = pattern.exec(lineText);
+  return match ? match.index + 1 : null;
+}
+
+function buildSuggestedLine(lineText, originalName, suggestion) {
+  if (!lineText || !originalName || !suggestion) {
+    return null;
+  }
+
+  const pattern = new RegExp(`\\b${escapeRegExp(originalName)}\\b`);
+  return pattern.test(lineText) ? lineText.replace(pattern, suggestion) : null;
+}
+
+function buildCodeFrame(lineText, lineNumber, columnNumber) {
+  if (!lineText) {
+    return "";
+  }
+
+  const safeLineNumber = lineNumber || "?";
+  const prefix = `${safeLineNumber} | `;
+  const frameLine = `${prefix}${lineText}`;
+
+  if (!columnNumber) {
+    return frameLine;
+  }
+
+  const safeColumn = Math.max(1, Math.min(columnNumber, lineText.length + 1));
+  return `${frameLine}\n${" ".repeat(prefix.length + safeColumn - 1)}^`;
+}
+
+function getFriendlyErrorMessage(errorInfo, undefinedName) {
+  const errorType = errorInfo?.type || "PythonError";
+
+  switch (errorType) {
+    case "NameError":
+      return undefinedName
+        ? `"${undefinedName}" nomi topilmadi.`
+        : "Aniqlanmagan nom ishlatildi.";
+    case "SyntaxError":
+      return "Kod sintaksisida xatolik bor.";
+    case "IndentationError":
+      return "Indentatsiya noto'g'ri. Bo'sh joy va tablarni tekshiring.";
+    case "TypeError":
+      return "Mos kelmaydigan qiymat turi ishlatildi.";
+    case "ZeroDivisionError":
+      return "0 ga bo'lish mumkin emas.";
+    case "LoopIterationError":
+      return "Kod juda uzoq ishladi. Cheksiz sikl bo'lishi mumkin.";
+    default:
+      return errorInfo?.message || "Kod bajarishda xatolik yuz berdi.";
+  }
+}
+
+function getWordRangeAtColumn(lineText, columnIndex) {
+  if (!lineText) {
+    return null;
+  }
+
+  const isWordCharacter = (char) => /[a-zA-Z0-9_]/.test(char || "");
+  const safeIndex = Math.max(
+    0,
+    Math.min(columnIndex, Math.max(0, lineText.length - 1))
+  );
+  let start = safeIndex;
+  let end = safeIndex;
+
+  if (
+    !isWordCharacter(lineText[start]) &&
+    start > 0 &&
+    isWordCharacter(lineText[start - 1])
+  ) {
+    start -= 1;
+    end -= 1;
+  }
+
+  if (!isWordCharacter(lineText[start])) {
+    return {
+      start: safeIndex,
+      end: Math.min(safeIndex + 1, lineText.length),
+    };
+  }
+
+  while (start > 0 && isWordCharacter(lineText[start - 1])) {
+    start -= 1;
+  }
+
+  while (end < lineText.length && isWordCharacter(lineText[end])) {
+    end += 1;
+  }
+
+  return { start, end };
+}
+
+function clearEditorDiagnostics() {
+  if (!editor) {
+    return;
+  }
+
+  if (activeErrorLineNumber !== null) {
+    editor.removeLineClass(activeErrorLineNumber, "background", "error-line");
+    activeErrorLineNumber = null;
+  }
+
+  if (activeErrorTextMarker) {
+    activeErrorTextMarker.clear();
+    activeErrorTextMarker = null;
+  }
+}
+
+function highlightEditorError(lineNumber, columnNumber, focusToken) {
+  clearEditorDiagnostics();
+
+  if (!editor) {
+    return;
+  }
+
+  const safeLineNumber = normalizePositiveInteger(lineNumber);
+  if (!safeLineNumber || safeLineNumber > editor.lineCount()) {
+    return;
+  }
+
+  const lineIndex = safeLineNumber - 1;
+  const lineText = editor.getLine(lineIndex) || "";
+  let start = null;
+  let end = null;
+
+  activeErrorLineNumber = lineIndex;
+  editor.addLineClass(lineIndex, "background", "error-line");
+
+  if (focusToken) {
+    const pattern = new RegExp(`\\b${escapeRegExp(focusToken)}\\b`);
+    const match = pattern.exec(lineText);
+    if (match) {
+      start = match.index;
+      end = match.index + match[0].length;
+    }
+  }
+
+  if (start === null) {
+    const safeColumn = normalizePositiveInteger(columnNumber);
+    if (safeColumn) {
+      const wordRange = getWordRangeAtColumn(lineText, safeColumn - 1);
+      if (wordRange) {
+        start = wordRange.start;
+        end = wordRange.end;
+      }
+    }
+  }
+
+  if (start !== null && end !== null && end > start) {
+    activeErrorTextMarker = editor.markText(
+      { line: lineIndex, ch: start },
+      { line: lineIndex, ch: end },
+      { className: "error-token" }
+    );
+  }
+
+  editor.setCursor({ line: lineIndex, ch: start !== null ? start : 0 });
+  editor.scrollIntoView(
+    { line: lineIndex, ch: start !== null ? start : 0 },
+    120
+  );
+}
+
+function buildExecutionErrorReport(resultObj, code, executionTime) {
+  const errorInfo = resultObj.error || {};
+  const undefinedName = extractUndefinedName(errorInfo);
+  const suggestion =
+    extractSuggestionFromMessage(errorInfo.message) ||
+    findClosestNameSuggestion(undefinedName, code);
+  const friendlyMessage = getFriendlyErrorMessage(errorInfo, undefinedName);
+  const rawPythonMessage = stripInlineSuggestion(errorInfo.message);
+  const lineNumber = normalizePositiveInteger(errorInfo.line);
+  let columnNumber = normalizePositiveInteger(errorInfo.column);
+  const editorLine =
+    lineNumber && editor && lineNumber <= editor.lineCount()
+      ? editor.getLine(lineNumber - 1)
+      : "";
+  const codeLine = (editorLine || errorInfo.codeLine || "").replace(/\r?\n$/, "");
+
+  if (!columnNumber && undefinedName && codeLine) {
+    columnNumber = findColumnForName(codeLine, undefinedName);
+  }
+
+  const reportLines = [
+    `Xatolik turi: ${errorInfo.type || "PythonError"}`,
+    `Sabab: ${friendlyMessage}`,
+  ];
+
+  if (rawPythonMessage && rawPythonMessage !== friendlyMessage) {
+    reportLines.push(`Python xabari: ${rawPythonMessage}`);
+  }
+
+  if (lineNumber) {
+    reportLines.push(
+      `Joylashuv: ${lineNumber}-qator${columnNumber ? `, ${columnNumber}-ustun` : ""}`
+    );
+  }
+
+  if (codeLine) {
+    reportLines.push(
+      "",
+      "Muammo bo'lgan qator:",
+      buildCodeFrame(codeLine, lineNumber, columnNumber)
+    );
+  }
+
+  if (suggestion && suggestion !== undefinedName) {
+    reportLines.push("", `Did you mean: "${suggestion}"?`);
+
+    const suggestedLine = buildSuggestedLine(codeLine, undefinedName, suggestion);
+    if (suggestedLine && suggestedLine !== codeLine) {
+      reportLines.push("Tavsiya etilgan variant:", suggestedLine);
+    }
+  }
+
+  if (resultObj.output && resultObj.output.trim()) {
+    reportLines.push("", "Xatolikdan oldingi chiqish:", resultObj.output.trim());
+  }
+
+  reportLines.push("", `Bajarilish vaqti: ${executionTime} soniya`);
+
+  return {
+    text: reportLines.join("\n"),
+    lineNumber,
+    columnNumber,
+    focusToken: undefinedName || suggestion || null,
+  };
+}
 
 window.addEventListener("DOMContentLoaded", function () {
   const textarea = document.getElementById("code-editor");
@@ -441,118 +918,6 @@ function setupAutoClose() {
 }
 
 function setupAutocomplete() {
-  const pythonKeywords = [
-    "False",
-    "None",
-    "True",
-    "and",
-    "as",
-    "assert",
-    "async",
-    "await",
-    "break",
-    "class",
-    "continue",
-    "def",
-    "del",
-    "elif",
-    "else",
-    "except",
-    "finally",
-    "for",
-    "from",
-    "global",
-    "if",
-    "import",
-    "in",
-    "is",
-    "lambda",
-    "nonlocal",
-    "not",
-    "or",
-    "pass",
-    "raise",
-    "return",
-    "try",
-    "while",
-    "with",
-    "yield",
-    "print",
-    "input",
-    "len",
-    "range",
-    "str",
-    "int",
-    "float",
-    "list",
-    "dict",
-    "set",
-    "tuple",
-    "bool",
-    "type",
-    "open",
-    "file",
-    "round",
-    "abs",
-    "all",
-    "any",
-    "sum",
-    "min",
-    "max",
-    "sorted",
-    "reversed",
-    "enumerate",
-    "zip",
-    "map",
-    "filter",
-    "help",
-  ];
-
-  const mathFunctions = [
-    "math.sqrt",
-    "math.pow",
-    "math.floor",
-    "math.ceil",
-    "math.round",
-    "math.sin",
-    "math.cos",
-    "math.tan",
-    "math.asin",
-    "math.acos",
-    "math.atan",
-    "math.log",
-    "math.log10",
-    "math.exp",
-    "math.pi",
-    "math.e",
-    "math.degrees",
-    "math.radians",
-    "math.factorial",
-  ];
-
-  function getUserDefinedNames(editor) {
-    const code = editor.getValue();
-    const names = new Set();
-
-    const funcRegex = /def\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
-    let match;
-    while ((match = funcRegex.exec(code)) !== null) {
-      names.add(match[1]);
-    }
-
-    const classRegex = /class\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
-    while ((match = classRegex.exec(code)) !== null) {
-      names.add(match[1]);
-    }
-
-    const varRegex = /([a-zA-Z_][a-zA-Z0-9_]*)\s*=/g;
-    while ((match = varRegex.exec(code)) !== null) {
-      names.add(match[1]);
-    }
-
-    return Array.from(names);
-  }
-
   CodeMirror.registerHelper("hint", "pythonComplete", function (editor) {
     const cursor = editor.getCursor();
     const token = editor.getTokenAt(cursor);
@@ -563,16 +928,16 @@ function setupAutocomplete() {
 
     let list = [];
 
-    const userNames = getUserDefinedNames(editor);
+    const userNames = extractUserDefinedNames(editor.getValue());
 
     if (line.slice(Math.max(0, end - 5), end) === "math.") {
-      list = mathFunctions.map((f) => f.replace("math.", ""));
+      list = MATH_FUNCTIONS.map((f) => f.replace("math.", ""));
     } else if (currentWord) {
       const userMatches = userNames.filter((word) =>
         word.toLowerCase().startsWith(currentWord.toLowerCase())
       );
 
-      const keywordMatches = pythonKeywords.filter((word) =>
+      const keywordMatches = PYTHON_KEYWORDS.filter((word) =>
         word.toLowerCase().startsWith(currentWord.toLowerCase())
       );
 
@@ -582,7 +947,7 @@ function setupAutocomplete() {
 
       list = [...userMatches, ...keywordMatches, ...mathMatch];
     } else {
-      list = [...userNames, ...pythonKeywords.slice(0, 15)];
+      list = [...userNames, ...PYTHON_KEYWORDS.slice(0, 15)];
     }
 
     list = [...new Set(list)];
@@ -711,6 +1076,7 @@ async function setupSafeExecutionEnvironment() {
 import sys
 import ast
 import builtins
+import traceback
 from io import StringIO
 import time
 
@@ -722,48 +1088,81 @@ class SafeExecutor:
         self.max_execution_time = max_execution_time  # Maximum execution time in seconds
         self.start_time = None
 
-    def transform_code(self, code):
-        try:
-            tree = ast.parse(code)
-            transformer = LoopTransformer()
-            new_tree = transformer.visit(tree)
-            ast.fix_missing_locations(new_tree)
-            return ast.unparse(new_tree) if hasattr(ast, 'unparse') else code
-        except:
-            return code
+    def compile_code(self, code):
+        tree = ast.parse(code, filename="<user_code>", mode="exec")
+        transformer = LoopTransformer()
+        new_tree = transformer.visit(tree)
+        ast.fix_missing_locations(new_tree)
+        return compile(new_tree, filename="<user_code>", mode="exec")
+
+    def _serialize_error(self, error):
+        traceback_summary = traceback.extract_tb(error.__traceback__)
+        user_frame = None
+
+        for frame in reversed(traceback_summary):
+            if frame.filename == "<user_code>":
+                user_frame = frame
+                break
+
+        line_number = getattr(error, "lineno", None)
+        column_number = getattr(error, "offset", None)
+        code_line = getattr(error, "text", None)
+
+        if user_frame is not None:
+            if line_number is None:
+                line_number = user_frame.lineno
+            if not code_line:
+                code_line = user_frame.line
+
+        return {
+            "type": error.__class__.__name__,
+            "message": str(error),
+            "line": line_number,
+            "column": column_number,
+            "codeLine": code_line.strip("\\n") if isinstance(code_line, str) else code_line,
+            "undefinedName": getattr(error, "name", None),
+            "traceback": "".join(traceback.format_exception(type(error), error, error.__traceback__)),
+        }
 
     def execute(self, code):
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
         sys.stdout = StringIO()
-        result = {"output": "", "success": True}
+        sys.stderr = StringIO()
+        result = {"output": "", "success": True, "error": None}
 
         try:
-            transformed_code = self.transform_code(code)
+            compiled_code = self.compile_code(code)
             self.start_time = time.time()
 
             exec_globals = {
                 "__builtins__": builtins,
+                "__name__": "__main__",
                 "_check_execution_time": self._check_execution_time,
             }
 
-            try:
-                exec(transformed_code, exec_globals)
-            except LoopIterationError as e:
-                result["output"] = str(e)
-                result["success"] = False
-            except Exception as e:
-                result["output"] = str(e)
-                result["success"] = False
-
-            result["output"] += sys.stdout.getvalue()
-        except Exception as e:
+            exec(compiled_code, exec_globals)
+        except BaseException as e:
             result["success"] = False
-            result["output"] = str(e)
+            result["error"] = self._serialize_error(e)
+        finally:
+            stdout_value = sys.stdout.getvalue().rstrip()
+            stderr_value = sys.stderr.getvalue().rstrip()
+            result["output"] = "\\n".join(
+                value for value in [stdout_value, stderr_value] if value
+            )
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
         return result
 
     def _check_execution_time(self):
         if time.time() - self.start_time > self.max_execution_time:
             raise LoopIterationError("⏳ Loop execution time exceeded the limit!")
+
+    def _check_execution_time(self):
+        if time.time() - self.start_time > self.max_execution_time:
+            raise LoopIterationError("Loop execution time exceeded the limit!")
 
 class LoopTransformer(ast.NodeTransformer):
     def visit_For(self, node):
@@ -775,6 +1174,7 @@ class LoopTransformer(ast.NodeTransformer):
                 keywords=[]
             )
         )
+        ast.copy_location(guard_call, node)
         node.body.insert(0, guard_call)
         return node
 
@@ -787,6 +1187,7 @@ class LoopTransformer(ast.NodeTransformer):
                 keywords=[]
             )
         )
+        ast.copy_location(guard_call, node)
         node.body.insert(0, guard_call)
         return node
 
@@ -813,6 +1214,7 @@ async function runCode() {
   showOutput("⏳ Bajarilmoqda...", "");
 
   try {
+    clearEditorDiagnostics();
     const startTime = performance.now();
 
     const result = await pyodide.runPythonAsync(`
@@ -826,7 +1228,19 @@ json.dumps(result)
 
     const resultObj = JSON.parse(result);
 
+    if (!resultObj.success) {
+      const errorReport = buildExecutionErrorReport(resultObj, code, executionTime);
+      highlightEditorError(
+        errorReport.lineNumber,
+        errorReport.columnNumber,
+        errorReport.focusToken
+      );
+      showOutput(errorReport.text, "error");
+      return;
+    }
+
     if (resultObj.success) {
+      clearEditorDiagnostics();
       if (resultObj.output && resultObj.output.trim()) {
         showOutput(
           `${resultObj.output}\n⏱ Bajarilish vaqti: ${executionTime} soniya`,
@@ -850,13 +1264,15 @@ json.dumps(result)
 }
 
 function clearOutput() {
+  clearEditorDiagnostics();
   showOutput('Natija tozalandi. Kodni yozing va "Run" tugmasini bosing.', "");
 }
 
 function showOutput(text, type) {
   const output = document.getElementById("output");
   output.textContent = text;
-  output.className = "output-content " + type;
+  output.className = type ? "output-content " + type : "output-content";
+  output.scrollTop = 0;
 }
 
 function saveCode() {
