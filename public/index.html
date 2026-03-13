@@ -137,33 +137,46 @@
                     <div class="editor-header-controls">
                         <label class="editor-control">
                             <span class="editor-control-label">Font</span>
-                            <select id="editor-font-family" class="editor-select">
-                                <option value="IBM Plex Mono">IBM Plex Mono</option>
-                                <option value="JetBrains Mono">JetBrains Mono</option>
-                                <option value="Fira Code">Fira Code</option>
-                                <option value="Victor Mono">Victor Mono</option>
-                                <option value="Inconsolata">Inconsolata</option>
-                                <option value="Azeret Mono">Azeret Mono</option>
-                                <option value="Source Code Pro">Source Code Pro</option>
-                                <option value="Roboto Mono">Roboto Mono</option>
-                                <option value="Space Mono">Space Mono</option>
-                                <option value="Ubuntu Mono">Ubuntu Mono</option>
-                                <option value="Courier Prime">Courier Prime</option>
-                                <option value="Anonymous Pro">Anonymous Pro</option>
-                            </select>
+                            <span class="editor-select-shell">
+                                <select id="editor-font-family" class="editor-select">
+                                    <option value="IBM Plex Mono">IBM Plex Mono</option>
+                                    <option value="JetBrains Mono">JetBrains Mono</option>
+                                    <option value="Fira Code">Fira Code</option>
+                                    <option value="Victor Mono">Victor Mono</option>
+                                    <option value="Inconsolata">Inconsolata</option>
+                                    <option value="Azeret Mono">Azeret Mono</option>
+                                    <option value="Source Code Pro">Source Code Pro</option>
+                                    <option value="Roboto Mono">Roboto Mono</option>
+                                    <option value="Space Mono">Space Mono</option>
+                                    <option value="Ubuntu Mono">Ubuntu Mono</option>
+                                    <option value="Courier Prime">Courier Prime</option>
+                                    <option value="Anonymous Pro">Anonymous Pro</option>
+                                </select>
+                            </span>
                         </label>
                         <label class="editor-control">
                             <span class="editor-control-label">Size</span>
-                            <select id="editor-font-size" class="editor-select">
-                                <option value="12px">12px</option>
-                                <option value="14px" selected>14px</option>
-                                <option value="16px">16px</option>
-                                <option value="18px">18px</option>
-                                <option value="20px">20px</option>
-                                <option value="22px">22px</option>
-                                <option value="24px">24px</option>
-                            </select>
+                            <span class="editor-select-shell">
+                                <select id="editor-font-size" class="editor-select">
+                                    <option value="12px">12px</option>
+                                    <option value="14px" selected>14px</option>
+                                    <option value="16px">16px</option>
+                                    <option value="18px">18px</option>
+                                    <option value="20px">20px</option>
+                                    <option value="22px">22px</option>
+                                    <option value="24px">24px</option>
+                                </select>
+                            </span>
                         </label>
+                        <div class="editor-control editor-control-range">
+                            <span class="editor-control-label">Debug range</span>
+                            <div class="debug-range-actions">
+                                <button type="button" class="debug-range-btn" id="debug-set-start">Start</button>
+                                <button type="button" class="debug-range-btn" id="debug-set-end">End</button>
+                                <button type="button" class="debug-range-btn debug-range-btn-reset" id="debug-clear-range">Reset</button>
+                            </div>
+                            <div class="debug-range-status" id="debug-range-status">All lines</div>
+                        </div>
                     </div>
                 </div>
                 <textarea id="code-editor">print("Salom, Python!")

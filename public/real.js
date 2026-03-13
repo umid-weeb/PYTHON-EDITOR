@@ -9,6 +9,10 @@ let activeDebugSession = null;
 let activeDebugLineNumber = null;
 let activeDebugSteps = [];
 let activeDebugStepIndex = 0;
+let debugRangeStartLine = null;
+let debugRangeEndLine = null;
+let debugRangeHighlightedStartLine = null;
+let debugRangeHighlightedEndLine = null;
 let pythonFormatterReady = false;
 
 const INDENT_SIZE = 4;
@@ -1940,7 +1944,8 @@ async function continueDebugSession(session) {
     const resultObj = await executeDebugSession(
       session.code,
       session.inputValues,
-      session.breakpoints
+      session.breakpoints,
+      session.rangeSelection
     );
     const executionTime = ((performance.now() - startTime) / 1000).toFixed(3);
 
@@ -1990,6 +1995,16 @@ async function continueDebugSession(session) {
         ? `Breakpointlar: ${session.breakpoints.join(", ")}`
         : "Breakpointlar: yo'q",
     ];
+
+    if (session.rangeSelection?.startLine && session.rangeSelection?.endLine) {
+      lines.push(
+        `Range: ${session.rangeSelection.startLine}-qatordan ${session.rangeSelection.endLine}-qatorgacha`
+      );
+    } else if (session.rangeSelection?.startLine) {
+      lines.push(`Range: ${session.rangeSelection.startLine}-qatordan oxirigacha`);
+    } else if (session.rangeSelection?.endLine) {
+      lines.push(`Range: boshidan ${session.rangeSelection.endLine}-qatorgacha`);
+    }
 
     if (resultObj.stepLimitReached) {
       lines.push(`Iz: faqat birinchi ${DEBUG_MAX_STEPS} qadam saqlandi.`);
@@ -4250,6 +4265,120 @@ function clearDebugState() {
   resetDebugPanelView();
 }
 
+function clearDebugRangeHighlights() {
+  if (!editor) {
+    return;
+  }
+
+  if (debugRangeHighlightedStartLine !== null) {
+    editor.removeLineClass(
+      debugRangeHighlightedStartLine,
+      "wrap",
+      "debug-range-start-line"
+    );
+    debugRangeHighlightedStartLine = null;
+  }
+
+  if (debugRangeHighlightedEndLine !== null) {
+    editor.removeLineClass(
+      debugRangeHighlightedEndLine,
+      "wrap",
+      "debug-range-end-line"
+    );
+    debugRangeHighlightedEndLine = null;
+  }
+}
+
+function getActiveDebugRangeSelection() {
+  const startLine = normalizePositiveInteger(debugRangeStartLine);
+  const endLine = normalizePositiveInteger(debugRangeEndLine);
+
+  if (!startLine && !endLine) {
+    return null;
+  }
+
+  if (startLine && endLine) {
+    return {
+      startLine: Math.min(startLine, endLine),
+      endLine: Math.max(startLine, endLine),
+    };
+  }
+
+  return {
+    startLine: startLine || null,
+    endLine: endLine || null,
+  };
+}
+
+function renderDebugRangeState() {
+  const status = document.getElementById("debug-range-status");
+  const startButton = document.getElementById("debug-set-start");
+  const endButton = document.getElementById("debug-set-end");
+  const activeRange = getActiveDebugRangeSelection();
+
+  clearDebugRangeHighlights();
+
+  if (activeRange?.startLine && editor) {
+    debugRangeHighlightedStartLine = activeRange.startLine - 1;
+    editor.addLineClass(
+      debugRangeHighlightedStartLine,
+      "wrap",
+      "debug-range-start-line"
+    );
+  }
+
+  if (activeRange?.endLine && editor) {
+    debugRangeHighlightedEndLine = activeRange.endLine - 1;
+    editor.addLineClass(
+      debugRangeHighlightedEndLine,
+      "wrap",
+      "debug-range-end-line"
+    );
+  }
+
+  if (status) {
+    if (!activeRange) {
+      status.textContent = "All lines";
+    } else if (activeRange.startLine && activeRange.endLine) {
+      status.textContent = `${activeRange.startLine}-qator -> ${activeRange.endLine}-qator`;
+    } else if (activeRange.startLine) {
+      status.textContent = `${activeRange.startLine}-qatordan oxirigacha`;
+    } else {
+      status.textContent = `Boshidan ${activeRange.endLine}-qatorgacha`;
+    }
+  }
+
+  if (startButton) {
+    startButton.classList.toggle("active", Boolean(activeRange?.startLine));
+  }
+
+  if (endButton) {
+    endButton.classList.toggle("active", Boolean(activeRange?.endLine));
+  }
+}
+
+function setDebugRangePoint(kind) {
+  if (!editor) {
+    return;
+  }
+
+  const lineNumber = editor.getCursor().line + 1;
+
+  if (kind === "start") {
+    debugRangeStartLine = lineNumber;
+  } else {
+    debugRangeEndLine = lineNumber;
+  }
+
+  renderDebugRangeState();
+}
+
+function clearDebugRangeSelection() {
+  debugRangeStartLine = null;
+  debugRangeEndLine = null;
+  renderDebugRangeState();
+}
+
 function getBreakpointLines() {
   if (!editor) {
     return [];
@@ -4363,6 +4492,7 @@ function renderDebugSession(resultObj, executionTime, mode) {
   const breakpoints = Array.isArray(resultObj?.breakpointLines)
     ? resultObj.breakpointLines
     : [];
+  const debugRange = resultObj?.debugRange || getActiveDebugRangeSelection();
   const parts = [
     `${mode === "error" ? "Debug to'xtadi" : "Debug tayyor"}`,
     `${steps.length} ta qadam`,
@@ -4370,6 +4500,14 @@ function renderDebugSession(resultObj, executionTime, mode) {
       ? `breakpointlar: ${breakpoints.join(", ")}`
       : "breakpointlar yo'q",
   ];
+
+  if (debugRange?.startLine && debugRange?.endLine) {
+    parts.push(`range: ${debugRange.startLine}-${debugRange.endLine}`);
+  } else if (debugRange?.startLine) {
+    parts.push(`range: ${debugRange.startLine}+`);
+  } else if (debugRange?.endLine) {
+    parts.push(`range: 1-${debugRange.endLine}`);
+  }
 
   if (resultObj?.stepLimitReached) {
     parts.push(`faqat birinchi ${steps.length} qadam saqlandi`);
@@ -4421,6 +4559,9 @@ function setupDebugPanelControls() {
   const nextButton = document.getElementById("debug-next");
   const breakpointButton = document.getElementById("debug-breakpoint");
   const closeButton = document.getElementById("debug-close");
+  const setStartButton = document.getElementById("debug-set-start");
+  const setEndButton = document.getElementById("debug-set-end");
+  const clearRangeButton = document.getElementById("debug-clear-range");
 
   if (prevButton) {
     prevButton.addEventListener("click", () => {
@@ -4447,6 +4588,19 @@ function setupDebugPanelControls() {
   }
 
   resetDebugPanelView();
+  if (setStartButton) {
+    setStartButton.addEventListener("click", () => setDebugRangePoint("start"));
+  }
+
+  if (setEndButton) {
+    setEndButton.addEventListener("click", () => setDebugRangePoint("end"));
+  }
+
+  if (clearRangeButton) {
+    clearRangeButton.addEventListener("click", clearDebugRangeSelection);
+  }
+
+  renderDebugRangeState();
 }
 
 function buildExactFixes(errorInfo, codeLine, undefinedName, suggestion) {
@@ -4673,11 +4827,22 @@ def _debug_serialize_scope(scope):
             break
     return serialized
 
-def debug_execute(code, provided_inputs=None, breakpoint_lines=None, max_steps=400):
+def debug_execute(
+    code,
+    provided_inputs=None,
+    breakpoint_lines=None,
+    max_steps=400,
+    start_line=None,
+    end_line=None,
+):
     old_stdout = sys.stdout
     old_stderr = sys.stderr
     sys.stdout = StringIO()
     sys.stderr = StringIO()
+    normalized_start = int(start_line) if str(start_line).strip().isdigit() and int(start_line) > 0 else None
+    normalized_end = int(end_line) if str(end_line).strip().isdigit() and int(end_line) > 0 else None
+    if normalized_start is not None and normalized_end is not None and normalized_start > normalized_end:
+        normalized_start, normalized_end = normalized_end, normalized_start
     result = {
         "output": "",
         "success": True,
@@ -4685,6 +4850,10 @@ def debug_execute(code, provided_inputs=None, breakpoint_lines=None, max_steps=4
         "error": None,
         "steps": [],
         "stepLimitReached": False,
+        "debugRange": {
+            "startLine": normalized_start,
+            "endLine": normalized_end,
+        },
         "breakpointLines": sorted(
             {
                 int(line)
@@ -4757,6 +4926,10 @@ def debug_execute(code, provided_inputs=None, breakpoint_lines=None, max_steps=4
                 if 0 < line_number <= len(source_lines)
                 else ""
             )
+            if normalized_start is not None and line_number < normalized_start:
+                return trace_calls
+            if normalized_end is not None and line_number > normalized_end:
+                return trace_calls
             result["steps"].append(
                 {
                     "line": line_number,
@@ -4804,7 +4977,7 @@ def debug_execute(code, provided_inputs=None, breakpoint_lines=None, max_steps=4
   `);
 }
 
-async function executeDebugSession(code, inputValues, breakpoints) {
+async function executeDebugSession(code, inputValues, breakpoints, rangeSelection) {
   await ensureDebugExecutionEnvironment();
   const result = await pyodide.runPythonAsync(`
 import json
@@ -4812,7 +4985,9 @@ result = debug_execute(
     ${JSON.stringify(code)},
     ${JSON.stringify(inputValues || [])},
     ${JSON.stringify(breakpoints || [])},
-    ${DEBUG_MAX_STEPS}
+    ${DEBUG_MAX_STEPS},
+    ${JSON.stringify(rangeSelection?.startLine || null)},
+    ${JSON.stringify(rangeSelection?.endLine || null)}
 )
 json.dumps(result)
   `);
@@ -4894,6 +5069,7 @@ async function debugCode() {
     code,
     inputValues: [],
     breakpoints: getBreakpointLines(),
+    rangeSelection: getActiveDebugRangeSelection(),
   };
   showOutput("Debugger ishga tushirilmoqda...", "");
   clearOutputInputHost();

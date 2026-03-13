@@ -332,7 +332,7 @@ body.dark-mode .btn-clear:hover {
 .editor-control {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -342,61 +342,93 @@ body.dark-mode .btn-clear:hover {
   font-weight: 700;
 }
 
-.editor-select {
-  min-width: 148px;
-  min-height: 36px;
-  padding: 8px 34px 8px 12px;
+.editor-select-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 170px;
+  min-height: 40px;
+  padding-right: 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  background-color: var(--surface);
+  border-radius: 12px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(246, 248, 251, 0.95));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 247, 251, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 18px rgba(15, 23, 42, 0.06);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.editor-select-shell::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+}
+
+.editor-control:hover .editor-select-shell {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.editor-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 34px 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent !important;
+  background-color: transparent !important;
   color: var(--text-main);
   font-family: "IBM Plex Sans", sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
   appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   color-scheme: light;
   cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background 0.18s ease;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
-    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0));
-  background-position:
-    calc(100% - 18px) calc(50% - 2px),
-    calc(100% - 12px) calc(50% - 2px),
-    0 0;
-  background-size: 6px 6px, 6px 6px, 100% 100%;
-  background-repeat: no-repeat;
+  box-shadow: none !important;
 }
 
-.editor-select:hover {
-  border-color: var(--border-strong);
-  background-color: var(--surface);
-}
-
+.editor-select:focus,
 .editor-select:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+}
+
+.editor-select-shell:focus-within {
   border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+  transform: translateY(-1px);
 }
 
 body.dark-mode .editor-select {
-  background-color: var(--surface-strong);
-  background:
-    linear-gradient(180deg, rgba(23, 35, 58, 0.98), rgba(17, 28, 50, 0.98));
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
-    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%),
-    linear-gradient(180deg, rgba(23, 35, 58, 0.98), rgba(17, 28, 50, 0.98));
-  border-color: var(--border);
   color: var(--text-main);
   color-scheme: dark;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+body.dark-mode .editor-select-shell {
+  border-color: rgba(91, 141, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(21, 33, 54, 0.98), rgba(11, 20, 36, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 12px 24px rgba(2, 6, 23, 0.34);
+}
+
+body.dark-mode .editor-select-shell::after {
+  border-color: var(--primary);
 }
 
 .editor-select option {
@@ -407,6 +439,69 @@ body.dark-mode .editor-select {
 body.dark-mode .editor-select option {
   background: var(--surface);
   color: var(--text-main);
+}
+
+.editor-control-range {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+body.dark-mode .editor-control-range {
+  border-color: rgba(91, 141, 255, 0.14);
+  background: rgba(11, 20, 36, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.debug-range-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.debug-range-btn {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-main);
+  cursor: pointer;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.debug-range-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.debug-range-btn.active {
+  border-color: var(--debug-border);
+  background: var(--debug-soft);
+  color: var(--debug-accent);
+}
+
+.debug-range-btn-reset {
+  color: var(--danger);
+}
+
+.debug-range-status {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .CodeMirror {
@@ -750,6 +845,14 @@ body.dark-mode .editor-select option {
   background: rgba(217, 119, 6, 0.14);
 }
 
+.debug-range-start-line {
+  box-shadow: inset 4px 0 0 rgba(91, 141, 255, 0.78);
+}
+
+.debug-range-end-line {
+  box-shadow: inset 4px 0 0 rgba(94, 234, 212, 0.7);
+}
+
 .output-input-label {
   margin-bottom: 10px;
   color: var(--text-muted);
@@ -953,6 +1056,10 @@ body.dark-mode .editor-select option {
 
   .editor-control {
     flex: 1 1 220px;
+  }
+
+  .editor-select-shell {
+    width: 100%;
   }
 
   .editor-select {
