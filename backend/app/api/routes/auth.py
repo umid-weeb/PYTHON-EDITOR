@@ -24,11 +24,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
 
 
-def normalize_password(password: str) -> str:
+def normalize_password(password: str) -> bytes:
     """
-    bcrypt accepts up to 72 bytes. Truncate to 72 characters (safe for typical UTF-8).
+    bcrypt accepts up to 72 BYTES. Encode to UTF-8 and truncate to 72 bytes.
     """
-    return (password or "")[:72]
+    return (password or "").encode("utf-8")[:72]
 
 
 class RegisterRequest(BaseModel):
