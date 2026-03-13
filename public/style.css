@@ -409,6 +409,65 @@ body.dark-mode .btn-clear:hover {
   color: var(--danger);
 }
 
+.output-input-host {
+  display: none;
+  padding: 16px 18px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.output-input-host.active {
+  display: block;
+}
+
+.output-input-label {
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.output-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.output-input-field {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-main);
+  padding: 12px 14px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.95rem;
+}
+
+.output-input-field:focus {
+  outline: none;
+  border-color: var(--border-strong);
+  box-shadow: var(--focus-ring);
+}
+
+.output-input-submit {
+  min-width: 120px;
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  background: var(--primary);
+  color: #ffffff;
+  padding: 0 16px;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.output-input-submit:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
 .find-replace-dialog {
   position: fixed;
   top: 50%;
@@ -541,6 +600,15 @@ body.dark-mode .btn-clear:hover {
 
   .header-buttons button {
     flex: 1 1 calc(50% - 10px);
+  }
+
+  .output-input-row {
+    flex-direction: column;
+  }
+
+  .output-input-submit {
+    width: 100%;
+    min-height: 44px;
   }
 
   .find-replace-dialog {
