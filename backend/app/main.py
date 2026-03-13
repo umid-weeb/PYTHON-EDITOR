@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.health import router as health_router
 from app.api.routes.problems import router as problem_router
 from app.api.routes.submissions import router as submission_router
 from app.core.config import get_settings
@@ -12,6 +14,10 @@ from app.repositories.submissions import SubmissionRepository
 
 
 settings = get_settings()
+logging.basicConfig(
+    level=getattr(logging, settings.log_level, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 
 @asynccontextmanager
@@ -32,6 +38,7 @@ app.add_middleware(
 
 app.include_router(problem_router, prefix=settings.api_prefix)
 app.include_router(submission_router, prefix=settings.api_prefix)
+app.include_router(health_router)
 
 
 @app.get("/")

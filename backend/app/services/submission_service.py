@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from functools import lru_cache
+import logging
 
 from app.core.config import get_settings
 from app.judge.runner import JudgeRunner
@@ -17,14 +18,23 @@ class SubmissionService:
         self.repository = SubmissionRepository(self.settings.submissions_db_path)
         self.problem_service: ProblemService = get_problem_service()
         self.judge = JudgeRunner(self.settings)
+        self.logger = logging.getLogger("pyzone.arena.submission")
 
     def create_submission(self, payload: SubmissionRequest, mode: str) -> str:
-        return self.repository.create(
+        submission_id = self.repository.create(
             problem_id=payload.problem_id,
             code=payload.code,
             language=payload.language,
             mode=mode,
         )
+        self.logger.info(
+            "submission.created id=%s problem=%s mode=%s inline=%s",
+            submission_id,
+            payload.problem_id,
+            mode,
+            self.settings.use_inline_execution,
+        )
+        return submission_id
 
     def enqueue_submission(self, submission_id: str) -> None:
         if self.settings.use_inline_execution:
@@ -40,6 +50,7 @@ class SubmissionService:
             from app.worker.tasks import process_submission_task
 
             process_submission_task.delay(submission_id)
+            self.logger.info("submission.enqueued id=%s backend=celery", submission_id)
         except Exception:
             worker = threading.Thread(
                 target=self.process_submission,
@@ -47,6 +58,7 @@ class SubmissionService:
                 daemon=True,
             )
             worker.start()
+            self.logger.warning("submission.celery_fallback id=%s running_inline", submission_id)
 
     def process_submission(self, submission_id: str) -> None:
         submission = self.repository.get(submission_id)
@@ -64,8 +76,18 @@ class SubmissionService:
                 mode=submission["mode"],
             )
             self.repository.complete(submission_id, result)
+            self.logger.info(
+                "submission.completed id=%s verdict=%s runtime_ms=%s memory_kb=%s passed=%s/%s",
+                submission_id,
+                result.get("verdict"),
+                result.get("runtime_ms"),
+                result.get("memory_kb"),
+                result.get("passed_count"),
+                result.get("total_count"),
+            )
         except Exception as error:
             self.repository.mark_failed(submission_id, str(error))
+            self.logger.exception("submission.failed id=%s error=%s", submission_id, error)
 
     def get_submission(self, submission_id: str) -> dict | None:
         return self.repository.get(submission_id)

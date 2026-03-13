@@ -6,6 +6,7 @@ const DEFAULT_EDITOR_CODE = [
 
 const ARENA_SPLIT_STORAGE_KEY = "pyzone-arena-split-v2";
 const ARENA_SEARCH_DEBOUNCE_MS = 300;
+const ARENA_REQUEST_TIMEOUT_MS = 7000;
 
 const arenaState = {
   apiBase: window.ARENA_API_BASE || "/api",
@@ -752,10 +753,23 @@ function setArenaBusy(isBusy) {
 }
 
 async function fetchArenaJson(url, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+  const retries = options.retries ?? (method === "GET" ? 2 : 0);
+  const timeoutMs = options.timeoutMs ?? ARENA_REQUEST_TIMEOUT_MS;
+  const signal = options.signal;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort(new DOMException("Arena request timeout", "AbortError"));
+  }, timeoutMs);
+  const mergedSignal = signal || controller.signal;
+
   beginNetworkActivity();
 
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(url, {
+      ...options,
+      signal: mergedSignal,
+    });
     const contentType = response.headers.get("content-type") || "";
 
     if (!response.ok) {
@@ -766,6 +780,16 @@ async function fetchArenaJson(url, options = {}) {
       } else {
         message = (await response.text()) || message;
       }
+      if (
+        url.includes("/api/") &&
+        (response.status === 404 ||
+          response.status === 502 ||
+          response.status === 503 ||
+          response.status === 504 ||
+          /NOT_FOUND|The page could not be found/i.test(message))
+      ) {
+        throw new Error("Backend not reachable");
+      }
       throw new Error(message);
     }
 
@@ -774,7 +798,19 @@ async function fetchArenaJson(url, options = {}) {
     }
 
     return JSON.parse(await response.text());
+  } catch (error) {
+    const normalizedError = normalizeArenaFetchError(error, url);
+    if (retries > 0 && shouldRetryArenaRequest(normalizedError)) {
+      await delay(getRetryDelayMs(retries));
+      return fetchArenaJson(url, {
+        ...options,
+        retries: retries - 1,
+        timeoutMs,
+      });
+    }
+    throw normalizedError;
   } finally {
+    clearTimeout(timeoutId);
     endNetworkActivity();
   }
 }
@@ -798,9 +834,41 @@ function handleArenaError(error, summary) {
   updateResultPanel(
     "Xatolik",
     "status-error",
-    summary,
+    error?.message === "Backend not reachable" ? "Backend not reachable" : summary,
     error instanceof Error ? error.message : String(error)
   );
+}
+
+function normalizeArenaFetchError(error, url) {
+  if (error instanceof Error) {
+    if (error.name === "AbortError") {
+      return new Error("Backend not reachable");
+    }
+    if (/Failed to fetch|NetworkError|Load failed/i.test(error.message)) {
+      return new Error("Backend not reachable");
+    }
+    return error;
+  }
+
+  if (String(error).includes(url)) {
+    return new Error("Backend not reachable");
+  }
+  return new Error(String(error));
+}
+
+function shouldRetryArenaRequest(error) {
+  return error instanceof Error && error.message === "Backend not reachable";
+}
+
+function getRetryDelayMs(retriesRemaining) {
+  const attemptIndex = Math.max(0, 2 - retriesRemaining);
+  return 350 * 2 ** attemptIndex;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function getEditorValue() {

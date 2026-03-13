@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +14,9 @@ from app.core.config import Settings, get_settings
 class ProblemSourceClient:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        self.logger = logging.getLogger("pyzone.arena.github")
+        self.last_fetch_status = "idle"
+        self.last_fetch_source = "local"
 
     @property
     def source_label(self) -> str:
@@ -34,14 +39,17 @@ class ProblemSourceClient:
             f"https://api.github.com/repos/"
             f"{self.settings.github_owner}/{self.settings.github_repo}/contents/{path}"
         )
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(
+        self.last_fetch_source = "github"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await self._perform_github_request(
+                client,
                 url,
                 params={"ref": self.settings.github_branch},
-                headers=self._github_headers(),
             )
             if response.status_code == 404:
+                self.last_fetch_status = "404"
                 return []
+            self.last_fetch_status = str(response.status_code)
             response.raise_for_status()
             payload = response.json()
 
@@ -59,14 +67,17 @@ class ProblemSourceClient:
             f"https://api.github.com/repos/"
             f"{self.settings.github_owner}/{self.settings.github_repo}/contents/{path}"
         )
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(
+        self.last_fetch_source = "github"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await self._perform_github_request(
+                client,
                 url,
                 params={"ref": self.settings.github_branch},
-                headers=self._github_headers(),
             )
             if response.status_code == 404:
+                self.last_fetch_status = "404"
                 raise FileNotFoundError(path)
+            self.last_fetch_status = str(response.status_code)
             response.raise_for_status()
             payload = response.json()
 
@@ -75,6 +86,8 @@ class ProblemSourceClient:
         return payload.get("content", "")
 
     def _local_list_directory(self, path: str) -> list[dict[str, str]]:
+        self.last_fetch_source = "local"
+        self.last_fetch_status = "local-ok"
         directory = self._resolve_local(path)
         if not directory.exists():
             return []
@@ -89,6 +102,8 @@ class ProblemSourceClient:
         ]
 
     def _local_read_text(self, path: str) -> str:
+        self.last_fetch_source = "local"
+        self.last_fetch_status = "local-ok"
         target = self._resolve_local(path)
         return target.read_text(encoding="utf-8")
 
@@ -107,3 +122,30 @@ class ProblemSourceClient:
         if self.settings.github_token:
             headers["Authorization"] = f"Bearer {self.settings.github_token}"
         return headers
+
+    async def _perform_github_request(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        *,
+        params: dict[str, Any],
+    ) -> httpx.Response:
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                response = await client.get(
+                    url,
+                    params=params,
+                    headers=self._github_headers(),
+                )
+                if response.status_code in {429, 500, 502, 503, 504} and attempt < 2:
+                    await asyncio.sleep(0.35 * 2**attempt)
+                    continue
+                return response
+            except (httpx.TimeoutException, httpx.TransportError) as error:
+                last_error = error
+                if attempt >= 2:
+                    break
+                await asyncio.sleep(0.35 * 2**attempt)
+
+        raise RuntimeError(f"GitHub request failed for {url}: {last_error}")

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import re
+from dataclasses import replace
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 import yaml
+import redis
 
 from app.core.config import get_settings
 from app.judge.parser import parse_memory_limit_mb, parse_time_limit_seconds
@@ -21,7 +25,32 @@ class ProblemService:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.source = ProblemSourceClient(self.settings)
-        self.cache = ProblemCache(self.settings.cache_dir)
+        redis_client = None
+        try:
+            if self.settings.redis_url:
+                candidate = redis.from_url(self.settings.redis_url, decode_responses=True)
+                candidate.ping()
+                redis_client = candidate
+        except Exception:
+            redis_client = None
+
+        self.cache = ProblemCache(
+            self.settings.cache_dir,
+            ttl_seconds=self.settings.cache_ttl_seconds,
+            redis_client=redis_client,
+        )
+        self.logger = logging.getLogger("pyzone.arena.problem_service")
+        self.hidden_source = None
+        if self.settings.hidden_github_enabled:
+            hidden_settings = replace(
+                self.settings,
+                github_owner=self.settings.hidden_github_owner,
+                github_repo=self.settings.hidden_github_repo,
+                github_branch=self.settings.hidden_github_branch,
+                github_token=self.settings.hidden_github_token,
+                github_problem_root=self.settings.hidden_github_problem_root,
+            )
+            self.hidden_source = ProblemSourceClient(hidden_settings)
 
     @property
     def source_label(self) -> str:
@@ -32,6 +61,25 @@ class ProblemService:
             cached = self.cache.load_index()
             if cached is not None:
                 return [ProblemSummary.model_validate(item) for item in cached]
+
+        index_path = f"{self.settings.github_problem_root}/index.json"
+        try:
+            index_text = await self.source.read_text(index_path)
+            index_payload = yaml.safe_load(index_text) if index_text.strip().startswith("{") is False else None
+            if index_text.strip().startswith("{"):
+                import json as _json
+                index_payload = _json.loads(index_text)
+            if index_payload and "items" in index_payload:
+                problems = [
+                    ProblemSummary.model_validate(item)
+                    for item in index_payload.get("items", [])
+                    if str(item.get("difficulty", "easy")).lower() == "easy"
+                ]
+                problems.sort(key=lambda item: item.title.lower())
+                self.cache.save_index([item.model_dump() for item in problems])
+                return problems
+        except Exception:
+            pass
 
         entries = await self.source.list_directory(self.settings.github_problem_root)
         problems: list[ProblemSummary] = []
@@ -133,7 +181,7 @@ class ProblemService:
 
         metadata = yaml.safe_load(metadata_text) or {}
         visible_testcases = await self._load_testcases(problem_id, "visible")
-        hidden_testcases = await self._load_testcases(problem_id, "hidden")
+        hidden_testcases = await self._load_hidden_testcases(problem_id)
 
         bundle = {
             "id": problem_id,
@@ -181,6 +229,40 @@ class ProblemService:
             f"{self.settings.github_problem_root}/{problem_id}/tests/{visibility}"
         )
         entries = await self.source.list_directory(directory)
+        return await self._build_testcases_from_entries(entries, visibility, self.source)
+
+    async def _load_hidden_testcases(self, problem_id: str) -> list[dict[str, Any]]:
+        hidden_root = self.settings.hidden_test_root / problem_id / "tests" / "hidden"
+        if hidden_root.exists():
+            return self._load_hidden_testcases_from_local_root(hidden_root)
+
+        if self.hidden_source is not None:
+            directory = (
+                f"{self.settings.hidden_github_problem_root}/{problem_id}/tests/hidden"
+            )
+            entries = await self.hidden_source.list_directory(directory)
+            return await self._build_testcases_from_entries(
+                entries,
+                "hidden",
+                self.hidden_source,
+            )
+
+        self.logger.warning(
+            "Hidden testcase source not configured for problem_id=%s. Falling back to public problem source.",
+            problem_id,
+        )
+        directory = (
+            f"{self.settings.github_problem_root}/{problem_id}/tests/hidden"
+        )
+        entries = await self.source.list_directory(directory)
+        return await self._build_testcases_from_entries(entries, "hidden", self.source)
+
+    async def _build_testcases_from_entries(
+        self,
+        entries: list[dict[str, Any]],
+        visibility: str,
+        source_client: ProblemSourceClient,
+    ) -> list[dict[str, Any]]:
         input_files: dict[str, str] = {}
         output_files: dict[str, str] = {}
 
@@ -203,14 +285,37 @@ class ProblemService:
             testcases.append(
                 {
                     "name": f"Case {index}",
-                    "input": (await self.source.read_text(input_files[key])).strip(),
+                    "input": (await source_client.read_text(input_files[key])).strip(),
                     "expected_output": (
-                        await self.source.read_text(output_files[key])
+                        await source_client.read_text(output_files[key])
                     ).strip(),
                     "hidden": visibility == "hidden",
                 }
             )
 
+        return testcases
+
+    def _load_hidden_testcases_from_local_root(self, hidden_root: Path) -> list[dict[str, Any]]:
+        input_files = {
+            self._suffix(path.name, "input"): path
+            for path in hidden_root.glob("input*.txt")
+        }
+        output_files = {
+            self._suffix(path.name, "output"): path
+            for path in hidden_root.glob("output*.txt")
+        }
+        testcase_keys = sorted(set(input_files) & set(output_files), key=self._sort_suffix)
+
+        testcases: list[dict[str, Any]] = []
+        for index, key in enumerate(testcase_keys, start=1):
+            testcases.append(
+                {
+                    "name": f"Case {index}",
+                    "input": input_files[key].read_text(encoding="utf-8").strip(),
+                    "expected_output": output_files[key].read_text(encoding="utf-8").strip(),
+                    "hidden": True,
+                }
+            )
         return testcases
 
     def _suffix(self, filename: str, prefix: str) -> str:

@@ -7,12 +7,15 @@ This backend adds a LeetCode-style problem solving arena to the existing Python 
 Architecture:
 
 - Frontend arena page: `public/arena.html`, `public/arena/arena.css`, `public/arena/arena.js`
+- Runtime config: `public/arena-config.js`
 - API layer: FastAPI routes under `backend/app/api/routes`
-- Problem source: GitHub API or local sample repository
-- Cache layer: filesystem cache under `backend/.cache/problems`
+- Problem source: GitHub API or local sample repository for visible assets
+- Hidden testcase source: secure local directory or private GitHub repository
+- Cache layer: filesystem cache under `backend/.cache/problems` with TTL
 - Submission store: SQLite under `backend/.data/submissions.sqlite3`
 - Async execution: Celery + Redis, with inline-thread fallback for development
 - Judge: metadata-driven runner with Docker sandbox support
+- Reverse proxy: Nginx serves frontend and proxies `/api` to FastAPI
 
 ## Frontend Structure
 
@@ -38,6 +41,32 @@ Architecture:
 - `app/judge/comparator.py`: exact + whitespace tolerant comparison
 - `app/judge/runner.py`: isolated execution orchestration
 - `app/worker/tasks.py`: Celery task entrypoint
+- `app/api/routes/health.py`: `GET /health`, `GET /health/db`, `GET /health/cache`
+
+## Updated Architecture Diagram
+
+```text
+Browser
+  |
+  |  GET /, /arena.html, /assets
+  v
+Nginx reverse proxy
+  |-------------------------------> static frontend files (public/)
+  |
+  |  /api/*, /health*
+  v
+FastAPI API
+  |------> Problem cache (.cache/problems)
+  |------> SQLite submissions (.data/submissions.sqlite3)
+  |------> Visible problem source (public GitHub repo or local sample repo)
+  |------> Hidden testcase source (.data/secure_problem_store or private GitHub repo)
+  |
+  v
+Celery worker -> Judge runner -> Docker sandbox
+  |
+  v
+Redis broker/result backend
+```
 
 ## Judge Flow
 
@@ -78,9 +107,21 @@ problems/
       visible/
         input1.txt
         output1.txt
-      hidden/
-        input1.txt
-        output1.txt
+```
+
+Hidden tests must not live in the public problem repository in production.
+
+Recommended production split:
+
+```text
+public problems repo:
+  problems/<slug>/problem.md
+  problems/<slug>/metadata.yaml
+  problems/<slug>/starter_code.py
+  problems/<slug>/tests/visible/*
+
+secure hidden store:
+  <secure_root>/<slug>/tests/hidden/*
 ```
 
 `metadata.yaml` example:
@@ -103,23 +144,53 @@ tags:
 
 ## Running Locally
 
-1. Copy `.env.example` to `.env`.
-2. For GitHub-backed mode, set:
+1. Enter the backend directory:
+
+```bash
+cd backend
+```
+
+2. Copy `.env.example` to `.env`.
+
+Windows:
+
+```bash
+copy .env.example .env
+```
+
+3. For GitHub-backed mode, set:
    - `ARENA_GITHUB_OWNER`
    - `ARENA_GITHUB_REPO`
    - `ARENA_GITHUB_BRANCH`
    - `ARENA_GITHUB_TOKEN` if needed
-3. Install dependencies:
+4. For secure hidden tests, set one of:
+   - `ARENA_HIDDEN_TEST_ROOT` to a local secure directory outside public web assets
+   - `ARENA_HIDDEN_GITHUB_OWNER`, `ARENA_HIDDEN_GITHUB_REPO`, `ARENA_HIDDEN_GITHUB_TOKEN`
+5. Install dependencies:
 
 ```bash
-pip install -r backend/requirements.txt
+py -m pip install -r requirements.txt
 ```
 
-4. Start API:
+6. Start API:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+py -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+Windows shortcut:
+
+```powershell
+./start-api.ps1
+```
+
+7. In development, frontend can talk to backend directly because `public/arena-config.js` defaults to:
+
+```js
+window.ARENA_API_BASE = "http://127.0.0.1:8000/api"
+```
+
+when loaded from `localhost` or `127.0.0.1`.
 
 List endpoint supports lightweight summary pagination:
 
@@ -153,19 +224,71 @@ Response shape:
 Run tests:
 
 ```bash
-pytest backend/tests
+py -m pytest tests -q
 ```
 
-5. Optional async stack:
+8. Optional full stack with Docker:
 
 ```bash
 docker compose up --build
 ```
 
+Worker only:
+
+```powershell
+./start-worker.ps1
+```
+
+This brings up:
+
+- `api` at container port `8000`
+- `worker`
+- `redis`
+- `nginx` serving frontend at `http://localhost:8080`
+- docker socket mounted to worker for sandboxed judge runs
+
+## Nginx Reverse Proxy
+
+Production sample config lives at:
+
+- `backend/deploy/nginx/default.conf`
+
+Routing:
+
+- `/` -> static frontend files from `public/`
+- `/api/*` -> FastAPI backend
+- `/health*` -> FastAPI backend
+
+## Health Endpoints
+
+- `GET /health`
+- `GET /health/db`
+- `GET /health/cache`
+
+These expose API health, SQLite connectivity and cache stats.
+
+## Logging
+
+Problem requests now log:
+
+- problem source
+- cache hit or miss
+- GitHub fetch status
+- request latency
+
+Example log line:
+
+```text
+problems.list source=local:... github_fetch=local-ok refresh=False cache=hit ... latency_ms=2.10
+```
+
 ## Production Notes
 
 - Populate the configured GitHub problem repo with 100+ easy problems.
-- Keep hidden tests only in the backend source repo and never expose them in API responses.
+- Keep hidden tests only in private storage and never expose them in API responses.
 - Enable Docker judge mode in production for sandboxing.
 - Move submissions from SQLite to PostgreSQL if multi-node scaling is needed.
 - Keep Redis + Celery for parallel submission processing.
+- Put Nginx in front so frontend and backend share one origin.
+- For production set `ARENA_USE_INLINE_EXECUTION=false` and ensure Redis and Celery worker are running.
+- Redis cache is used automatically when reachable; otherwise filesystem cache is used.

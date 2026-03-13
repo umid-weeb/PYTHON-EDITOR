@@ -125,6 +125,14 @@ class SubmissionRepository:
         payload["case_results"] = json.loads(payload.pop("case_results_json") or "[]")
         return payload
 
+    def ping(self) -> dict[str, Any]:
+        with self._connect() as connection:
+            connection.execute("SELECT 1").fetchone()
+        return {
+            "status": "ok",
+            "database": str(self.database_path),
+        }
+
     def _update_status(self, submission_id: str, status: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as connection:

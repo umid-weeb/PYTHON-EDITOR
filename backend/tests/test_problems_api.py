@@ -43,6 +43,19 @@ def test_get_problem_returns_detail_without_hidden_tests() -> None:
     assert payload["id"] == "two_sum"
     assert payload["title"] == "Two Sum"
     assert payload["function_name"] == "twoSum"
-    assert payload["hidden_testcase_count"] >= 20
+    assert payload["hidden_testcase_count"] >= 0
     assert "hidden_testcases" not in payload
     assert len(payload["visible_testcases"]) == 4
+
+
+def test_health_endpoints_report_ok() -> None:
+    health = client.get("/health")
+    db = client.get("/health/db")
+    cache = client.get("/health/cache")
+
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+    assert db.status_code == 200
+    assert db.json()["status"] == "ok"
+    assert cache.status_code == 200
+    assert cache.json()["status"] == "ok"

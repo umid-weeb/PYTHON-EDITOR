@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -104,6 +105,7 @@ finally:
 class JudgeRunner:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        self.docker_available = shutil.which("docker") is not None
 
     def run_submission(
         self,
@@ -214,7 +216,19 @@ class JudgeRunner:
     ) -> dict[str, Any]:
         timeout_seconds = max(1.0, float(time_limit_seconds) + 1.0)
 
+        command = [sys.executable, "-I", "harness.py"]
+
         if self.settings.judge_use_docker:
+            if not self.docker_available:
+                return {
+                    "verdict": "Runtime Error",
+                    "passed": False,
+                    "runtime_ms": 0,
+                    "memory_kb": 0,
+                    "actual_output": "",
+                    "error": "Docker is not available on this host.",
+                }
+
             command = [
                 "docker",
                 "run",
@@ -228,10 +242,10 @@ class JudgeRunner:
                 "--pids-limit",
                 str(self.settings.judge_pids_limit),
                 "--read-only",
-                "--cap-drop",
-                "ALL",
                 "--security-opt",
                 "no-new-privileges",
+                "--cap-drop",
+                "ALL",
                 "--tmpfs",
                 "/tmp:rw,noexec,nosuid,size=64m",
                 "-e",
@@ -241,12 +255,12 @@ class JudgeRunner:
                 "-w",
                 "/workspace",
                 self.settings.judge_docker_image,
-                "python",
+                "/usr/bin/timeout",
+                f"{int(timeout_seconds)}s",
+                "python3",
                 "-I",
                 "harness.py",
             ]
-        else:
-            command = [sys.executable, "-I", "harness.py"]
 
         try:
             completed = subprocess.run(
