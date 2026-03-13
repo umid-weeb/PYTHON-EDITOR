@@ -1401,6 +1401,183 @@ function setupBreakpoints() {
   renderDebugRangeState();
 }
 
+function isStackedPanelLayout() {
+  return window.matchMedia("(max-width: 1080px)").matches;
+}
+
+function getPanelSplitStorageKey(stacked) {
+  return stacked ? "editorPanelSplitMobileRatio" : "editorPanelSplitDesktopRatio";
+}
+
+function getPanelSplitDefaultRatio(stacked) {
+  return stacked ? 0.54 : 0.56;
+}
+
+function getPanelSplitBounds(container, stacked) {
+  const availableSpace =
+    (stacked ? container.clientHeight : container.clientWidth) -
+    (parseFloat(getComputedStyle(container).getPropertyValue("--panel-resizer-size")) ||
+      14);
+  const minPrimary = stacked ? 240 : 320;
+  const minSecondary = stacked ? 220 : 300;
+
+  return {
+    availableSpace: Math.max(0, availableSpace),
+    minPrimary,
+    minSecondary,
+  };
+}
+
+function getCurrentPanelSplitRatio(container, stacked) {
+  const primaryPanel = container.querySelector(".editor-panel");
+  const bounds = getPanelSplitBounds(container, stacked);
+  const primaryRect = primaryPanel?.getBoundingClientRect();
+  const primarySize = stacked ? primaryRect?.height : primaryRect?.width;
+
+  if (!primarySize || !bounds.availableSpace) {
+    return getPanelSplitDefaultRatio(stacked);
+  }
+
+  return primarySize / bounds.availableSpace;
+}
+
+function applyPanelSplitRatio(container, ratio, options = {}) {
+  const stacked = isStackedPanelLayout();
+  const bounds = getPanelSplitBounds(container, stacked);
+  if (!bounds.availableSpace) {
+    return;
+  }
+
+  const minRatio = bounds.minPrimary / bounds.availableSpace;
+  const maxRatio = 1 - bounds.minSecondary / bounds.availableSpace;
+  const safeRatio = Math.min(
+    Math.max(Number.isFinite(ratio) ? ratio : getPanelSplitDefaultRatio(stacked), minRatio),
+    Math.max(minRatio, maxRatio)
+  );
+  const sizePx = Math.round(bounds.availableSpace * safeRatio);
+  const resizer = document.getElementById("panel-resizer");
+
+  container.style.setProperty("--panel-primary-size", `${sizePx}px`);
+  if (resizer) {
+    resizer.setAttribute("aria-orientation", stacked ? "horizontal" : "vertical");
+  }
+
+  if (options.persist !== false) {
+    localStorage.setItem(getPanelSplitStorageKey(stacked), safeRatio.toFixed(4));
+  }
+
+  requestAnimationFrame(() => {
+    if (editor) {
+      editor.refresh();
+      scrollEditorToCursor();
+    }
+  });
+}
+
+function loadSavedPanelSplitRatio(stacked) {
+  const stored = Number.parseFloat(
+    localStorage.getItem(getPanelSplitStorageKey(stacked)) || ""
+  );
+  return Number.isFinite(stored) ? stored : getPanelSplitDefaultRatio(stacked);
+}
+
+function setupPanelResizer() {
+  const container = document.querySelector(".editor-container");
+  const resizer = document.getElementById("panel-resizer");
+  const primaryPanel = container?.querySelector(".editor-panel");
+
+  if (!container || !resizer || !primaryPanel) {
+    return;
+  }
+
+  const applySavedSplit = () => {
+    applyPanelSplitRatio(container, loadSavedPanelSplitRatio(isStackedPanelLayout()), {
+      persist: false,
+    });
+  };
+
+  let dragState = null;
+
+  const endResize = () => {
+    if (!dragState) {
+      return;
+    }
+
+    container.classList.remove("is-resizing");
+    document.body.classList.remove("panel-resizing", "panel-resizing-horizontal", "panel-resizing-vertical");
+    dragState = null;
+  };
+
+  const onPointerMove = (event) => {
+    if (!dragState) {
+      return;
+    }
+
+    const delta = dragState.stacked
+      ? event.clientY - dragState.startPointer
+      : event.clientX - dragState.startPointer;
+    const nextSize = dragState.startSize + delta;
+    const ratio = nextSize / dragState.availableSpace;
+    applyPanelSplitRatio(container, ratio);
+  };
+
+  resizer.addEventListener("pointerdown", (event) => {
+    const stacked = isStackedPanelLayout();
+    const bounds = getPanelSplitBounds(container, stacked);
+    const panelRect = primaryPanel.getBoundingClientRect();
+    dragState = {
+      stacked,
+      startPointer: stacked ? event.clientY : event.clientX,
+      startSize: stacked ? panelRect.height : panelRect.width,
+      availableSpace: bounds.availableSpace,
+    };
+
+    container.classList.add("is-resizing");
+    document.body.classList.add("panel-resizing");
+    document.body.classList.add(
+      stacked ? "panel-resizing-vertical" : "panel-resizing-horizontal"
+    );
+    resizer.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  resizer.addEventListener("pointermove", onPointerMove);
+  resizer.addEventListener("pointerup", endResize);
+  resizer.addEventListener("pointercancel", endResize);
+  resizer.addEventListener("lostpointercapture", endResize);
+
+  resizer.addEventListener("keydown", (event) => {
+    const stacked = isStackedPanelLayout();
+    const currentRatio = getCurrentPanelSplitRatio(container, stacked);
+    const step = event.shiftKey ? 0.08 : 0.04;
+    let nextRatio = null;
+
+    if (!stacked && event.key === "ArrowLeft") {
+      nextRatio = currentRatio - step;
+    } else if (!stacked && event.key === "ArrowRight") {
+      nextRatio = currentRatio + step;
+    } else if (stacked && event.key === "ArrowUp") {
+      nextRatio = currentRatio - step;
+    } else if (stacked && event.key === "ArrowDown") {
+      nextRatio = currentRatio + step;
+    } else if (event.key === "Home") {
+      nextRatio = getPanelSplitDefaultRatio(stacked);
+    }
+
+    if (nextRatio === null) {
+      return;
+    }
+
+    event.preventDefault();
+    applyPanelSplitRatio(container, nextRatio);
+  });
+
+  window.addEventListener("resize", applySavedSplit);
+  applySavedSplit();
+}
+
+window.addEventListener("DOMContentLoaded", setupPanelResizer);
+
 function setupBreakpoints() {
   editor.on("gutterClick", function (cm, line, gutter) {
     if (!["breakpoints", "CodeMirror-linenumbers"].includes(gutter)) {

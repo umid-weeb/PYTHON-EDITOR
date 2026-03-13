@@ -2,6 +2,8 @@
   --shell-frame-padding: 48px;
   --editor-font-family: "IBM Plex Mono", monospace;
   --editor-font-size: 14px;
+  --panel-resizer-size: 14px;
+  --panel-primary-size: 56%;
   --page-bg: linear-gradient(180deg, #f4f7fb 0%, #e8eef6 100%);
   --shell-bg: rgba(255, 255, 255, 0.78);
   --surface: #ffffff;
@@ -277,7 +279,10 @@ body.dark-mode .btn-clear:hover {
 .editor-container {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  grid-template-columns:
+    minmax(320px, var(--panel-primary-size))
+    var(--panel-resizer-size)
+    minmax(300px, 1fr);
   min-height: 0;
   overflow: hidden;
 }
@@ -293,7 +298,64 @@ body.dark-mode .btn-clear:hover {
 }
 
 .editor-panel {
-  border-right: 1px solid var(--border);
+  border-right: 0;
+}
+
+.panel-resizer {
+  position: relative;
+  width: var(--panel-resizer-size);
+  min-width: var(--panel-resizer-size);
+  min-height: 0;
+  cursor: col-resize;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0)),
+    var(--surface-muted);
+  border-inline: 1px solid var(--border);
+  touch-action: none;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.panel-resizer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 4px;
+  height: 64px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, rgba(91, 141, 255, 0.95) 0 1px, transparent 2px),
+    linear-gradient(180deg, rgba(91, 141, 255, 0.18), rgba(91, 141, 255, 0.45), rgba(91, 141, 255, 0.18));
+  background-size: 4px 12px, 100% 100%;
+  background-repeat: repeat-y, no-repeat;
+  background-position: center, center;
+  opacity: 0.78;
+}
+
+.panel-resizer:hover,
+.editor-container.is-resizing .panel-resizer,
+.panel-resizer:focus-visible {
+  background:
+    linear-gradient(180deg, rgba(91, 141, 255, 0.08), rgba(91, 141, 255, 0.02)),
+    var(--surface);
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+}
+
+.panel-resizer:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(91, 141, 255, 0.35);
+}
+
+body.panel-resizing {
+  user-select: none;
+}
+
+body.panel-resizing-horizontal {
+  cursor: col-resize;
+}
+
+body.panel-resizing-vertical {
+  cursor: row-resize;
 }
 
 .panel-header {
@@ -968,12 +1030,34 @@ body.dark-mode .debug-range-body-line {
 
   .editor-container {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 0.92fr);
+    grid-template-rows:
+      minmax(240px, var(--panel-primary-size))
+      var(--panel-resizer-size)
+      minmax(220px, 1fr);
   }
 
   .editor-panel {
     border-right: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .panel-resizer {
+    width: auto;
+    min-width: 0;
+    min-height: var(--panel-resizer-size);
+    cursor: row-resize;
+    border-inline: 0;
+    border-block: 1px solid var(--border);
+  }
+
+  .panel-resizer::before {
+    width: 72px;
+    height: 4px;
+    background:
+      radial-gradient(circle at center, rgba(91, 141, 255, 0.95) 0 1px, transparent 2px),
+      linear-gradient(90deg, rgba(91, 141, 255, 0.18), rgba(91, 141, 255, 0.45), rgba(91, 141, 255, 0.18));
+    background-size: 12px 4px, 100% 100%;
+    background-repeat: repeat-x, no-repeat;
   }
 
   .editor-panel,
