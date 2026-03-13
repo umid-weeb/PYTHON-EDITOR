@@ -307,6 +307,50 @@ function getFriendlyErrorMessage(errorInfo, undefinedName) {
   }
 }
 
+function buildRepairHints(errorInfo, undefinedName, suggestion, codeLine) {
+  const errorType = errorInfo?.type || "PythonError";
+  const normalizedLine = (codeLine || "").trim();
+  const hints = [];
+
+  switch (errorType) {
+    case "NameError":
+      if (suggestion && suggestion !== undefinedName) {
+        hints.push(`"${undefinedName}" o'rniga "${suggestion}" ni ishlatib ko'ring.`);
+      }
+      hints.push("Nom yozilishi va kerakli import mavjudligini tekshiring.");
+      break;
+    case "SyntaxError":
+      if (
+        /^(if|elif|else|for|while|def|class|try|except|finally|with)\b/.test(
+          normalizedLine
+        ) &&
+        !normalizedLine.endsWith(":")
+      ) {
+        hints.push("Qator oxiriga ':' qo'shib ko'ring.");
+      } else {
+        hints.push("Qavs, qo'shtirnoq va ':' belgilarini qayta tekshirib ko'ring.");
+      }
+      break;
+    case "IndentationError":
+    case "TabError":
+      hints.push("Ctrl+Shift+F bilan formatlab, tab o'rniga 4 ta space ishlatib ko'ring.");
+      break;
+    case "TypeError":
+      hints.push("Qiymat turlarini tekshirib, kerak bo'lsa int(), float() yoki str() bilan aylantirib ko'ring.");
+      break;
+    case "ZeroDivisionError":
+      hints.push("Bo'luvchi qiymat 0 emasligini tekshirib ko'ring.");
+      break;
+    case "LoopIterationError":
+      hints.push("Sikl sharti yangilanayotganini yoki kerakli joyda break borligini tekshirib ko'ring.");
+      break;
+    default:
+      break;
+  }
+
+  return hints;
+}
+
 function getWordRangeAtColumn(lineText, columnIndex) {
   if (!lineText) {
     return null;
@@ -564,6 +608,12 @@ function buildExecutionErrorReport(resultObj, code, executionTime) {
       ? editor.getLine(lineNumber - 1)
       : "";
   const codeLine = (editorLine || errorInfo.codeLine || "").replace(/\r?\n$/, "");
+  const repairHints = buildRepairHints(
+    errorInfo,
+    undefinedName,
+    suggestion,
+    codeLine
+  );
 
   if (!columnNumber && undefinedName && codeLine) {
     columnNumber = findColumnForName(codeLine, undefinedName);
@@ -593,12 +643,19 @@ function buildExecutionErrorReport(resultObj, code, executionTime) {
   }
 
   if (suggestion && suggestion !== undefinedName) {
-    reportLines.push("", `Did you mean: "${suggestion}"?`);
+    reportLines.push("", `Taxminiy yechim: "${suggestion}" ni sinab ko'ring.`);
 
     const suggestedLine = buildSuggestedLine(codeLine, undefinedName, suggestion);
     if (suggestedLine && suggestedLine !== codeLine) {
       reportLines.push("Tavsiya etilgan variant:", suggestedLine);
     }
+  }
+
+  if (repairHints.length) {
+    reportLines.push("", "Sinab ko'ring:");
+    repairHints.forEach((hint, index) => {
+      reportLines.push(`${index + 1}. ${hint}`);
+    });
   }
 
   if (resultObj.output && resultObj.output.trim()) {
@@ -621,14 +678,13 @@ window.addEventListener("DOMContentLoaded", function () {
 
   editor = CodeMirror.fromTextArea(textarea, {
     mode: "python",
-    theme: "monokai",
+    theme: "eclipse",
     lineNumbers: true,
     indentUnit: 4,
     indentWithTabs: false,
     lineWrapping: true,
     autoCloseBrackets: true,
     matchBrackets: true,
-    matchTags: true,
     styleActiveLine: true,
     foldGutter: true,
     gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
@@ -669,6 +725,7 @@ window.addEventListener("DOMContentLoaded", function () {
   setupCodeSnippets();
   setupMultipleCursors();
   setupBreakpoints();
+  setupEditorUtilityListeners();
   loadAutoSavedCode();
   loadTheme();
   startAutoSave();
@@ -957,48 +1014,50 @@ function setupBreakpoints() {
   });
 }
 
-// 12. AUTO-INDENT PASTE
-editor.on("beforeChange", function (cm, change) {
-  if (change.origin === "paste") {
-    const lines = change.text;
-    const cursor = change.from;
-    const currentIndent = cm.getLine(cursor.line).match(/^\s*/)[0].length;
+// 12. AUTO-INDENT PASTE, BRACKET CHECKING, SELECTION INFO
+function setupEditorUtilityListeners() {
+  editor.on("beforeChange", function (cm, change) {
+    if (change.origin === "paste") {
+      const lines = change.text;
+      const cursor = change.from;
+      const currentIndent = cm.getLine(cursor.line).match(/^\s*/)[0].length;
 
-    const indented = lines.map((line, i) => {
-      if (i === 0) return line;
-      return " ".repeat(currentIndent) + line;
-    });
+      const indented = lines.map((line, index) => {
+        if (index === 0) {
+          return line;
+        }
+        return " ".repeat(currentIndent) + line;
+      });
 
-    change.update(change.from, change.to, indented);
-  }
-});
+      change.update(change.from, change.to, indented);
+    }
+  });
 
-// 13. BRACKET MATCHING HIGHLIGHT
-editor.on("cursorActivity", function (cm) {
-  const cursor = cm.getCursor();
-  const token = cm.getTokenAt(cursor);
+  editor.on("cursorActivity", function (cm) {
+    const cursor = cm.getCursor();
+    const token = cm.getTokenAt(cursor);
 
-  if (["(", ")", "[", "]", "{", "}"].includes(token.string)) {
-    cm.matchBrackets();
-  }
-});
+    if (["(", ")", "[", "]", "{", "}"].includes(token.string)) {
+      cm.matchBrackets();
+    }
+  });
 
-// 14. UNDO/REDO HISTORY VIEWER
+  editor.on("cursorActivity", function (cm) {
+    const selection = cm.getSelection();
+    if (selection) {
+      const lines = selection.split("\n").length;
+      const chars = selection.length;
+      console.log(`Selected: ${lines} lines, ${chars} chars`);
+    }
+  });
+}
+
+// 13. UNDO/REDO HISTORY VIEWER
 function showHistory() {
   const history = editor.getHistory();
   console.log("Undo stack:", history.undone.length);
   console.log("Redo stack:", history.done.length);
 }
-
-// 15. SELECTION INFO
-editor.on("cursorActivity", function (cm) {
-  const selection = cm.getSelection();
-  if (selection) {
-    const lines = selection.split("\n").length;
-    const chars = selection.length;
-    console.log(`Selected: ${lines} lines, ${chars} chars`);
-  }
-});
 
 function setupAutoClose() {
   const pairs = {
@@ -1446,6 +1505,7 @@ function clearOutput() {
 
 function showOutput(text, type) {
   const output = document.getElementById("output");
+  clearOutputInputHost();
   output.textContent = text;
   output.className = type ? "output-content " + type : "output-content";
   output.scrollTop = 0;
@@ -1535,6 +1595,414 @@ function uploadFile(event) {
   event.target.value = "";
 }
 
+function formatCodeWithAutoFix(cm) {
+  return (async () => {
+    const code = cm.getValue();
+    const prepared = await prepareCodeForExecution(code);
+
+    if (prepared.code !== code) {
+      cm.setValue(prepared.code.replace(/\n$/, ""));
+    }
+
+    showOutput(
+      prepared.changed
+        ? "Kod avtomatik tozalandi va formatlandi"
+        : "Kod allaqachon tartibli ko'rinishda",
+      "success"
+    );
+    setTimeout(clearOutput, 2000);
+  })();
+}
+
+function setupBreakpoints() {
+  editor.on("gutterClick", function (cm, line, gutter) {
+    if (gutter !== "breakpoints") {
+      return;
+    }
+
+    const info = cm.lineInfo(line);
+    if (info.gutterMarkers && info.gutterMarkers.breakpoints) {
+      cm.setGutterMarker(line, "breakpoints", null);
+      return;
+    }
+
+    const marker = document.createElement("div");
+    marker.textContent = "o";
+    marker.style.color = "#ff4444";
+    marker.style.fontSize = "20px";
+    cm.setGutterMarker(line, "breakpoints", marker);
+  });
+}
+
+function loadAutoSavedCode() {
+  const autoSaveData = localStorage.getItem("pythonAutoSave");
+
+  if (!autoSaveData) {
+    return;
+  }
+
+  try {
+    const data = JSON.parse(autoSaveData);
+    if (!data.code || !data.code.trim()) {
+      return;
+    }
+
+    editor.setValue(data.code);
+    const timeSaved = new Date(data.lastSaved).toLocaleString("uz-UZ");
+    showOutput(
+      `Oxirgi sessiya qayta tiklandi\nSaqlangan vaqt: ${timeSaved}`,
+      "success"
+    );
+
+    setTimeout(() => {
+      clearOutput();
+    }, 3000);
+  } catch (error) {
+    console.error("Avtomatik saqlangan kodni yuklashda xatolik:", error);
+  }
+}
+
+function toggleTheme() {
+  const body = document.body;
+  const themeBtn = document.getElementById("themeBtn");
+  const label = themeBtn.querySelector(".button-label");
+
+  body.classList.toggle("dark-mode");
+
+  if (body.classList.contains("dark-mode")) {
+    label.textContent = "Light";
+    editor.setOption("theme", "monokai");
+    localStorage.setItem("theme", "dark");
+  } else {
+    label.textContent = "Dark";
+    editor.setOption("theme", "eclipse");
+    localStorage.setItem("theme", "light");
+  }
+}
+
+function loadTheme() {
+  const savedTheme = localStorage.getItem("theme");
+  const themeBtn = document.getElementById("themeBtn");
+  const label = themeBtn.querySelector(".button-label");
+
+  if (savedTheme === "dark") {
+    document.body.classList.add("dark-mode");
+    label.textContent = "Light";
+    editor.setOption("theme", "monokai");
+    return;
+  }
+
+  label.textContent = "Dark";
+  editor.setOption("theme", "eclipse");
+}
+
+async function initPyodide() {
+  const loading = document.getElementById("loading");
+  loading.classList.add("active");
+
+  try {
+    pyodide = await loadPyodide();
+    loading.textContent = "Formatlash vositalari yuklanmoqda...";
+    await ensurePythonRuntimeTools();
+    loading.textContent = "Python ishga tayyorlanmoqda...";
+    await setupSafeExecutionEnvironment();
+    loading.textContent = "Python tayyor.";
+    setTimeout(() => {
+      loading.classList.remove("active");
+    }, 1800);
+  } catch (error) {
+    loading.textContent = "Xatolik: Python yuklanmadi.";
+    loading.style.background = "#fff1f3";
+    loading.style.color = "#b9384a";
+  }
+}
+
+async function setupSafeExecutionEnvironment() {
+  const pyodideVersion = pyodide.version;
+  if (!pyodideVersion || parseFloat(pyodideVersion) < 0.23) {
+    console.warn(
+      "Pyodide versiyasi eski. Ba'zi funksiyalar ishlamasligi mumkin."
+    );
+  }
+
+  await pyodide.runPythonAsync(`
+import sys
+import ast
+import builtins
+import traceback
+from io import StringIO
+import time
+
+try:
+    import autopep8
+except Exception:
+    autopep8 = None
+
+class LoopIterationError(Exception):
+    pass
+
+class LoopTransformer(ast.NodeTransformer):
+    def visit_For(self, node):
+        self.generic_visit(node)
+        guard_call = ast.Expr(
+            value=ast.Call(
+                func=ast.Name(id="_check_execution_time", ctx=ast.Load()),
+                args=[],
+                keywords=[]
+            )
+        )
+        ast.copy_location(guard_call, node)
+        node.body.insert(0, guard_call)
+        return node
+
+    def visit_While(self, node):
+        self.generic_visit(node)
+        guard_call = ast.Expr(
+            value=ast.Call(
+                func=ast.Name(id="_check_execution_time", ctx=ast.Load()),
+                args=[],
+                keywords=[]
+            )
+        )
+        ast.copy_location(guard_call, node)
+        node.body.insert(0, guard_call)
+        return node
+
+class SafeExecutor:
+    def __init__(self, max_execution_time=5):
+        self.max_execution_time = max_execution_time
+        self.start_time = None
+
+    def compile_code(self, code):
+        tree = ast.parse(code, filename="<user_code>", mode="exec")
+        transformer = LoopTransformer()
+        new_tree = transformer.visit(tree)
+        ast.fix_missing_locations(new_tree)
+        return compile(new_tree, filename="<user_code>", mode="exec")
+
+    def _serialize_error(self, error):
+        traceback_summary = traceback.extract_tb(error.__traceback__)
+        user_frame = None
+
+        for frame in reversed(traceback_summary):
+            if frame.filename == "<user_code>":
+                user_frame = frame
+                break
+
+        line_number = getattr(error, "lineno", None)
+        column_number = getattr(error, "offset", None)
+        code_line = getattr(error, "text", None)
+
+        if user_frame is not None:
+            if line_number is None:
+                line_number = user_frame.lineno
+            if not code_line:
+                code_line = user_frame.line
+
+        return {
+            "type": error.__class__.__name__,
+            "message": str(error),
+            "line": line_number,
+            "column": column_number,
+            "codeLine": code_line.strip("\\n") if isinstance(code_line, str) else code_line,
+            "undefinedName": getattr(error, "name", None),
+            "traceback": "".join(traceback.format_exception(type(error), error, error.__traceback__)),
+        }
+
+    def _check_execution_time(self):
+        if time.time() - self.start_time > self.max_execution_time:
+            raise LoopIterationError("Loop execution time exceeded the limit!")
+
+    def execute(self, code):
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = StringIO()
+        sys.stderr = StringIO()
+        result = {"output": "", "success": True, "error": None}
+
+        try:
+            compiled_code = self.compile_code(code)
+            self.start_time = time.time()
+            exec_globals = {
+                "__builtins__": builtins,
+                "__name__": "__main__",
+                "_check_execution_time": self._check_execution_time,
+            }
+            exec(compiled_code, exec_globals)
+        except BaseException as error:
+            result["success"] = False
+            result["error"] = self._serialize_error(error)
+        finally:
+            stdout_value = sys.stdout.getvalue().rstrip()
+            stderr_value = sys.stderr.getvalue().rstrip()
+            result["output"] = "\\n".join(
+                value for value in [stdout_value, stderr_value] if value
+            )
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
+        return result
+
+_safe_executor = SafeExecutor(max_execution_time=5)
+
+def auto_fix_code(code):
+    prepared = str(code).replace("\\r\\n", "\\n").replace("\\t", "    ")
+    formatter_available = autopep8 is not None
+
+    if formatter_available:
+        try:
+            prepared = autopep8.fix_code(prepared)
+        except Exception:
+            formatter_available = False
+
+    return {
+        "code": prepared,
+        "formatterAvailable": formatter_available,
+    }
+
+def safe_execute(code):
+    return _safe_executor.execute(code)
+  `);
+}
+
+async function runCode() {
+  if (!pyodide) {
+    showOutput("Python hali yuklanmagan. Iltimos, kuting...", "error");
+    return;
+  }
+
+  const code = editor.getValue();
+  if (!code.trim()) {
+    showOutput("Kod kiritilmagan.", "error");
+    return;
+  }
+
+  showOutput("Bajarilmoqda...", "");
+
+  try {
+    clearEditorDiagnostics();
+    const startTime = performance.now();
+    const result = await pyodide.runPythonAsync(`
+import json
+result = safe_execute(${JSON.stringify(code)})
+json.dumps(result)
+    `);
+
+    const executionTime = ((performance.now() - startTime) / 1000).toFixed(3);
+    const resultObj = JSON.parse(result);
+
+    if (!resultObj.success) {
+      const errorReport = buildExecutionErrorReport(resultObj, code, executionTime);
+      highlightEditorError(
+        errorReport.lineNumber,
+        errorReport.columnNumber,
+        errorReport.focusToken
+      );
+      showOutput(errorReport.text, "error");
+      return;
+    }
+
+    clearEditorDiagnostics();
+    if (resultObj.output && resultObj.output.trim()) {
+      showOutput(
+        `${resultObj.output}\nBajarilish vaqti: ${executionTime} soniya`,
+        "success"
+      );
+      return;
+    }
+
+    showOutput(
+      `Kod muvaffaqiyatli bajarildi\n\nBajarilish vaqti: ${executionTime} soniya`,
+      "success"
+    );
+  } catch (error) {
+    showOutput(`Xatolik:\n${error.message}`, "error");
+  }
+}
+
+function showOutput(text, type) {
+  const output = document.getElementById("output");
+  clearOutputInputHost();
+  output.textContent = text;
+  output.className = type ? "output-content " + type : "output-content";
+  output.scrollTop = 0;
+}
+
+function saveCode() {
+  const code = editor.getValue();
+  const savedCodes = JSON.parse(localStorage.getItem("pythonCodes") || "[]");
+  const timestamp = new Date().toLocaleString("uz-UZ");
+
+  savedCodes.unshift({ code, timestamp });
+  if (savedCodes.length > 10) {
+    savedCodes.pop();
+  }
+
+  localStorage.setItem("pythonCodes", JSON.stringify(savedCodes));
+  showOutput(`Kod saqlandi (${timestamp})`, "success");
+  setTimeout(() => {
+    clearOutput();
+  }, 2000);
+}
+
+function loadCode() {
+  const savedCodes = JSON.parse(localStorage.getItem("pythonCodes") || "[]");
+
+  if (savedCodes.length === 0) {
+    showOutput("Saqlangan kodlar topilmadi.", "error");
+    return;
+  }
+
+  editor.setValue(savedCodes[0].code);
+  showOutput(`Oxirgi kod yuklandi (${savedCodes[0].timestamp})`, "success");
+  setTimeout(() => {
+    clearOutput();
+  }, 2000);
+}
+
+function downloadCode() {
+  const code = editor.getValue();
+  const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const filename = `python_code_${Date.now()}.py`;
+
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  showOutput(`Kod yuklab olindi: ${filename}`, "success");
+  setTimeout(() => {
+    clearOutput();
+  }, 2000);
+}
+
+function uploadFile(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function (loadEvent) {
+    editor.setValue(loadEvent.target.result);
+    showOutput(`Fayl yuklandi: ${file.name}`, "success");
+    setTimeout(() => {
+      clearOutput();
+    }, 2000);
+  };
+
+  reader.onerror = function () {
+    showOutput("Faylni o'qishda xatolik yuz berdi.", "error");
+  };
+
+  reader.readAsText(file);
+  event.target.value = "";
+}
+
 document.addEventListener("keydown", function (e) {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     e.preventDefault();
@@ -1544,7 +2012,7 @@ document.addEventListener("keydown", function (e) {
     e.preventDefault();
     saveCode();
   }
-  if ((e.ctrlKey || e.metaKey) && e.key === "d") {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "d") {
     e.preventDefault();
     downloadCode();
   }
