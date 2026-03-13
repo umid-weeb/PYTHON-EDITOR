@@ -34,7 +34,8 @@ app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allow_origins or ["https://pyzone.uz", "https://www.pyzone.uz", "http://localhost"],
+    allow_origins=settings.cors_allow_origins
+    or ["https://pyzone.uz", "https://www.pyzone.uz", "http://localhost", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -18,7 +18,7 @@ router = APIRouter(tags=["auth"], prefix="/api")
 
 SECRET_KEY = os.getenv("ARENA_JWT_SECRET", os.getenv("JWT_SECRET", "dev-secret-change-me"))
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ARENA_JWT_EXPIRE_MINUTES", "10080"))  # 7 days default
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ARENA_JWT_EXPIRE_MINUTES", "60"))  # default 60 minutes
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
@@ -63,28 +63,46 @@ def create_access_token(subject: str) -> str:
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
-    existing = db.query(User).filter(User.username == payload.username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    user = User(
-        username=payload.username,
-        password_hash=get_password_hash(payload.password),
-        country=payload.country,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    token = create_access_token(user.username)
-    return {"success": True, "token": token, "access_token": token, "token_type": "bearer"}
+    try:
+        existing = db.query(User).filter(User.username == payload.username).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        user = User(
+            username=payload.username,
+            password_hash=get_password_hash(payload.password),
+            country=payload.country,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        token = create_access_token(user.username)
+        return {"success": True, "token": token, "access_token": token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # Capture unexpected errors to help debug 500s in production
+        import logging
+
+        logging.getLogger(__name__).exception("Register failed: %s", exc)
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Registration failed")
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    user = db.query(User).filter(User.username == payload.username).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token(user.username)
-    return TokenResponse(token=token, access_token=token)
+    try:
+        user = db.query(User).filter(User.username == payload.username).first()
+        if not user or not verify_password(payload.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        token = create_access_token(user.username)
+        return TokenResponse(token=token, access_token=token)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).exception("Login failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Login failed")
 
 
 @router.get("/me", response_model=MeResponse)
