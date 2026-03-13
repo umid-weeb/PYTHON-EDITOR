@@ -642,6 +642,32 @@ function updateEditorStatus() {
   }
 }
 
+function scrollEditorToCursor() {
+  if (!editor) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    const cursor = editor.getCursor();
+    editor.scrollIntoView({ line: cursor.line, ch: cursor.ch }, 90);
+  });
+}
+
+function scrollOutputToLatest() {
+  requestAnimationFrame(() => {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+
+    if (output) {
+      output.scrollTop = output.scrollHeight;
+    }
+
+    if (inputHost && inputHost.classList.contains("active")) {
+      inputHost.scrollIntoView({ block: "nearest" });
+    }
+  });
+}
+
 function formatEditorCode() {
   if (!editor) {
     return;
@@ -735,7 +761,12 @@ function renderOutputPanelInput(promptText, inputIndex) {
       submitInput();
     }
   });
+  inputElement.addEventListener("input", () => {
+    inputElement.scrollLeft = inputElement.scrollWidth;
+    scrollOutputToLatest();
+  });
   inputElement.focus();
+  scrollOutputToLatest();
 }
 
 function normalizeCodeForExecution(code) {
@@ -1243,6 +1274,7 @@ function setupEditorUtilityListeners() {
 
   editor.on("changes", function () {
     updateEditorStatus();
+    scrollEditorToCursor();
   });
 
   editor.on("cursorActivity", function (cm) {
@@ -1254,6 +1286,7 @@ function setupEditorUtilityListeners() {
     }
 
     updateEditorStatus();
+    scrollEditorToCursor();
   });
 
   editor.on("cursorActivity", function (cm) {
@@ -1722,7 +1755,7 @@ function showOutput(text, type) {
   clearOutputInputHost();
   output.textContent = text;
   output.className = type ? "output-content " + type : "output-content";
-  output.scrollTop = 0;
+  scrollOutputToLatest();
 }
 
 function saveCode() {
@@ -2590,6 +2623,14 @@ async function runCode() {
   showOutput("Bajarilmoqda...", "");
   clearOutputInputHost();
   await continueRunSession(activeRunSession);
+}
+
+function showOutput(text, type) {
+  const output = document.getElementById("output");
+  clearOutputInputHost();
+  output.textContent = text;
+  output.className = type ? "output-content " + type : "output-content";
+  scrollOutputToLatest();
 }
 
 document.addEventListener("keydown", function (e) {
