@@ -813,82 +813,64 @@ body.dark-mode .output-content.error {
   border-bottom-color: #ef4444;
 }
 
-.benefits-section {
-  padding: 28px 30px 34px;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-  border-top: 1px solid #e2e8f0;
+.output-input-host {
+  display: none;
+  padding: 16px 20px 20px;
+  background: #111827;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-body.dark-mode .benefits-section {
-  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
-  border-top-color: #1f2937;
+body.dark-mode .output-input-host {
+  background: #020617;
+  border-top-color: rgba(71, 85, 105, 0.45);
 }
 
-.benefits-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 18px;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
+.output-input-host.active {
+  display: block;
 }
 
-.benefits-header h2 {
-  font-size: 24px;
-  color: #1e293b;
-}
-
-body.dark-mode .benefits-header h2 {
-  color: #f8fafc;
-}
-
-.benefits-header p {
-  max-width: 720px;
-  line-height: 1.6;
-  color: #475569;
-}
-
-body.dark-mode .benefits-header p {
-  color: #cbd5e1;
-}
-
-.benefits-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.benefit-card {
-  padding: 18px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid #dbeafe;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-}
-
-body.dark-mode .benefit-card {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: #243b53;
-  box-shadow: none;
-}
-
-.benefit-card h3 {
+.output-input-label {
   margin-bottom: 10px;
-  font-size: 17px;
-  color: #0f172a;
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-body.dark-mode .benefit-card h3 {
+.output-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.output-input-field {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #0f172a;
   color: #f8fafc;
+  padding: 12px 14px;
+  font-family: "Courier New", monospace;
+  font-size: 14px;
 }
 
-.benefit-card p {
-  line-height: 1.6;
-  color: #475569;
+.output-input-field:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
-body.dark-mode .benefit-card p {
-  color: #cbd5e1;
+.output-input-submit {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  color: white;
+  padding: 0 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.output-input-submit:hover {
+  filter: brightness(1.06);
 }
 
 .cm-tab {
@@ -932,22 +914,6 @@ body.dark-mode .benefit-card p {
 .dark-mode .CodeMirror-vscrollbar::-webkit-scrollbar-track,
 .dark-mode .CodeMirror-hscrollbar::-webkit-scrollbar-track {
   background: #1e1e1e;
-}
-
-@media (max-width: 1080px) {
-  .benefits-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .benefits-section {
-    padding: 22px 18px 26px;
-  }
-
-  .benefits-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,

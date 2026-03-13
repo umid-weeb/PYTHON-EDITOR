@@ -4,6 +4,8 @@ let autoSaveInterval;
 let defaultCode = "";
 let activeErrorLineNumber = null;
 let activeErrorTextMarker = null;
+let activeRunSession = null;
+let pythonFormatterReady = false;
 
 const PYTHON_KEYWORDS = [
   "False",
@@ -292,6 +294,8 @@ function getFriendlyErrorMessage(errorInfo, undefinedName) {
       return "Kod sintaksisida xatolik bor.";
     case "IndentationError":
       return "Indentatsiya noto'g'ri. Bo'sh joy va tablarni tekshiring.";
+    case "TabError":
+      return "Tab va space aralashib ketgan. Editor kodni tekislashga harakat qildi, lekin bu qatorni qo'lda ham tekshiring.";
     case "TypeError":
       return "Mos kelmaydigan qiymat turi ishlatildi.";
     case "ZeroDivisionError":
@@ -412,6 +416,137 @@ function highlightEditorError(lineNumber, columnNumber, focusToken) {
     { line: lineIndex, ch: start !== null ? start : 0 },
     120
   );
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[char]
+  );
+}
+
+function clearOutputInputHost() {
+  const inputHost = document.getElementById("output-input-host");
+  if (!inputHost) {
+    return;
+  }
+
+  inputHost.className = "output-input-host";
+  inputHost.innerHTML = "";
+}
+
+function buildInputWaitingMessage(resultObj, executionTime) {
+  const lines = [];
+
+  if (resultObj.output && resultObj.output.trim()) {
+    lines.push(resultObj.output.trimEnd());
+  }
+
+  lines.push(
+    "",
+    `Kutilayotgan input: ${(resultObj.error?.prompt || "Qiymat kiriting").trim() || "Qiymat kiriting"}`,
+    `Bajarilish vaqti: ${executionTime} soniya`
+  );
+
+  return lines.join("\n").trim();
+}
+
+function renderOutputPanelInput(promptText, inputIndex) {
+  const inputHost = document.getElementById("output-input-host");
+  if (!inputHost) {
+    return;
+  }
+
+  inputHost.className = "output-input-host active";
+  inputHost.innerHTML = `
+    <div class="output-input-label">${escapeHtml(
+      promptText || `Input ${inputIndex + 1}`
+    )}</div>
+    <div class="output-input-row">
+      <input
+        type="text"
+        class="output-input-field"
+        id="output-panel-input"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button type="button" class="output-input-submit" id="output-panel-submit">Yuborish</button>
+    </div>
+  `;
+
+  const inputElement = document.getElementById("output-panel-input");
+  const submitButton = document.getElementById("output-panel-submit");
+
+  const submitInput = () => {
+    if (!activeRunSession) {
+      clearOutputInputHost();
+      return;
+    }
+
+    activeRunSession.inputValues.push(inputElement.value);
+    clearOutputInputHost();
+    continueRunSession(activeRunSession);
+  };
+
+  submitButton.addEventListener("click", submitInput);
+  inputElement.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitInput();
+    }
+  });
+  inputElement.focus();
+}
+
+function normalizeCodeForExecution(code) {
+  return code
+    .replace(/\r\n/g, "\n")
+    .replace(/\t/g, "    ")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+$/g, ""))
+    .join("\n");
+}
+
+async function prepareCodeForExecution(code) {
+  const normalizedCode = normalizeCodeForExecution(code);
+
+  if (!pyodide) {
+    return {
+      code: normalizedCode,
+      changed: normalizedCode !== code,
+      formatterUsed: false,
+    };
+  }
+
+  try {
+    const result = await pyodide.runPythonAsync(`
+import json
+prepared = auto_fix_code(${JSON.stringify(normalizedCode)})
+json.dumps(prepared)
+    `);
+    const prepared = JSON.parse(result);
+    const preparedCode = typeof prepared.code === "string" ? prepared.code : normalizedCode;
+
+    return {
+      code: preparedCode,
+      changed: preparedCode !== code,
+      formatterUsed: Boolean(prepared.formatterAvailable),
+    };
+  } catch (error) {
+    console.warn("Kodni avtomatik tozalashda xatolik:", error);
+    return {
+      code: normalizedCode,
+      changed: normalizedCode !== code,
+      formatterUsed: false,
+    };
+  }
 }
 
 function buildExecutionErrorReport(resultObj, code, executionTime) {
@@ -577,7 +712,26 @@ function toggleComment(cm) {
 }
 
 // 2. CODE FORMATTING (Ctrl+Shift+F)
+async function formatCodeWithAutoFix(cm) {
+  const code = cm.getValue();
+  const prepared = await prepareCodeForExecution(code);
+
+  if (prepared.code !== code) {
+    cm.setValue(prepared.code.replace(/\n$/, ""));
+  }
+
+  showOutput(
+    prepared.changed
+      ? "✅ Kod avtomatik tozalandi va formatlandi"
+      : "✅ Kod allaqachon tartibli ko'rinishda",
+    "success"
+  );
+  setTimeout(clearOutput, 2000);
+}
+
 function formatCode(cm) {
+  formatCodeWithAutoFix(cm);
+  return;
   const code = cm.getValue();
   const lines = code.split("\n");
   let formatted = [];
@@ -1046,12 +1200,34 @@ function loadTheme() {
   }
 }
 
+async function ensurePythonRuntimeTools() {
+  try {
+    await pyodide.loadPackage("micropip");
+    await pyodide.runPythonAsync(`
+import micropip
+
+try:
+    import autopep8
+except Exception:
+    await micropip.install("autopep8")
+    import autopep8
+    `);
+    pythonFormatterReady = true;
+  } catch (error) {
+    pythonFormatterReady = false;
+    console.warn("Python formatter vositalari yuklanmadi:", error);
+  }
+}
+
 async function initPyodide() {
   const loading = document.getElementById("loading");
   loading.classList.add("active");
 
   try {
     pyodide = await loadPyodide();
+    loading.textContent = "⏳ Formatlash vositalari yuklanmoqda...";
+    await ensurePythonRuntimeTools();
+    loading.textContent = "⏳ Python ishga tayyorlanmoqda...";
     await setupSafeExecutionEnvironment();
     loading.textContent = "✅ Python tayyor!";
     setTimeout(() => {
