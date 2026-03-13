@@ -7,6 +7,8 @@ let activeErrorTextMarker = null;
 let activeRunSession = null;
 let pythonFormatterReady = false;
 
+const INDENT_SIZE = 4;
+
 const PYTHON_KEYWORDS = [
   "False",
   "None",
@@ -333,7 +335,8 @@ function buildRepairHints(errorInfo, undefinedName, suggestion, codeLine) {
       break;
     case "IndentationError":
     case "TabError":
-      hints.push("Ctrl+Shift+F bilan formatlab, tab o'rniga 4 ta space ishlatib ko'ring.");
+      hints.push("Format tugmasi yoki Ctrl+Shift+F bilan kodni tekislab ko'ring.");
+      hints.push(`Tab o'rniga ${INDENT_SIZE} ta space ishlating.`);
       break;
     case "TypeError":
       hints.push("Qiymat turlarini tekshirib, kerak bo'lsa int(), float() yoki str() bilan aylantirib ko'ring.");
@@ -349,6 +352,160 @@ function buildRepairHints(errorInfo, undefinedName, suggestion, codeLine) {
   }
 
   return hints;
+}
+
+function getLeadingWhitespace(lineText) {
+  return (lineText || "").match(/^[ \t]*/)?.[0] || "";
+}
+
+function getIndentationDetails(lineText) {
+  const leadingWhitespace = getLeadingWhitespace(lineText);
+  const tabs = (leadingWhitespace.match(/\t/g) || []).length;
+  const spaces = (leadingWhitespace.match(/ /g) || []).length;
+
+  return {
+    leadingWhitespace,
+    tabs,
+    spaces,
+    width: spaces + tabs * INDENT_SIZE,
+    visual: leadingWhitespace.replace(/\t/g, "[tab]").replace(/ /g, "."),
+  };
+}
+
+function findPreviousMeaningfulLine(lines, startIndex) {
+  for (let index = startIndex; index >= 0; index -= 1) {
+    if ((lines[index] || "").trim()) {
+      return {
+        lineNumber: index + 1,
+        text: lines[index],
+      };
+    }
+  }
+
+  return null;
+}
+
+function collectIndentationLevels(lines, beforeIndex) {
+  const levels = new Set([0]);
+
+  for (let index = 0; index < beforeIndex; index += 1) {
+    if (!(lines[index] || "").trim()) {
+      continue;
+    }
+
+    levels.add(getIndentationDetails(lines[index]).width);
+  }
+
+  return Array.from(levels).sort((left, right) => left - right);
+}
+
+function buildIndentationDiagnostics(errorInfo, code) {
+  const errorType = errorInfo?.type || "PythonError";
+  if (!["IndentationError", "TabError"].includes(errorType)) {
+    return { lines: [], suggestedLine: null };
+  }
+
+  const lineNumber = normalizePositiveInteger(errorInfo.line);
+  const codeLines = String(code || "").replace(/\r\n/g, "\n").split("\n");
+  const lineText =
+    (lineNumber && codeLines[lineNumber - 1]) || errorInfo.codeLine || "";
+  const currentIndent = getIndentationDetails(lineText);
+  const previousLine = findPreviousMeaningfulLine(codeLines, (lineNumber || 1) - 2);
+  const previousIndent = previousLine
+    ? getIndentationDetails(previousLine.text)
+    : { width: 0 };
+  const message = String(errorInfo.message || "");
+  const lines = [];
+  let suggestedSpaces = null;
+
+  if (currentIndent.tabs && currentIndent.spaces) {
+    lines.push(
+      `Bu qatorda boshida ${currentIndent.tabs} ta tab va ${currentIndent.spaces} ta space aralashgan.`
+    );
+  } else if (currentIndent.tabs) {
+    lines.push(
+      `Bu qatorda boshida ${currentIndent.tabs} ta tab bor. Python uchun faqat space ishlatish tavsiya qilinadi.`
+    );
+  } else {
+    lines.push(`Bu qatorda boshida ${currentIndent.spaces} ta space bor.`);
+  }
+
+  lines.push(
+    `Ko'rinadigan indent: ${currentIndent.visual || "(yo'q)"}`
+  );
+
+  if (previousLine) {
+    lines.push(
+      `Oldingi muhim qator: ${previousLine.lineNumber}-qator, indent ${previousIndent.width} ta space.`
+    );
+  }
+
+  if (/expected an indented block/i.test(message)) {
+    suggestedSpaces = previousIndent.width + INDENT_SIZE;
+    lines.push(`Kutilgan indent: kamida ${suggestedSpaces} ta space.`);
+  } else if (/unexpected indent/i.test(message)) {
+    lines.push("Bu qatorda ortiqcha bosh bo'sh joy bor.");
+    suggestedSpaces = previousIndent.width;
+  } else if (/unindent does not match any outer indentation level/i.test(message)) {
+    const validLevels = collectIndentationLevels(codeLines, lineNumber || 0);
+    lines.push(`Mos indent darajalari: ${validLevels.join(", ")} ta space.`);
+  }
+
+  return {
+    lines,
+    suggestedLine:
+      suggestedSpaces === null || !lineText.trim()
+        ? null
+        : `${" ".repeat(suggestedSpaces)}${lineText.trimStart()}`,
+  };
+}
+
+function findBlockingWhitespaceIssue(code) {
+  const lines = String(code || "").replace(/\r\n/g, "\n").split("\n");
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineText = lines[index];
+    if (!lineText.trim()) {
+      continue;
+    }
+
+    const details = getIndentationDetails(lineText);
+    if (!details.tabs) {
+      continue;
+    }
+
+    return {
+      lineNumber: index + 1,
+      columnNumber: 1,
+      text: lineText,
+      details,
+    };
+  }
+
+  return null;
+}
+
+function buildWhitespaceIssueMessage(issue) {
+  const issueType =
+    issue.details.spaces > 0 ? "Tab va space aralashgan" : "Tab ishlatilgan";
+
+  return [
+    `Xatolik turi: ${issueType}`,
+    `Joylashuv: ${issue.lineNumber}-qator, 1-ustun`,
+    `Sabab: Python indentatsiyada tab ishlatilsa xato berishi mumkin.`,
+    "",
+    "Muammo bo'lgan qator:",
+    buildCodeFrame(issue.text, issue.lineNumber, 1),
+    "",
+    "Indentatsiya tahlili:",
+    `1. Tablar: ${issue.details.tabs} ta`,
+    `2. Spacelar: ${issue.details.spaces} ta`,
+    `3. Ko'rinadigan indent: ${issue.details.visual || "(yo'q)"}`,
+    "",
+    "Sinab ko'ring:",
+    `1. Toolbar'dagi Format tugmasini bosing.`,
+    `2. Tab o'rniga ${INDENT_SIZE} ta space ishlating.`,
+  ].join("\n");
 }
 
 function getWordRangeAtColumn(lineText, columnIndex) {
@@ -460,6 +617,37 @@ function highlightEditorError(lineNumber, columnNumber, focusToken) {
     { line: lineIndex, ch: start !== null ? start : 0 },
     120
   );
+}
+
+function updateEditorStatus() {
+  if (!editor) {
+    return;
+  }
+
+  const cursor = editor.getCursor();
+  const lineText = editor.getLine(cursor.line) || "";
+  const indentation = getIndentationDetails(lineText);
+  const primary = document.getElementById("editor-status-primary");
+  const secondary = document.getElementById("editor-status-secondary");
+
+  if (primary) {
+    primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+  }
+
+  if (secondary) {
+    secondary.textContent =
+      indentation.tabs > 0
+        ? `Tabs: ${indentation.tabs} | Spaces: ${indentation.spaces}`
+        : `Spaces: ${indentation.spaces} | Tab size: ${INDENT_SIZE}`;
+  }
+}
+
+function formatEditorCode() {
+  if (!editor) {
+    return;
+  }
+
+  formatCodeWithAutoFix(editor);
 }
 
 function escapeHtml(value) {
@@ -614,6 +802,7 @@ function buildExecutionErrorReport(resultObj, code, executionTime) {
     suggestion,
     codeLine
   );
+  const indentationDiagnostics = buildIndentationDiagnostics(errorInfo, code);
 
   if (!columnNumber && undefinedName && codeLine) {
     columnNumber = findColumnForName(codeLine, undefinedName);
@@ -640,6 +829,23 @@ function buildExecutionErrorReport(resultObj, code, executionTime) {
       "Muammo bo'lgan qator:",
       buildCodeFrame(codeLine, lineNumber, columnNumber)
     );
+  }
+
+  if (indentationDiagnostics.lines.length) {
+    reportLines.push("", "Indentatsiya tahlili:");
+    indentationDiagnostics.lines.forEach((line, index) => {
+      reportLines.push(`${index + 1}. ${line}`);
+    });
+
+    if (
+      indentationDiagnostics.suggestedLine &&
+      indentationDiagnostics.suggestedLine !== codeLine
+    ) {
+      reportLines.push(
+        "Tavsiya etilgan indent:",
+        indentationDiagnostics.suggestedLine
+      );
+    }
   }
 
   if (suggestion && suggestion !== undefinedName) {
@@ -728,6 +934,7 @@ window.addEventListener("DOMContentLoaded", function () {
   setupEditorUtilityListeners();
   loadAutoSavedCode();
   loadTheme();
+  updateEditorStatus();
   startAutoSave();
   initPyodide();
 });
@@ -1033,6 +1240,10 @@ function setupEditorUtilityListeners() {
     }
   });
 
+  editor.on("changes", function () {
+    updateEditorStatus();
+  });
+
   editor.on("cursorActivity", function (cm) {
     const cursor = cm.getCursor();
     const token = cm.getTokenAt(cursor);
@@ -1040,6 +1251,8 @@ function setupEditorUtilityListeners() {
     if (["(", ")", "[", "]", "{", "}"].includes(token.string)) {
       cm.matchBrackets();
     }
+
+    updateEditorStatus();
   });
 
   editor.on("cursorActivity", function (cm) {
@@ -2001,6 +2214,95 @@ function uploadFile(event) {
 
   reader.readAsText(file);
   event.target.value = "";
+}
+
+function formatCodeWithAutoFix(cm) {
+  return (async () => {
+    const code = cm.getValue();
+    const prepared = await prepareCodeForExecution(code);
+
+    if (prepared.code !== code) {
+      cm.setValue(prepared.code.replace(/\n$/, ""));
+    }
+
+    updateEditorStatus();
+    showOutput(
+      prepared.changed
+        ? prepared.formatterUsed
+          ? "Kod formatlandi va indentatsiya tozalandi."
+          : "Tablar va ortiqcha bo'shliqlar tozalandi."
+        : "Kod allaqachon tartibli ko'rinishda.",
+      "success"
+    );
+    setTimeout(clearOutput, 2000);
+  })();
+}
+
+async function runCode() {
+  if (!pyodide) {
+    showOutput("Python hali yuklanmagan. Iltimos, kuting...", "error");
+    return;
+  }
+
+  const code = editor.getValue();
+  if (!code.trim()) {
+    showOutput("Kod kiritilmagan.", "error");
+    return;
+  }
+
+  const whitespaceIssue = findBlockingWhitespaceIssue(code);
+  if (whitespaceIssue) {
+    clearEditorDiagnostics();
+    highlightEditorError(
+      whitespaceIssue.lineNumber,
+      whitespaceIssue.columnNumber,
+      null
+    );
+    showOutput(buildWhitespaceIssueMessage(whitespaceIssue), "error");
+    return;
+  }
+
+  showOutput("Bajarilmoqda...", "");
+
+  try {
+    clearEditorDiagnostics();
+    const startTime = performance.now();
+    const result = await pyodide.runPythonAsync(`
+import json
+result = safe_execute(${JSON.stringify(code)})
+json.dumps(result)
+    `);
+
+    const executionTime = ((performance.now() - startTime) / 1000).toFixed(3);
+    const resultObj = JSON.parse(result);
+
+    if (!resultObj.success) {
+      const errorReport = buildExecutionErrorReport(resultObj, code, executionTime);
+      highlightEditorError(
+        errorReport.lineNumber,
+        errorReport.columnNumber,
+        errorReport.focusToken
+      );
+      showOutput(errorReport.text, "error");
+      return;
+    }
+
+    clearEditorDiagnostics();
+    if (resultObj.output && resultObj.output.trim()) {
+      showOutput(
+        `${resultObj.output}\nBajarilish vaqti: ${executionTime} soniya`,
+        "success"
+      );
+      return;
+    }
+
+    showOutput(
+      `Kod muvaffaqiyatli bajarildi\n\nBajarilish vaqti: ${executionTime} soniya`,
+      "success"
+    );
+  } catch (error) {
+    showOutput(`Xatolik:\n${error.message}`, "error");
+  }
 }
 
 document.addEventListener("keydown", function (e) {
