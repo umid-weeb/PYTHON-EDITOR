@@ -17,8 +17,9 @@ Architecture:
 ## Frontend Structure
 
 - `ProblemList`: GitHub-backed easy problem navigator with search
+- Three-pane resizable layout with cached pane sizes and fast-first-paint skeletons
 - `ProblemDescription`: markdown description, metadata, tags, limits
-- `CodeEditor`: CodeMirror-based Python editor with starter code preload
+- `CodeEditor`: Monaco editor with textarea fallback and lazy starter-code loading
 - `RunButton`: executes only visible tests
 - `SubmitButton`: executes visible + hidden tests
 - `TestcasePanel`: shows 3-4 visible testcases
@@ -118,6 +119,41 @@ pip install -r backend/requirements.txt
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+List endpoint supports lightweight summary pagination:
+
+```text
+GET /api/problems?page=1&per_page=20&q=two&tags=array,hashmap
+```
+
+Response shape:
+
+```json
+{
+  "items": [
+    {
+      "id": "two_sum",
+      "title": "Two Sum",
+      "difficulty": "easy",
+      "tags": ["array", "hashmap"],
+      "preview": "2 <= nums.length <= 10000"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "per_page": 20,
+  "total_pages": 1,
+  "selected_tags": ["array"],
+  "available_tags": ["array", "hashmap"],
+  "source": "local:..."
+}
+```
+
+Run tests:
+
+```bash
+pytest backend/tests
 ```
 
 5. Optional async stack:

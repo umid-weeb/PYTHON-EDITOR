@@ -11,6 +11,9 @@ class ProblemSummary(BaseModel):
     title: str
     difficulty: str
     tags: list[str] = Field(default_factory=list)
+    preview: str | None = None
+    acceptance_rate: int | None = None
+    is_solved: bool = False
     time_limit_seconds: float | None = None
     memory_limit_mb: int | None = None
 
@@ -35,6 +38,12 @@ class ProblemDetail(ProblemSummary):
 class ProblemListResponse(BaseModel):
     items: list[ProblemSummary]
     total: int
+    page: int
+    per_page: int
+    total_pages: int
+    query: str | None = None
+    selected_tags: list[str] = Field(default_factory=list)
+    available_tags: list[str] = Field(default_factory=list)
     source: str
     easy_only: bool = True
 
@@ -78,4 +87,3 @@ class SubmissionStatus(BaseModel):
     updated_at: datetime
     error_text: str | None = None
     case_results: list[CaseResult] = Field(default_factory=list)
-

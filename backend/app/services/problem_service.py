@@ -48,6 +48,64 @@ class ProblemService:
         self.cache.save_index([item.model_dump() for item in problems])
         return problems
 
+    async def list_problem_page(
+        self,
+        *,
+        page: int = 1,
+        per_page: int = 20,
+        query: str = "",
+        tags: list[str] | None = None,
+        force_refresh: bool = False,
+    ) -> dict[str, Any]:
+        all_items = await self.list_problems(force_refresh=force_refresh)
+        normalized_query = query.strip().lower()
+        normalized_tags = [tag.strip().lower() for tag in (tags or []) if tag.strip()]
+
+        filtered = []
+        for item in all_items:
+            haystack = " ".join(
+                [
+                    item.id,
+                    item.title,
+                    item.preview or "",
+                    *item.tags,
+                ]
+            ).lower()
+            matches_query = not normalized_query or normalized_query in haystack
+            matches_tags = not normalized_tags or all(
+                tag in [problem_tag.lower() for problem_tag in item.tags]
+                for tag in normalized_tags
+            )
+            if matches_query and matches_tags:
+                filtered.append(item)
+
+        total = len(filtered)
+        safe_per_page = max(1, min(per_page, 100))
+        total_pages = max(1, (total + safe_per_page - 1) // safe_per_page)
+        safe_page = min(max(1, page), total_pages)
+        start = (safe_page - 1) * safe_per_page
+        end = start + safe_per_page
+
+        available_tags = sorted(
+            {
+                tag
+                for item in all_items
+                for tag in item.tags
+                if tag
+            }
+        )
+
+        return {
+            "items": filtered[start:end],
+            "total": total,
+            "page": safe_page,
+            "per_page": safe_per_page,
+            "total_pages": total_pages,
+            "query": query or None,
+            "selected_tags": normalized_tags,
+            "available_tags": available_tags,
+        }
+
     async def get_problem(self, problem_id: str, force_refresh: bool = False) -> ProblemDetail:
         bundle = await self.get_problem_bundle(problem_id, force_refresh=force_refresh)
         public_payload = dict(bundle)
@@ -111,6 +169,9 @@ class ProblemService:
             title=metadata.get("title") or self._humanize(problem_id),
             difficulty=str(metadata.get("difficulty", "easy")).lower(),
             tags=self._normalize_list(metadata.get("tags")),
+            preview=self._build_preview(metadata),
+            acceptance_rate=self._normalize_acceptance_rate(metadata.get("acceptance_rate")),
+            is_solved=bool(metadata.get("is_solved", False)),
             time_limit_seconds=parse_time_limit_seconds(metadata.get("time_limit")),
             memory_limit_mb=parse_memory_limit_mb(metadata.get("memory_limit")),
         )
@@ -168,6 +229,29 @@ class ProblemService:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return [str(item).strip() for item in value if str(item).strip()]
+
+    def _build_preview(self, metadata: dict[str, Any]) -> str | None:
+        preview = metadata.get("preview")
+        if preview:
+            return str(preview).strip()
+
+        constraints = self._normalize_list(metadata.get("constraints"))
+        if constraints:
+            return constraints[0]
+
+        tags = self._normalize_list(metadata.get("tags"))
+        if tags:
+            return ", ".join(tags[:3])
+
+        return None
+
+    def _normalize_acceptance_rate(self, value: Any) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        match = re.search(r"(\d+)", str(value))
+        return int(match.group(1)) if match else None
 
 
 @lru_cache(maxsize=1)

@@ -15,13 +15,30 @@ router = APIRouter(tags=["problems"])
 
 @router.get("/problems", response_model=ProblemListResponse)
 async def list_problems(
+    page: int = 1,
+    per_page: int = 20,
+    q: str = "",
+    tags: str = "",
     refresh: bool = False,
     service: ProblemService = Depends(get_problem_service),
 ) -> ProblemListResponse:
-    items = await service.list_problems(force_refresh=refresh)
+    tag_items = [item.strip() for item in tags.split(",") if item.strip()]
+    payload = await service.list_problem_page(
+        page=page,
+        per_page=per_page,
+        query=q,
+        tags=tag_items,
+        force_refresh=refresh,
+    )
     return ProblemListResponse(
-        items=items,
-        total=len(items),
+        items=payload["items"],
+        total=payload["total"],
+        page=payload["page"],
+        per_page=payload["per_page"],
+        total_pages=payload["total_pages"],
+        query=payload["query"],
+        selected_tags=payload["selected_tags"],
+        available_tags=payload["available_tags"],
         source=service.source_label,
         easy_only=True,
     )
