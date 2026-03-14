@@ -221,7 +221,8 @@ textarea {
   border: 1px solid var(--arena-border);
   background: var(--arena-surface);
   box-shadow: var(--arena-shadow);
-  min-width: 160px;
+  min-width: 180px;
+  z-index: 30;
 }
 
 .user-menu a,
@@ -231,8 +232,14 @@ textarea {
   text-align: left;
   background: none;
   border: none;
-  padding: 6px 4px;
+  padding: 6px 8px;
   cursor: pointer;
+  border-radius: 10px;
+}
+
+.user-menu a:hover,
+.user-menu button:hover {
+  background: rgba(91, 141, 255, 0.12);
 }
 
 .arena-back {

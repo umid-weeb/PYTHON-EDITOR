@@ -59,14 +59,10 @@ function bindEvents() {
   ui.runBtn.addEventListener("click", () => handleRun(ui));
   ui.submitBtn.addEventListener("click", () => handleSubmit(ui));
   if (ui.userAvatar && ui.userMenu) {
-    ui.userAvatar.addEventListener("click", () => {
-      ui.userMenu.hidden = !ui.userMenu.hidden;
-    });
+    ui.userAvatar.addEventListener("click", toggleUserMenu);
   }
   if (ui.hamburger && ui.userMenu) {
-    ui.hamburger.addEventListener("click", () => {
-      ui.userMenu.hidden = !ui.userMenu.hidden;
-    });
+    ui.hamburger.addEventListener("click", toggleUserMenu);
   }
   if (ui.logoutBtn) {
     ui.logoutBtn.addEventListener("click", () => {
@@ -79,6 +75,10 @@ function bindEvents() {
   if (ui.authModalSignup) ui.authModalSignup.addEventListener("click", () => redirectToAuth("register.html"));
   document.addEventListener("click", (e) => {
     if (e.target === ui.authModal) closeAuthModal();
+    if (ui.userMenu && !ui.userMenu.hidden) {
+      const targetInside = e.target.closest("#user-menu") || e.target.closest("#user-avatar") || e.target.closest("#hamburger-btn");
+      if (!targetInside) ui.userMenu.hidden = true;
+    }
   });
   if (ui.searchInput) {
     ui.searchInput.addEventListener("input", (e) => {
@@ -119,6 +119,9 @@ function bindShortcuts() {
       e.preventDefault();
       ui.submitBtn.click();
     }
+    if (e.key === "Escape" && ui.userMenu && !ui.userMenu.hidden) {
+      ui.userMenu.hidden = true;
+    }
   });
 }
 
@@ -139,6 +142,11 @@ function hydrateUser() {
       })
       .catch(() => {})
   );
+}
+
+function toggleUserMenu() {
+  if (!ui.userMenu) return;
+  ui.userMenu.hidden = !ui.userMenu.hidden;
 }
 
 function pickInitialProblemId(problems) {
