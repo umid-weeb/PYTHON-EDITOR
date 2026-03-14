@@ -21,4 +21,5 @@ __all__ = [
     "SubmissionStatus",
     "CaseResult",
     "User",
+    "UserProfile",
 ]
