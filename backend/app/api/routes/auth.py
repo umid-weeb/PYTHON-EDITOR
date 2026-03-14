@@ -32,9 +32,9 @@ def normalize_password(password: str) -> bytes:
 
 
 class RegisterRequest(BaseModel):
-    full_name: str = Field(min_length=1, max_length=255)
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=4, max_length=128)
+    country: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -90,9 +90,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
 
         # Create user with hashed password
         user = User(
-            full_name=payload.full_name,
             username=payload.username,
             password_hash=get_password_hash(payload.password),
+            country=payload.country,
         )
         db.add(user)
         db.commit()
@@ -109,8 +109,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
             logger.warning("Register integrity error (likely duplicate): %s", exc, exc_info=True)
             raise HTTPException(status_code=400, detail="Username already exists")
 
+        # Print the real error for debugging
         logger.error("Register failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail="Registration failed")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(exc)}")
 
 
 @router.post("/login")
