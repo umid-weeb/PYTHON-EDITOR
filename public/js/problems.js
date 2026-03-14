@@ -50,6 +50,9 @@ export function renderProblemList(ui) {
 
 export async function openProblem(ui, problemId) {
   if (!problemId) return;
+  if (ui.showDescriptionPane) {
+    ui.showDescriptionPane();
+  }
   if (state.cache.has(problemId)) {
     await renderProblemDetail(ui, state.cache.get(problemId));
     return;

@@ -12,16 +12,11 @@ let navSearchVersion = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
   collectUi();
+  showListPane();
   renderResultMessage(ui, "Loading problems...");
   hydrateUser();
   await initEditor(ui.editorHost);
-  const problems = await loadProblemList(ui);
-  const initialId = pickInitialProblemId(problems);
-  if (initialId) {
-    await openProblem(ui, initialId);
-  } else if (ui.listContainer.firstChild) {
-    ui.listContainer.firstChild.click();
-  }
+  await loadProblemList(ui);
   await resumePendingAction();
   bindEvents();
   bindShortcuts();
@@ -63,6 +58,10 @@ function collectUi() {
   ui.navUserSearch = document.getElementById("nav-user-search");
   ui.navSearchResults = document.getElementById("nav-search-results");
   ui.backToListBtn = document.getElementById("back-to-list-btn");
+  ui.leftListPane = document.getElementById("arena-pane-list");
+  ui.leftDescriptionPane = document.getElementById("arena-pane-description");
+  ui.showDescriptionPane = showDescriptionPane;
+  ui.showListPane = showListPane;
 }
 
 function bindEvents() {
@@ -82,27 +81,7 @@ function bindEvents() {
   if (ui.authModalSignup) ui.authModalSignup.addEventListener("click", () => redirectToAuth("register.html"));
   if (ui.backToListBtn) {
     ui.backToListBtn.addEventListener("click", () => {
-      // Hide description and show list
-      if (ui.description) ui.description.classList.remove("is-visible");
-      if (ui.descriptionLoading) ui.descriptionLoading.classList.remove("is-hidden");
-      if (ui.problemTitle) ui.problemTitle.textContent = "Problem loading...";
-      if (ui.problemDifficulty) ui.problemDifficulty.textContent = "Easy";
-      if (ui.problemMeta) ui.problemMeta.textContent = "";
-      
-      // Clear editor and results
-      if (ui.resultSummary) ui.resultSummary.textContent = "Run yoki Submit tugmasini bosing.";
-      if (ui.resultDetails) ui.resultDetails.textContent = "";
-      if (ui.statusChip) ui.statusChip.textContent = "Idle";
-      ui.statusChip.className = "result-chip";
-      
-      // Reset URL
-      const url = new URL(window.location);
-      url.searchParams.delete("problem");
-      window.history.replaceState({}, "", url.toString());
-      
-      // Reset active state on list items
-      const activeItems = document.querySelectorAll(".problem-list-item.is-active");
-      activeItems.forEach(item => item.classList.remove("is-active"));
+      showListPane();
     });
   }
   document.addEventListener("click", (e) => {
@@ -321,6 +300,24 @@ function showLoggedInUI() {
   buildLoggedInMenu();
   if (ui.userPanel) ui.userPanel.hidden = false;
   if (ui.authActions) ui.authActions.hidden = true;
+}
+
+function showListPane() {
+  if (ui.leftListPane) ui.leftListPane.classList.remove("panel-hidden");
+  if (ui.leftDescriptionPane) {
+    ui.leftDescriptionPane.classList.add("panel-hidden");
+    ui.leftDescriptionPane.classList.remove("is-visible");
+  }
+}
+
+function showDescriptionPane() {
+  if (ui.leftListPane) ui.leftListPane.classList.add("panel-hidden");
+  if (ui.leftDescriptionPane) {
+    ui.leftDescriptionPane.classList.remove("panel-hidden");
+    ui.leftDescriptionPane.classList.add("is-visible");
+    const surface = ui.leftDescriptionPane.querySelector(".pane-surface");
+    if (surface) surface.scrollTop = 0;
+  }
 }
 
 function buildLoggedOutMenu() {

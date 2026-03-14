@@ -98,10 +98,26 @@ textarea {
   padding: 18px;
 }
 
+.panel-hidden {
+  display: none !important;
+}
+
 .arena-grid {
   display: grid;
-  grid-template-columns: 25% 40% 35%;
+  grid-template-columns: 45% 55%;
+  grid-auto-rows: 1fr;
   height: 100%;
+}
+
+.arena-pane-list,
+.arena-pane-description {
+  grid-column: 1 / 2;
+  grid-row: 1 / 2;
+}
+
+.arena-pane-workbench {
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
 }
 
 .arena-pane {
@@ -125,6 +141,8 @@ textarea {
 .pane-sidebar {
   flex-direction: column;
   padding: 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .arena-pane-description .pane-surface {
@@ -1771,7 +1789,7 @@ textarea {
   }
 
   .arena-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 45% 55%;
   }
 
   .gutter {
