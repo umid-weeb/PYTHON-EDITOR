@@ -160,12 +160,16 @@ function bindShortcuts() {
 }
 
 function hydrateUser() {
-  // Check our pocket for the VIP ticket!
+  // 1. Check our pocket for the VIP ticket immediately
   const token = getToken() || localStorage.getItem("access_token");
   if (!token) {
     showLoggedOutUI();
     return;
   }
+
+  // 2. We have a ticket! Show the "VIP" menu right away so the user isn't confused
+  showLoggedInUI();
+
   import("./api.js").then(({ authApi }) =>
     authApi
       .me()

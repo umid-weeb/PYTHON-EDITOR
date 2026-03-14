@@ -17,15 +17,19 @@ export async function requireAuth(redirectBack = "/arena.html") {
 }
 
 export async function login(username, password) {
-  const data = await authApi.login({ username, password });
-  if (data?.access_token) setToken(data.access_token);
-  return data;
+  const box = await authApi.login({ username, password });
+  // Check the box for the ticket and put it in the pocket
+  const ticket = box?.access_token || box?.token;
+  if (ticket) setToken(ticket);
+  return box;
 }
 
 export async function register(payload) {
-  const data = await authApi.register(payload);
-  if (data?.access_token) setToken(data.access_token);
-  return data;
+  const box = await authApi.register(payload);
+  // Even new friends get a ticket put in their pocket immediately!
+  const ticket = box?.access_token || box?.token;
+  if (ticket) setToken(ticket);
+  return box;
 }
 
 export async function logout() {

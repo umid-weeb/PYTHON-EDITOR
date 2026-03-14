@@ -33,14 +33,16 @@
       btn.textContent = "Logging in...";
       try {
         const next = new URLSearchParams(window.location.search).get("next") || "/arena.html";
-        const data = await login(
+        const box = await login(
           document.getElementById("username").value.trim(),
           document.getElementById("password").value
         );
 
-        // Make sure the VIP ticket is tucked safely in our pocket!
-        if (data && data.access_token) {
-          localStorage.setItem("access_token", data.access_token);
+        // We take the VIP ticket from the box and put it in our Magic Pocket!
+        const ticket = box?.access_token || box?.token;
+        if (ticket) {
+          localStorage.setItem("arena_jwt", ticket);
+          localStorage.setItem("access_token", ticket);
         }
 
         // Handle pending actions after login
