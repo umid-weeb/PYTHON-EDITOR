@@ -159,6 +159,30 @@ textarea {
 .user-panel {
   margin-left: auto;
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hamburger {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--arena-border);
+  background: rgba(8, 15, 28, 0.85);
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.hamburger span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--arena-text);
 }
 
 .user-avatar {
@@ -169,12 +193,27 @@ textarea {
   background: rgba(8, 15, 28, 0.8);
   color: var(--arena-text);
   cursor: pointer;
+  overflow: hidden;
+  display: inline-grid;
+  place-items: center;
+}
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.user-username {
+  font-weight: 700;
+  color: var(--arena-text);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-menu {
   position: absolute;
   right: 0;
-  top: 44px;
+  top: 48px;
   display: grid;
   gap: 6px;
   padding: 10px;
@@ -1338,6 +1377,61 @@ textarea {
 }
 .muted {
   color: var(--arena-muted);
+}
+.profile-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.profile-form {
+  display: grid;
+  gap: 10px;
+}
+.form-field {
+  display: grid;
+  gap: 6px;
+}
+.form-field input,
+.form-field textarea {
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--arena-border);
+  background: rgba(8, 15, 28, 0.82);
+  color: var(--arena-text);
+}
+.form-hint {
+  color: var(--arena-danger);
+  font-size: 0.85rem;
+}
+.form-status {
+  color: var(--arena-muted);
+  font-size: 0.92rem;
+}
+.form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.avatar-upload {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+}
+.avatar-preview {
+  width: 92px;
+  height: 92px;
+  border-radius: 18px;
+  border: 1px solid var(--arena-border);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 15, 28, 0.85);
+}
+.avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .activity-grid {
   display: grid;

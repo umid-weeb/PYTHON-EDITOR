@@ -30,5 +30,6 @@ export async function register(payload) {
 
 export function logout() {
   clearToken();
-  window.location.href = "/login.html";
+  sessionStorage.clear();
+  window.location.href = "/arena.html";
 }

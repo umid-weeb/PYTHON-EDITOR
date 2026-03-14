@@ -127,6 +127,83 @@
         <div id="badge-grid" class="badge-grid"></div>
       </div>
     </section>
+
+    <section class="profile-card">
+      <header class="card-head">
+        <div class="card-title">Social</div>
+      </header>
+      <div class="chip-row" id="social-links"></div>
+    </section>
+
+    <section class="profile-card profile-edit-grid">
+      <div>
+        <header class="card-head">
+          <div class="card-title">Edit profile</div>
+        </header>
+        <form id="profile-form" class="profile-form">
+          <label class="form-field">
+            <span>Username</span>
+            <input id="edit-username" name="username" type="text" required />
+            <span class="form-hint" id="username-hint"></span>
+          </label>
+          <label class="form-field">
+            <span>Country</span>
+            <input id="edit-country" name="country" type="text" />
+          </label>
+          <label class="form-field">
+            <span>Bio</span>
+            <textarea id="edit-bio" name="bio" rows="3"></textarea>
+          </label>
+          <label class="form-field">
+            <span>GitHub</span>
+            <input id="edit-github" name="github" type="url" placeholder="https://github.com/username" />
+          </label>
+          <label class="form-field">
+            <span>LinkedIn</span>
+            <input id="edit-linkedin" name="linkedin" type="url" placeholder="https://www.linkedin.com/in/..." />
+          </label>
+          <label class="form-field">
+            <span>Website</span>
+            <input id="edit-website" name="website" type="url" placeholder="https://example.com" />
+          </label>
+          <div class="form-actions">
+            <button class="arena-button button-run" type="submit">Save profile</button>
+            <span class="form-status" id="profile-status"></span>
+          </div>
+        </form>
+      </div>
+      <div>
+        <header class="card-head">
+          <div class="card-title">Avatar & password</div>
+        </header>
+        <div class="avatar-upload">
+          <div class="avatar-preview">
+            <img id="avatar-preview-img" alt="Avatar preview" hidden />
+            <div id="avatar-preview-fallback" class="avatar-circle">U</div>
+          </div>
+          <input id="avatar-input" type="file" accept=".png,.jpg,.jpeg,.webp" />
+          <div class="form-status" id="avatar-status"></div>
+        </div>
+        <form id="password-form" class="profile-form">
+          <label class="form-field">
+            <span>Current password</span>
+            <input id="current-password" name="current_password" type="password" required />
+          </label>
+          <label class="form-field">
+            <span>New password</span>
+            <input id="new-password" name="new_password" type="password" required />
+          </label>
+          <label class="form-field">
+            <span>Confirm new password</span>
+            <input id="confirm-password" name="confirm_password" type="password" required />
+          </label>
+          <div class="form-actions">
+            <button class="arena-button button-submit" type="submit">Change password</button>
+            <span class="form-status" id="password-status"></span>
+          </div>
+        </form>
+      </div>
+    </section>
   </main>
 
   <script type="module">
@@ -135,7 +212,6 @@
 
     const ok = await requireAuth("/profile.html");
     if (!ok) return;
-
     document.getElementById("logout-btn").addEventListener("click", logout);
 
     const profileData = await authApi.me().catch(() => null);
@@ -150,6 +226,8 @@
     renderRecent(submissionsRaw);
     renderSkills(profileData);
     renderBadges(activityRaw, submissionsRaw);
+    hydrateEditForms(profileData);
+    renderSocial(profileData);
 
     function renderProfile(profile, submissions) {
       const name = profile?.username || "Guest";
@@ -158,6 +236,16 @@
       document.getElementById("profile-meta").textContent = `${profile?.country || "Unknown"} · Joined ${profile?.joined_at || "—"}`;
       document.getElementById("profile-avatar").textContent = (name || "").slice(0, 1).toUpperCase();
       document.getElementById("rank-badge").textContent = profile?.rank ? `Rank #${profile.rank}` : "Member";
+      const previewFallback = document.getElementById("avatar-preview-fallback");
+      if (profile?.avatar_url) {
+        const img = document.getElementById("avatar-preview-img");
+        img.src = profile.avatar_url;
+        img.hidden = false;
+        previewFallback.hidden = true;
+      } else {
+        previewFallback.textContent = (name || "U")[0].toUpperCase();
+      }
+      document.getElementById("profile-avatar").textContent = (name || "U")[0].toUpperCase();
 
       const totalSubs = Array.isArray(submissions) ? submissions.length : 0;
       document.getElementById("submission-pill").textContent = `${totalSubs} submissions`;
@@ -263,6 +351,29 @@
       });
     }
 
+    function renderSocial(profile) {
+      const container = document.getElementById("social-links");
+      container.innerHTML = "";
+      const links = [
+        { label: "GitHub", url: profile?.github, icon: "" },
+        { label: "LinkedIn", url: profile?.linkedin, icon: "" },
+        { label: "Website", url: profile?.website, icon: "" },
+      ].filter((l) => l.url);
+      if (!links.length) {
+        container.innerHTML = `<span class="muted">No social links yet.</span>`;
+        return;
+      }
+      links.forEach((link) => {
+        const a = document.createElement("a");
+        a.className = "chip";
+        a.href = link.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = `${link.label}`;
+        container.appendChild(a);
+      });
+    }
+
     function renderBadges(activity, submissions) {
       const streak = calcCurrentStreak(buildActivityDays(activity || []));
       const acceptedCount = Array.isArray(submissions)
@@ -287,6 +398,89 @@
           </div>
         `;
         grid.appendChild(card);
+      });
+    }
+
+    function hydrateEditForms(profile) {
+      const usernameInput = document.getElementById("edit-username");
+      const countryInput = document.getElementById("edit-country");
+      const bioInput = document.getElementById("edit-bio");
+      const ghInput = document.getElementById("edit-github");
+      const liInput = document.getElementById("edit-linkedin");
+      const webInput = document.getElementById("edit-website");
+      usernameInput.value = profile?.username || "";
+      countryInput.value = profile?.country || "";
+      bioInput.value = profile?.bio || "";
+      ghInput.value = profile?.github || "";
+      liInput.value = profile?.linkedin || "";
+      webInput.value = profile?.website || "";
+
+      document.getElementById("profile-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const status = document.getElementById("profile-status");
+        status.textContent = "Saving...";
+        try {
+          await userApi.updateProfile({
+            username: usernameInput.value.trim(),
+            country: countryInput.value.trim(),
+            bio: bioInput.value.trim(),
+            github: ghInput.value.trim(),
+            linkedin: liInput.value.trim(),
+            website: webInput.value.trim(),
+          });
+          status.textContent = "Saved";
+          document.getElementById("username-hint").textContent = "";
+          document.getElementById("profile-username").textContent = usernameInput.value.trim();
+          document.getElementById("profile-handle").textContent = `@${usernameInput.value.trim()}`;
+          document.getElementById("profile-meta").textContent = `${countryInput.value.trim() || "Unknown"} · Joined ${profile?.joined_at || "—"}`;
+        } catch (err) {
+          const message = err.message || "";
+          if (message.toLowerCase().includes("taken") || err?.status === 409) {
+            document.getElementById("username-hint").textContent = "This username is already taken.";
+          } else {
+            status.textContent = "Save failed";
+          }
+        }
+      });
+
+      document.getElementById("avatar-input").addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        const status = document.getElementById("avatar-status");
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          status.textContent = "Max size 2MB";
+          return;
+        }
+        const preview = document.getElementById("avatar-preview-img");
+        preview.src = URL.createObjectURL(file);
+        preview.hidden = false;
+        document.getElementById("avatar-preview-fallback").hidden = true;
+        status.textContent = "Uploading...";
+        try {
+          await userApi.uploadAvatar(file);
+          status.textContent = "Uploaded";
+        } catch (err) {
+          status.textContent = "Upload failed";
+        }
+      });
+
+      document.getElementById("password-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const current = document.getElementById("current-password").value;
+        const next = document.getElementById("new-password").value;
+        const confirm = document.getElementById("confirm-password").value;
+        const status = document.getElementById("password-status");
+        if (next !== confirm) {
+          status.textContent = "Passwords do not match";
+          return;
+        }
+        status.textContent = "Updating...";
+        try {
+          await userApi.updatePassword({ current_password: current, new_password: next });
+          status.textContent = "Password updated";
+        } catch (err) {
+          status.textContent = "Password update failed";
+        }
       });
     }
 

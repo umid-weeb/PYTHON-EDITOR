@@ -39,6 +39,10 @@ function collectUi() {
   ui.submitBtn = document.getElementById("submit-solution");
   ui.editorHost = document.getElementById("arena-editor");
   ui.userAvatar = document.getElementById("user-avatar");
+  ui.userAvatarImg = document.getElementById("user-avatar-img");
+  ui.userAvatarFallback = document.getElementById("user-avatar-fallback");
+  ui.usernameLabel = document.getElementById("navbar-username");
+  ui.hamburger = document.getElementById("hamburger-btn");
   ui.userMenu = document.getElementById("user-menu");
   ui.logoutBtn = document.getElementById("logout-btn");
   ui.authModal = document.getElementById("auth-modal");
@@ -56,6 +60,11 @@ function bindEvents() {
   ui.submitBtn.addEventListener("click", () => handleSubmit(ui));
   if (ui.userAvatar && ui.userMenu) {
     ui.userAvatar.addEventListener("click", () => {
+      ui.userMenu.hidden = !ui.userMenu.hidden;
+    });
+  }
+  if (ui.hamburger && ui.userMenu) {
+    ui.hamburger.addEventListener("click", () => {
       ui.userMenu.hidden = !ui.userMenu.hidden;
     });
   }
@@ -119,7 +128,14 @@ function hydrateUser() {
     authApi
       .me()
       .then((me) => {
-        if (me?.username) ui.userAvatar.textContent = (me.username || "U")[0].toUpperCase();
+        const letter = (me?.username || "U")[0].toUpperCase();
+        ui.userAvatarFallback.textContent = letter;
+        if (me?.username) ui.usernameLabel.textContent = me.username;
+        if (me?.avatar_url && ui.userAvatarImg) {
+          ui.userAvatarImg.src = me.avatar_url;
+          ui.userAvatarImg.hidden = false;
+          ui.userAvatarFallback.hidden = true;
+        }
       })
       .catch(() => {})
   );

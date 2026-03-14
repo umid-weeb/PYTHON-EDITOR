@@ -30,7 +30,14 @@
                             <div class="arena-subtitle">LeetCode-style Python solving workspace</div>
                         </div>
                         <div class="user-panel" id="user-panel">
-                          <button class="user-avatar" id="user-avatar">🙂</button>
+                          <button class="hamburger" id="hamburger-btn" aria-label="Open menu">
+                            <span></span><span></span><span></span>
+                          </button>
+                          <button class="user-avatar" id="user-avatar" aria-label="User menu">
+                            <img id="user-avatar-img" alt="" hidden />
+                            <span id="user-avatar-fallback">U</span>
+                          </button>
+                          <span class="user-username" id="navbar-username"></span>
                           <div class="user-menu" id="user-menu" hidden>
                             <a href="/profile.html">Profile</a>
                             <a href="/submissions.html">Submissions</a>

@@ -29,7 +29,9 @@ export async function fetchJson(path, options = {}) {
   });
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(text || `HTTP ${resp.status}`);
+    const err = new Error(text || `HTTP ${resp.status}`);
+    err.status = resp.status;
+    throw err;
   }
   const contentType = resp.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
@@ -77,4 +79,17 @@ export const userApi = {
   activity: () => fetchJson("/user/activity"),
   submissions: () => fetchJson("/user/submissions"),
   leaderboard: () => fetchJson("/leaderboard"),
+  updateProfile: (payload) => fetchJson("/user/profile", { method: "PUT", body: JSON.stringify(payload) }),
+  updatePassword: (payload) => fetchJson("/user/password", { method: "POST", body: JSON.stringify(payload) }),
+  uploadAvatar: async (file) => {
+    const form = new FormData();
+    form.append("avatar", file);
+    const resp = await fetch(`${API_BASE_URL}/user/avatar`, {
+      method: "POST",
+      headers: { ...authHeaders() },
+      body: form,
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    return resp.json();
+  },
 };
