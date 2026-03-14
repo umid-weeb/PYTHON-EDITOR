@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from sqlalchemy import Column, Integer, String, func, DateTime
-from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -15,5 +14,3 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     country = Column(String(120), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
-    profile = relationship("UserProfile", back_populates="profile", uselist=False)
