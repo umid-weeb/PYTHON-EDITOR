@@ -78,11 +78,11 @@ export const authApi = {
 
 // User data APIs
 export const userApi = {
-  activity: () => fetchJson("/user/activity"),
-  submissions: () => fetchJson("/user/submissions"),
-  leaderboard: () => fetchJson("/leaderboard"),
-  updateProfile: (payload) => fetchJson("/user/profile", { method: "PUT", body: JSON.stringify(payload) }),
-  updatePassword: (payload) => fetchJson("/user/password", { method: "POST", body: JSON.stringify(payload) }),
+  activity: () => fetchJson("/api/user/activity"),
+  submissions: () => fetchJson("/api/user/submissions"),
+  leaderboard: () => fetchJson("/api/leaderboard"),
+  updateProfile: (payload) => fetchJson("/api/user/profile", { method: "PUT", body: JSON.stringify(payload) }),
+  updatePassword: (payload) => fetchJson("/api/user/password", { method: "POST", body: JSON.stringify(payload) }),
   publicProfile: (username) => fetchJson(`/api/users/${encodeURIComponent(username)}`),
   searchUsers: async (query) => {
     const res = await fetchJson(`/api/users/search?q=${encodeURIComponent(query)}`);
@@ -96,7 +96,7 @@ export const userApi = {
   uploadAvatar: async (file) => {
     const form = new FormData();
     form.append("avatar", file);
-    const resp = await fetch(`${API_BASE_URL}/user/avatar`, {
+    const resp = await fetch(`${API_BASE_URL}/api/profile/avatar`, {
       method: "POST",
       headers: { ...authHeaders() },
       body: form,

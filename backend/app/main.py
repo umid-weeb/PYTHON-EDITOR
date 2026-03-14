@@ -46,9 +46,9 @@ app.add_middleware(
 app.include_router(problem_router, prefix=settings.api_prefix)
 app.include_router(submission_router, prefix=settings.api_prefix)
 app.include_router(health_router)
-app.include_router(auth_router)
+app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(user_router, prefix=settings.api_prefix)
-app.include_router(account_router)
+app.include_router(account_router, prefix=settings.api_prefix)
 
 # Serve uploaded avatars
 uploads_root = settings.backend_root / "uploads"

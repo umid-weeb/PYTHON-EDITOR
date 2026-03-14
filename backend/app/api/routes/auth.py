@@ -16,7 +16,7 @@ from app.models.user import User
 from app.models.user_profile import UserProfile
 
 
-router = APIRouter(tags=["auth"], prefix="/api")
+router = APIRouter(tags=["auth"])
 
 SECRET_KEY = os.getenv("ARENA_JWT_SECRET", os.getenv("JWT_SECRET", "dev-secret-change-me"))
 ALGORITHM = "HS256"
