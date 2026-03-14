@@ -22,9 +22,10 @@
             const userMenu = document.getElementById('user-menu');
             const body = document.body;
             
-            // Check login state
+            // Check login state - FIX: Check both token keys for compatibility
             function checkLoginState() {
-                const token = localStorage.getItem('access_token');
+                // Check arena_jwt (new key used by api.js) and access_token (for compatibility)
+                const token = localStorage.getItem('arena_jwt') || localStorage.getItem('access_token');
                 if (token) {
                     // User is logged in - show avatar with dropdown
                     userPanel.style.display = 'flex';
@@ -64,8 +65,9 @@
                 }
             });
             
-            // Logout function
+            // Logout function - FIX: Remove both token keys
             window.logout = function() {
+                localStorage.removeItem('arena_jwt');
                 localStorage.removeItem('access_token');
                 userMenu.classList.remove('is-open');
                 checkLoginState();
