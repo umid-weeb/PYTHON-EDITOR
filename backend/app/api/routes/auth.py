@@ -172,6 +172,10 @@ class PasswordUpdateRequest(BaseModel):
     new_password: str = Field(min_length=6, max_length=128)
 
 
+class ResetVerifyRequest(BaseModel):
+    phone: str | None = None
+    code: str
+
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> User:
     if credentials is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -284,3 +288,11 @@ def request_password_reset(user: User = Depends(get_current_user)):
     # This would integrate with Telegram bot
     # For now, just return success
     return {"message": "Reset code sent to your Telegram"}
+
+
+@router.post("/password/reset/verify")
+def verify_password_reset(request: ResetVerifyRequest):
+    # Placeholder verification logic; integrate with Telegram bot or DB in production
+    if not request.code:
+        raise HTTPException(status_code=400, detail="Code is required")
+    return {"message": "Reset code verified"}
