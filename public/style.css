@@ -78,6 +78,7 @@ body {
   color: var(--text-main);
   font-family: "IBM Plex Sans", sans-serif;
   transition: background 0.25s ease, color 0.25s ease;
+  overflow-x: hidden;
 }
 
 body::before {

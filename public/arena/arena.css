@@ -180,7 +180,8 @@ textarea {
   position: absolute;
   top: 40px;
   left: 0;
-  right: 0;
+  width: 320px;
+  max-width: 100%;
   background: var(--arena-surface);
   border: 1px solid var(--arena-border);
   border-radius: 12px;
@@ -191,6 +192,7 @@ textarea {
   max-height: 320px;
   overflow: auto;
   z-index: 40;
+  overflow-x: hidden;
 }
 .search-card {
   display: grid;
@@ -653,6 +655,33 @@ textarea {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+}
+
+.description-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-to-list-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--arena-border);
+  background: rgba(8, 15, 28, 0.8);
+  color: var(--arena-text);
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.back-to-list-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--arena-border-strong);
+  background: rgba(12, 20, 35, 0.9);
 }
 
 .description-title-wrap h1 {

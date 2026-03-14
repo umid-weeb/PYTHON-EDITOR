@@ -1,3 +1,4 @@
+
 import { initEditor } from "./editor.js";
 import { loadProblemList, openProblem } from "./problems.js";
 import { handleRun, handleSubmit, renderResultMessage } from "./runner.js";
@@ -58,6 +59,7 @@ function collectUi() {
   ui.languageSelect = document.getElementById("language-select");
   ui.navUserSearch = document.getElementById("nav-user-search");
   ui.navSearchResults = document.getElementById("nav-search-results");
+  ui.backToListBtn = document.getElementById("back-to-list-btn");
 }
 
 function bindEvents() {
@@ -75,6 +77,31 @@ function bindEvents() {
   if (ui.authModalContinue) ui.authModalContinue.addEventListener("click", closeAuthModal);
   if (ui.authModalSignin) ui.authModalSignin.addEventListener("click", () => redirectToAuth("login.html"));
   if (ui.authModalSignup) ui.authModalSignup.addEventListener("click", () => redirectToAuth("register.html"));
+  if (ui.backToListBtn) {
+    ui.backToListBtn.addEventListener("click", () => {
+      // Hide description and show list
+      if (ui.description) ui.description.classList.remove("is-visible");
+      if (ui.descriptionLoading) ui.descriptionLoading.classList.remove("is-hidden");
+      if (ui.problemTitle) ui.problemTitle.textContent = "Problem loading...";
+      if (ui.problemDifficulty) ui.problemDifficulty.textContent = "Easy";
+      if (ui.problemMeta) ui.problemMeta.textContent = "";
+      
+      // Clear editor and results
+      if (ui.resultSummary) ui.resultSummary.textContent = "Run yoki Submit tugmasini bosing.";
+      if (ui.resultDetails) ui.resultDetails.textContent = "";
+      if (ui.statusChip) ui.statusChip.textContent = "Idle";
+      ui.statusChip.className = "result-chip";
+      
+      // Reset URL
+      const url = new URL(window.location);
+      url.searchParams.delete("problem");
+      window.history.replaceState({}, "", url.toString());
+      
+      // Reset active state on list items
+      const activeItems = document.querySelectorAll(".problem-list-item.is-active");
+      activeItems.forEach(item => item.classList.remove("is-active"));
+    });
+  }
   document.addEventListener("click", (e) => {
     if (e.target === ui.authModal) closeAuthModal();
     if (ui.userMenu && ui.userMenu.classList.contains("is-open")) {
