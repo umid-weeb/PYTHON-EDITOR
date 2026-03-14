@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 import logging
@@ -159,3 +159,128 @@ def logout(credentials: HTTPAuthorizationCredentials | None = Depends(security))
     if not username:
         raise HTTPException(status_code=401, detail="Invalid token")
     return {"message": "Successfully logged out"}
+
+
+# Settings endpoints
+
+class UsernameUpdateRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+
+
+class PasswordUpdateRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> User:
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str | None = payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+@router.get("/user/profile")
+def get_user_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+    return {
+        "user": {
+            "username": user.username,
+            "email": user.email,
+            "country": user.country,
+            "created_at": user.created_at
+        },
+        "profile": {
+            "avatar_url": profile.avatar_url if profile else None
+        }
+    }
+
+
+@router.patch("/user/username")
+def update_username(request: UsernameUpdateRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Check if username is already taken
+    existing = db.query(User).filter(User.username == request.username).first()
+    if existing and existing.id != user.id:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    user.username = request.username
+    db.commit()
+    return {"message": "Username updated successfully"}
+
+
+@router.patch("/user/password")
+def update_password(request: PasswordUpdateRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Verify old password
+    if not verify_password(request.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Update password
+    user.password_hash = get_password_hash(request.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+
+@router.post("/profile/avatar")
+async def upload_avatar(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Create uploads directory if it doesn't exist
+    import os
+    upload_dir = "public/uploads/avatars"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generate unique filename
+    import uuid
+    file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+    filename = f"{user.id}_{uuid.uuid4().hex}.{file_extension}"
+    file_path = os.path.join(upload_dir, filename)
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+    
+    # Update or create profile
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+    if not profile:
+        profile = UserProfile(user_id=user.id, avatar_url=f"/uploads/avatars/{filename}")
+        db.add(profile)
+    else:
+        profile.avatar_url = f"/uploads/avatars/{filename}"
+    
+    db.commit()
+    return {"avatar_url": f"/uploads/avatars/{filename}"}
+
+
+@router.delete("/profile/avatar")
+def delete_avatar(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+    if profile:
+        # Delete file if it exists
+        import os
+        if profile.avatar_url:
+            file_path = f"public{profile.avatar_url}"
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        db.delete(profile)
+        db.commit()
+    
+    return {"message": "Avatar removed successfully"}
+
+
+@router.post("/password/reset")
+def request_password_reset(user: User = Depends(get_current_user)):
+    # This would integrate with Telegram bot
+    # For now, just return success
+    return {"message": "Reset code sent to your Telegram"}

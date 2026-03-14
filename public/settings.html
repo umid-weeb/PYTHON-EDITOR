@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings | Pyzone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./arena/arena.css">
+  <style>
+    .settings-shell { padding: 32px 20px; max-width: 1100px; margin: 0 auto; }
+    .settings-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .settings-grid { display:grid; gap:16px; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); }
+    .settings-card { background: var(--arena-surface); border:1px solid var(--arena-border); border-radius:12px; padding:16px 18px; box-shadow: var(--arena-shadow); }
+    .settings-card h2 { margin:0 0 10px; font-size:1.1rem; }
+    .settings-card p { margin:0 0 12px; color: var(--arena-muted); }
+    .settings-form { display:flex; flex-direction:column; gap:10px; }
+    .settings-form label { font-weight:600; font-size:0.95rem; }
+    .settings-form input { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--arena-border); background: rgba(255,255,255,0.02); color: var(--arena-text); }
+    .settings-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .status-text { font-size:0.9rem; color: var(--arena-muted); }
+    .avatar-preview { width:96px; height:96px; border-radius:50%; border:1px solid var(--arena-border); overflow:hidden; background: rgba(8,15,28,0.8); display:grid; place-items:center; font-weight:700; font-size:32px; color: var(--arena-text); }
+    .avatar-preview img { width:100%; height:100%; object-fit:cover; }
+    .pill-muted { display:inline-block; padding:4px 8px; border-radius:999px; background: rgba(255,255,255,0.04); color: var(--arena-muted); font-size:0.85rem; }
+  </style>
+</head>
+<body class="settings-shell">
+  <div class="settings-header">
+    <div>
+      <div class="pill-muted">Account</div>
+      <h1>Settings</h1>
+    </div>
+    <a class="arena-button button-ghost" href="/arena.html">Back to Arena</a>
+  </div>
+
+  <div class="settings-grid">
+    <section class="settings-card" id="section-avatar">
+      <h2>Profile Picture</h2>
+      <p>Upload a square image. Max 2MB. Supported: png, jpg, jpeg, webp.</p>
+      <div class="settings-actions">
+        <div class="avatar-preview" id="avatar-preview"><span id="avatar-letter">U</span></div>
+        <div class="settings-form" style="flex:1 1 200px;">
+          <input type="file" id="avatar-input" accept=".png,.jpg,.jpeg,.webp" />
+          <div class="status-text" id="avatar-status"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-card">
+      <h2>Edit Username</h2>
+      <p>Change your public username.</p>
+      <form id="username-form" class="settings-form">
+        <label for="username-input">New username</label>
+        <input id="username-input" name="username" type="text" required minlength="3" maxlength="50" />
+        <div class="settings-actions">
+          <button class="arena-button button-run" type="submit">Save</button>
+          <span class="status-text" id="username-status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="settings-card">
+      <h2>Change Password</h2>
+      <p>Update your password.</p>
+      <form id="password-form" class="settings-form">
+        <label for="old-password">Current password</label>
+        <input id="old-password" name="old_password" type="password" required />
+        <label for="new-password">New password</label>
+        <input id="new-password" name="new_password" type="password" required minlength="6" />
+        <div class="settings-actions">
+          <button class="arena-button button-submit" type="submit">Update</button>
+          <span class="status-text" id="password-status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="settings-card">
+      <h2>Reset Password</h2>
+      <p>Receive a reset code via Telegram.</p>
+      <form id="reset-form" class="settings-form">
+        <label for="reset-phone">Telegram phone number</label>
+        <input id="reset-phone" name="phone" type="tel" placeholder="+99890..." required />
+        <div class="settings-actions">
+          <button class="arena-button button-ghost" type="button" id="send-reset-btn">Send reset code</button>
+          <span class="status-text" id="reset-status"></span>
+        </div>
+        <label for="reset-code">Enter received code</label>
+        <input id="reset-code" name="code" type="text" minlength="4" maxlength="8" />
+        <div class="settings-actions">
+          <button class="arena-button button-run" type="button" id="verify-reset-btn">Verify code</button>
+          <span class="status-text" id="verify-status"></span>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from "./js/auth.js";
+    import { API_BASE_URL, fetchJson, getToken } from "./js/api.js";
+
+    const avatarPreview = document.getElementById("avatar-preview");
+    const avatarLetter = document.getElementById("avatar-letter");
+    const avatarInput = document.getElementById("avatar-input");
+    const avatarStatus = document.getElementById("avatar-status");
+    const usernameInput = document.getElementById("username-input");
+    const usernameStatus = document.getElementById("username-status");
+    const passwordStatus = document.getElementById("password-status");
+    const resetStatus = document.getElementById("reset-status");
+    const verifyStatus = document.getElementById("verify-status");
+    const sendResetBtn = document.getElementById("send-reset-btn");
+    const verifyResetBtn = document.getElementById("verify-reset-btn");
+
+    await requireAuth("/settings.html");
+    await hydrateMe();
+
+    avatarInput.addEventListener("change", handleAvatarUpload);
+    document.getElementById("username-form").addEventListener("submit", handleUsernameChange);
+    document.getElementById("password-form").addEventListener("submit", handlePasswordChange);
+    sendResetBtn.addEventListener("click", handleSendReset);
+    verifyResetBtn.addEventListener("click", handleVerifyReset);
+
+    async function hydrateMe() {
+      try {
+        const me = await fetchJson("/api/me");
+        if (me?.username) {
+          usernameInput.value = me.username;
+          avatarLetter.textContent = me.username[0].toUpperCase();
+        }
+        if (me?.avatar_url) {
+          setAvatarImage(me.avatar_url);
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    function setAvatarImage(url) {
+      avatarPreview.innerHTML = `<img src="${url}" alt="Avatar">`;
+    }
+
+    async function handleAvatarUpload(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        avatarStatus.textContent = "Max size 2MB";
+        return;
+      }
+      avatarStatus.textContent = "Uploading...";
+      const form = new FormData();
+      form.append("avatar", file);
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/profile/avatar`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: form,
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+        const data = await resp.json();
+        if (data?.avatar_url) setAvatarImage(data.avatar_url);
+        avatarStatus.textContent = "Updated";
+      } catch (err) {
+        avatarStatus.textContent = "Upload failed";
+      }
+    }
+
+    async function handleUsernameChange(e) {
+      e.preventDefault();
+      usernameStatus.textContent = "Saving...";
+      try {
+        await fetchJson("/api/user/username", {
+          method: "PATCH",
+          body: JSON.stringify({ username: usernameInput.value.trim() }),
+        });
+        usernameStatus.textContent = "Saved";
+      } catch (err) {
+        const msg = (err?.message || "").toLowerCase();
+        if (msg.includes("taken") || err.status === 409) {
+          usernameStatus.textContent = "Username already taken";
+        } else {
+          usernameStatus.textContent = "Save failed";
+        }
+      }
+    }
+
+    async function handlePasswordChange(e) {
+      e.preventDefault();
+      passwordStatus.textContent = "Updating...";
+      const oldPassword = document.getElementById("old-password").value;
+      const newPassword = document.getElementById("new-password").value;
+      try {
+        await fetchJson("/api/user/password", {
+          method: "PATCH",
+          body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+        });
+        passwordStatus.textContent = "Updated";
+      } catch (err) {
+        passwordStatus.textContent = "Update failed";
+      }
+    }
+
+    async function handleSendReset() {
+      resetStatus.textContent = "Sending...";
+      const phone = document.getElementById("reset-phone").value.trim();
+      try {
+        await fetchJson("/api/password/reset", { method: "POST", body: JSON.stringify({ phone }) });
+        resetStatus.textContent = "Code sent via Telegram";
+      } catch (err) {
+        resetStatus.textContent = "Send failed";
+      }
+    }
+
+    async function handleVerifyReset() {
+      verifyStatus.textContent = "Verifying...";
+      const phone = document.getElementById("reset-phone").value.trim();
+      const code = document.getElementById("reset-code").value.trim();
+      try {
+        await fetchJson("/api/password/reset/verify", { method: "POST", body: JSON.stringify({ phone, code }) });
+        verifyStatus.textContent = "Code verified";
+      } catch (err) {
+        verifyStatus.textContent = "Invalid code";
+      }
+    }
+  </script>
+</body>
+</html>

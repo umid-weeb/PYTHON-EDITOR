@@ -101,7 +101,7 @@ const app = createApp({
     
     async fetchUserInfo() {
       try {
-        const response = await fetch("/api/auth/me", {
+        const response = await fetch("/api/me", {
           headers: {
             "Authorization": `Bearer ${this.token}`
           }
@@ -141,6 +141,25 @@ const app = createApp({
         this.token = null;
         this.user = null;
         this.isMenuOpen = false;
+      }
+    },
+    
+    async updateAvatar() {
+      if (!this.token) return;
+      
+      try {
+        const response = await fetch("/api/me", {
+          headers: {
+            "Authorization": `Bearer ${this.token}`
+          }
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          this.user = userData;
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
       }
     },
     
@@ -196,6 +215,11 @@ const app = createApp({
       if (e.key === 'Escape') {
         this.isMenuOpen = false;
       }
+    });
+    
+    // Listen for avatar updates
+    window.addEventListener('avatar-updated', () => {
+      this.updateAvatar();
     });
   }
 });
