@@ -9,6 +9,7 @@ let navSearchVersion = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
   collectUi();
+  console.log("AUTH TOKEN (on load):", localStorage.getItem("token"));
   showListPane();
   renderResultMessage(ui, "Loading problems...");
   hydrateUser();
