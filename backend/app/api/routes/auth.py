@@ -127,3 +127,21 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return MeResponse(username=user.username, country=user.country, created_at=user.created_at)
+
+
+@router.post("/logout")
+def logout(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> dict:
+    """
+    Logout endpoint that validates the token and returns success.
+    Frontend should handle token removal from localStorage.
+    """
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str | None = payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"message": "Successfully logged out"}

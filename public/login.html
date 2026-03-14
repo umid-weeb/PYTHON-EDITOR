@@ -21,7 +21,7 @@
     <div id="auth-status" class="auth-status"></div>
     <p>New here? <a href="/register.html">Create account</a></p>
   </div>
-  <script type="module">
+    <script type="module">
     import { login } from "./js/auth.js";
     const statusEl = document.getElementById("auth-status");
     const btn = document.getElementById("login-btn");
@@ -53,6 +53,21 @@
         btn.textContent = "Login";
       }
     });
+    
+    // Handle submit login flow
+    const pending = new URLSearchParams(window.location.search).get("pending");
+    const problem = new URLSearchParams(window.location.search).get("problem");
+    
+    if (pending === "submit" && problem) {
+      // Show custom message for submit login flow
+      const message = document.createElement("div");
+      message.className = "auth-message";
+      message.textContent = "Masalani yuborish uchun avval tizimga kiring.";
+      message.style.color = "#007bff";
+      message.style.marginTop = "10px";
+      message.style.fontWeight = "500";
+      document.querySelector(".auth-card").appendChild(message);
+    }
   </script>
 </body>
 </html>

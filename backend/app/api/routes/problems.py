@@ -72,6 +72,41 @@ async def list_problems(
     )
 
 
+@router.get("/search", response_model=ProblemListResponse)
+async def search_problems(
+    q: str,
+    page: int = 1,
+    per_page: int = 20,
+    tags: str = "",
+    service: ProblemService = Depends(get_problem_service),
+) -> ProblemListResponse:
+    """Enhanced search endpoint for problems with better query handling"""
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="Search query cannot be empty")
+    
+    tag_items = [item.strip() for item in tags.split(",") if item.strip()]
+    payload = await service.list_problem_page(
+        page=page,
+        per_page=per_page,
+        query=q.strip(),
+        tags=tag_items,
+        force_refresh=False,
+    )
+    
+    return ProblemListResponse(
+        items=payload["items"],
+        total=payload["total"],
+        page=payload["page"],
+        per_page=payload["per_page"],
+        total_pages=payload["total_pages"],
+        query=payload["query"],
+        selected_tags=payload["selected_tags"],
+        available_tags=payload["available_tags"],
+        source=service.source_label,
+        easy_only=True,
+    )
+
+
 @router.get("/problem/{problem_id}", response_model=ProblemDetail)
 async def get_problem(
     problem_id: str,

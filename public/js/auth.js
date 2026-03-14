@@ -1,4 +1,4 @@
-import { authApi, clearToken, getToken, setToken } from "./api.js";
+import { authApi, clearToken, getToken, setToken, fetchJson } from "./api.js";
 
 export async function requireAuth(redirectBack = "/arena.html") {
   const token = getToken();
@@ -28,11 +28,22 @@ export async function register(payload) {
   return data;
 }
 
-export function logout() {
+export async function logout() {
+  try {
+    // Call the backend logout endpoint to validate the token
+    await fetchJson("/api/logout", { method: "POST" });
+  } catch (error) {
+    // Continue with logout even if backend call fails
+    console.warn("Logout endpoint failed:", error);
+  }
+  
+  // Clear all local storage and session storage
   clearToken();
   localStorage.removeItem("arena_pending_action");
   localStorage.removeItem("arena_pending_problem");
   localStorage.removeItem("access_token");
   sessionStorage.clear();
+  
+  // Redirect to arena page
   window.location.href = "/arena.html";
 }
