@@ -45,6 +45,12 @@
         </div>
       </div>
       <div class="hero-right">
+        <div class="hero-actions">
+          <div class="follow-stats">
+            <span id="followers-count">0</span> Followers · <span id="following-count">0</span> Following
+          </div>
+          <button id="follow-btn" class="arena-button button-run" type="button" hidden>Follow</button>
+        </div>
         <div class="solve-ring">
           <div class="solve-ring-fill" id="solve-ring">
             <div class="solve-ring-center">
@@ -82,6 +88,16 @@
           <div class="label">Active days</div>
           <div class="value" id="stat-active-days">0</div>
           <div class="stat-sub muted">Last 26 weeks</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Followers</div>
+          <div class="value" id="stat-followers">0</div>
+          <div class="stat-sub muted">Community reach</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Following</div>
+          <div class="value" id="stat-following">0</div>
+          <div class="stat-sub muted">Your network</div>
         </div>
       </div>
     </section>
@@ -133,6 +149,30 @@
         <div class="card-title">Social</div>
       </header>
       <div class="chip-row" id="social-links"></div>
+    </section>
+
+    <section class="profile-grid-two">
+      <div class="profile-card">
+        <header class="card-head">
+          <div class="card-title">Followers</div>
+          <a class="ghost-link" href="#" id="followers-view-all">View all</a>
+        </header>
+        <div id="followers-list" class="people-list"></div>
+      </div>
+      <div class="profile-card">
+        <header class="card-head">
+          <div class="card-title">Following</div>
+          <a class="ghost-link" href="#" id="following-view-all">View all</a>
+        </header>
+        <div id="following-list" class="people-list"></div>
+      </div>
+    </section>
+
+    <section class="profile-card">
+      <header class="card-head">
+        <div class="card-title">Discover developers</div>
+      </header>
+      <div id="discover-grid" class="people-grid"></div>
     </section>
 
     <section class="profile-card profile-edit-grid">

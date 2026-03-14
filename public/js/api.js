@@ -81,6 +81,13 @@ export const userApi = {
   leaderboard: () => fetchJson("/leaderboard"),
   updateProfile: (payload) => fetchJson("/user/profile", { method: "PUT", body: JSON.stringify(payload) }),
   updatePassword: (payload) => fetchJson("/user/password", { method: "POST", body: JSON.stringify(payload) }),
+  publicProfile: (username) => fetchJson(`/users/${encodeURIComponent(username)}`),
+  searchUsers: (query) => fetchJson(`/users/search?q=${encodeURIComponent(query)}`),
+  follow: (username) => fetchJson(`/users/${encodeURIComponent(username)}/follow`, { method: "POST" }),
+  unfollow: (username) => fetchJson(`/users/${encodeURIComponent(username)}/follow`, { method: "DELETE" }),
+  followers: (username) => fetchJson(`/users/${encodeURIComponent(username)}/followers`),
+  following: (username) => fetchJson(`/users/${encodeURIComponent(username)}/following`),
+  discover: () => fetchJson("/users/discover"),
   uploadAvatar: async (file) => {
     const form = new FormData();
     form.append("avatar", file);

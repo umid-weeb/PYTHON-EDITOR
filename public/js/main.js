@@ -53,6 +53,8 @@ function collectUi() {
   ui.searchInput = document.getElementById("problem-search");
   ui.difficultyFilters = document.querySelectorAll("[data-difficulty]");
   ui.languageSelect = document.getElementById("language-select");
+  ui.navUserSearch = document.getElementById("nav-user-search");
+  ui.navSearchResults = document.getElementById("nav-search-results");
 }
 
 function bindEvents() {
@@ -78,6 +80,10 @@ function bindEvents() {
     if (ui.userMenu && !ui.userMenu.hidden) {
       const targetInside = e.target.closest("#user-menu") || e.target.closest("#user-avatar") || e.target.closest("#hamburger-btn");
       if (!targetInside) ui.userMenu.hidden = true;
+    }
+    if (ui.navSearchResults && !ui.navSearchResults.hidden) {
+      const inside = e.target.closest("#nav-search-results") || e.target.closest("#nav-user-search");
+      if (!inside) ui.navSearchResults.hidden = true;
     }
   });
   if (ui.searchInput) {
@@ -105,6 +111,20 @@ function bindEvents() {
     if (savedLang) ui.languageSelect.value = savedLang;
     ui.languageSelect.addEventListener("change", (e) => {
       localStorage.setItem("arena_language", e.target.value);
+    });
+  }
+
+  if (ui.navUserSearch) {
+    let searchTimer = null;
+    ui.navUserSearch.addEventListener("input", (e) => {
+      const q = e.target.value.trim();
+      if (!q) {
+        ui.navSearchResults.hidden = true;
+        ui.navSearchResults.innerHTML = "";
+        return;
+      }
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => runUserSearch(q), 180);
     });
   }
 }
@@ -147,6 +167,41 @@ function hydrateUser() {
 function toggleUserMenu() {
   if (!ui.userMenu) return;
   ui.userMenu.hidden = !ui.userMenu.hidden;
+}
+
+async function runUserSearch(query) {
+  if (!ui.navSearchResults) return;
+  ui.navSearchResults.hidden = false;
+  ui.navSearchResults.innerHTML = `<div class="muted">Searching...</div>`;
+  try {
+    const { userApi } = await import("./api.js");
+    const results = await userApi.searchUsers(query);
+    if (!results?.length) {
+      ui.navSearchResults.innerHTML = `<div class="muted">No users found</div>`;
+      return;
+    }
+    ui.navSearchResults.innerHTML = "";
+    results.slice(0, 8).forEach((u) => {
+      const card = document.createElement("div");
+      card.className = "search-card";
+      card.innerHTML = `
+        <div class="search-avatar">
+          ${u.avatar_url ? `<img src="${u.avatar_url}" alt="${u.username}">` : `<span>${(u.username || "U")[0].toUpperCase()}</span>`}
+        </div>
+        <div class="search-meta">
+          <div>${u.username || ""}</div>
+          <div class="muted">${u.country || ""}</div>
+        </div>
+        <div class="muted">${u.solved_total ?? "-"}</div>
+      `;
+      card.addEventListener("click", () => {
+        window.location.href = `/profile.html?user=${encodeURIComponent(u.username)}`;
+      });
+      ui.navSearchResults.appendChild(card);
+    });
+  } catch (err) {
+    ui.navSearchResults.innerHTML = `<div class="muted">Search failed</div>`;
+  }
 }
 
 function pickInitialProblemId(problems) {

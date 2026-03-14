@@ -163,6 +163,70 @@ textarea {
   align-items: center;
   gap: 8px;
 }
+.nav-search {
+  position: relative;
+  margin-left: 18px;
+}
+.nav-search input {
+  min-height: 34px;
+  border-radius: 12px;
+  border: 1px solid var(--arena-border);
+  background: rgba(8, 15, 28, 0.8);
+  color: var(--arena-text);
+  padding: 8px 12px;
+  width: 220px;
+}
+.nav-search-results {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  background: var(--arena-surface);
+  border: 1px solid var(--arena-border);
+  border-radius: 12px;
+  box-shadow: var(--arena-shadow);
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  max-height: 320px;
+  overflow: auto;
+  z-index: 40;
+}
+.search-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.search-card:hover {
+  background: rgba(91, 141, 255, 0.12);
+}
+.search-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--arena-border);
+  background: rgba(8, 15, 28, 0.85);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.search-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.search-meta {
+  display: grid;
+  gap: 2px;
+}
+.search-meta .muted {
+  font-size: 0.86rem;
+}
 
 .hamburger {
   display: inline-flex;
@@ -1510,6 +1574,56 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+/* People / discover cards */
+.people-list {
+  display: grid;
+  gap: 10px;
+}
+.people-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.people-card,
+.discover-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--arena-border);
+  background: rgba(8, 15, 28, 0.78);
+}
+.people-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--arena-border);
+  background: rgba(8, 15, 28, 0.85);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.people-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.people-meta {
+  display: grid;
+  gap: 2px;
+}
+.follow-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--arena-border);
+  background: rgba(91, 141, 255, 0.12);
+  color: var(--arena-text);
+  cursor: pointer;
 }
 .subs-table {
   width: 100%;
