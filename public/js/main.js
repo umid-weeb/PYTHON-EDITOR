@@ -69,6 +69,9 @@ function bindEvents() {
   ui.submitBtn.addEventListener("click", () => handleSubmit(ui));
   if (ui.userAvatar && ui.userMenu) {
     ui.userAvatar.addEventListener("click", toggleUserMenu);
+    ui.userMenu.addEventListener("click", () => {
+      ui.userMenu.classList.remove("is-open");
+    });
   }
   if (ui.logoutBtn) {
     ui.logoutBtn.addEventListener("click", () => {
@@ -333,7 +336,8 @@ function buildLoggedInMenu() {
   ui.userMenu.innerHTML = `
     <a href="/profile.html">Profile</a>
     <a href="/submissions.html">Submissions</a>
-    <a href="/leaderboard.html">Leaderboard</a>
+    <a href="/leaderboard.html">Rating</a>
+    <a href="/settings.html">Settings</a>
     <button type="button" id="logout-btn">Logout</button>
   `;
   ui.logoutBtn = document.getElementById("logout-btn");

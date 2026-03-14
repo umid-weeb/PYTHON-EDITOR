@@ -14,6 +14,67 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
     <script type="module" src="./js/main.js"></script>
+    <script>
+        // Profile Avatar Button Logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const userPanel = document.getElementById('user-panel');
+            const userAvatar = document.getElementById('user-avatar');
+            const userMenu = document.getElementById('user-menu');
+            const body = document.body;
+            
+            // Check login state
+            function checkLoginState() {
+                const token = localStorage.getItem('access_token');
+                if (token) {
+                    // User is logged in - show avatar with dropdown
+                    userPanel.style.display = 'flex';
+                    userMenu.innerHTML = `
+                        <a href="/profile.html">Profile</a>
+                        <a href="/submissions.html">Submissions</a>
+                        <a href="/leaderboard.html">Rating</a>
+                        <a href="/settings.html">Settings</a>
+                        <button type="button" onclick="logout()">Logout</button>
+                    `;
+                } else {
+                    // User is not logged in - show Login/Sign Up
+                    userPanel.style.display = 'flex';
+                    userMenu.innerHTML = `
+                        <a href="/login.html">Login</a>
+                        <a href="/register.html">Sign Up</a>
+                    `;
+                }
+            }
+            
+            // Toggle dropdown menu
+            function toggleMenu() {
+                userMenu.classList.toggle('is-open');
+            }
+            
+            // Close dropdown when clicking outside
+            body.addEventListener('click', function(e) {
+                if (!userPanel.contains(e.target)) {
+                    userMenu.classList.remove('is-open');
+                }
+            });
+            
+            // Close dropdown on ESC key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    userMenu.classList.remove('is-open');
+                }
+            });
+            
+            // Logout function
+            window.logout = function() {
+                localStorage.removeItem('access_token');
+                userMenu.classList.remove('is-open');
+                checkLoginState();
+            };
+            
+            // Initialize
+            checkLoginState();
+        });
+    </script>
 </head>
 <body>
     <div class="arena-progress" id="arena-progress" aria-hidden="true">
@@ -30,37 +91,20 @@
                             <div class="arena-title">Zone</div>
                         </div>
                         <div class="nav-search">
-                          <input id="nav-user-search" type="search" placeholder="Search users" autocomplete="off" v-model="searchQuery" @input="searchUsers(searchQuery)" />
-                          <div id="nav-search-results" class="nav-search-results" :hidden="!searchResults.length && !searchLoading">
-                            <div v-if="searchLoading" class="muted">Searching...</div>
-                            <div v-else-if="!searchResults.length && searchQuery" class="muted">No users found</div>
-                            <div v-else v-for="user in searchResults" :key="user.username" class="search-card" @click="goToProfile(user.username)">
-                              <div class="search-avatar">
-                                <img v-if="user.avatar_url" :src="user.avatar_url" :alt="user.username">
-                                <span v-else>{{ user.username[0].toUpperCase() }}</span>
-                              </div>
-                              <div class="search-meta">
-                                <div>{{ user.username }}</div>
-                                <div class="muted">{{ user.country || '' }}</div>
-                              </div>
-                              <div class="muted">{{ user.solved_total ?? '-' }}</div>
-                            </div>
-                          </div>
+                          <input id="nav-user-search" type="search" placeholder="Search users" autocomplete="off" />
+                          <div id="nav-search-results" class="nav-search-results" hidden></div>
                         </div>
-                        <div class="auth-actions" id="auth-actions" v-if="!isLoggedIn" style="display: none;">
-                          <a class="arena-button button-ghost" href="/login.html">Login</a>
-                          <a class="arena-button button-submit" href="/register.html">Sign Up</a>
-                        </div>
-                        <div class="user-panel" id="user-panel" v-if="isLoggedIn" style="display: none;">
-                          <button class="user-avatar" id="user-avatar" aria-label="User menu" @click="toggleMenu">
-                            <img :src="avatarUrl" alt="User avatar" v-if="user">
-                            <span v-else>{{ avatarText }}</span>
+                        <div class="user-panel" id="user-panel">
+                          <button class="user-avatar" id="user-avatar" aria-label="User menu">
+                            <img id="user-avatar-img" alt="" hidden />
+                            <span id="user-avatar-fallback">U</span>
                           </button>
-                          <div class="user-menu" id="user-menu" :class="{ 'is-open': isMenuOpen }">
+                          <div class="user-menu" id="user-menu">
                             <a href="/profile.html">Profile</a>
                             <a href="/submissions.html">Submissions</a>
-                            <a href="/leaderboard.html">Leaderboard</a>
-                            <button type="button" @click="logout">Logout</button>
+                            <a href="/leaderboard.html">Rating</a>
+                            <a href="/settings.html">Settings</a>
+                            <button type="button" id="logout-btn">Logout</button>
                           </div>
                         </div>
                     </div>
