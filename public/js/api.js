@@ -1,4 +1,7 @@
-export const API_BASE_URL = "https://python-editor-b87c.onrender.com";
+// Use local backend for development, remote for production
+export const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+  ? "http://localhost:8000" 
+  : "https://python-editor-b87c.onrender.com";
 const TOKEN_KEY = "arena_jwt";
 
 let problemsCache = null;
@@ -85,8 +88,16 @@ export const userApi = {
   updatePassword: (payload) => fetchJson("/api/user/password", { method: "POST", body: JSON.stringify(payload) }),
   publicProfile: (username) => fetchJson(`/api/users/${encodeURIComponent(username)}`),
   searchUsers: async (query) => {
-    const res = await fetchJson(`/api/users/search?q=${encodeURIComponent(query)}`);
-    return res?.users || res || [];
+    // Use a plain GET without JSON headers to avoid unnecessary preflight/CORS issues
+    const resp = await fetch(`${API_BASE_URL}/api/users/search?q=${encodeURIComponent(query)}`, {
+      headers: { ...authHeaders() },
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(text || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    return data?.users || data || [];
   },
   follow: (username) => fetchJson(`/api/users/${encodeURIComponent(username)}/follow`, { method: "POST" }),
   unfollow: (username) => fetchJson(`/api/users/${encodeURIComponent(username)}/follow`, { method: "DELETE" }),

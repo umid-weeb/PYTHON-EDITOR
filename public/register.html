@@ -39,6 +39,18 @@
           password: document.getElementById("password").value,
           country: document.getElementById("country").value.trim(),
         };
+        if (payload.username.length < 3) {
+          statusEl.textContent = "Username must be at least 3 characters.";
+          btn.disabled = false;
+          btn.textContent = "Register";
+          return;
+        }
+        if (payload.password.length < 6) {
+          statusEl.textContent = "Password must be at least 6 characters.";
+          btn.disabled = false;
+          btn.textContent = "Register";
+          return;
+        }
         await register(payload);
         
         // Handle pending actions after registration
