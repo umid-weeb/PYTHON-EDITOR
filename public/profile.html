@@ -4,57 +4,336 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Profile | Pyzone Arena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./arena/arena.css">
 </head>
 <body class="profile-shell">
-  <div class="profile-header">
-    <div>
-      <h1 id="profile-username">Profile</h1>
-      <div id="profile-meta" class="profile-meta"></div>
+  <div class="profile-topbar">
+    <div class="topbar-brand">
+      <div class="brand-mark"></div>
+      <div>
+        <div class="brand-title">Pyzone Arena</div>
+        <div class="brand-sub">Personal dashboard</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <a class="chip-button" href="/arena.html">Back to Arena</a>
+      <button class="ghost-button" id="logout-btn" type="button">Logout</button>
     </div>
   </div>
 
-  <section class="stats-grid">
-    <div class="stat-card"><div class="label">Solved</div><div id="stat-solved" class="value">-</div></div>
-    <div class="stat-card"><div class="label">Easy</div><div id="stat-easy" class="value">-</div></div>
-    <div class="stat-card"><div class="label">Medium</div><div id="stat-medium" class="value">-</div></div>
-    <div class="stat-card"><div class="label">Hard</div><div id="stat-hard" class="value">-</div></div>
-    <div class="stat-card"><div class="label">Submissions</div><div id="stat-submissions" class="value">-</div></div>
-  </section>
+  <main class="profile-layout">
+    <section class="profile-card profile-hero">
+      <div class="hero-left">
+        <div class="avatar-stack">
+          <div class="avatar-circle" id="profile-avatar">U</div>
+          <div class="avatar-glow"></div>
+        </div>
+        <div class="hero-info">
+          <div class="hero-title">
+            <h1 id="profile-username">Profile</h1>
+            <span id="rank-badge" class="pill">New</span>
+          </div>
+          <div id="profile-handle" class="profile-handle muted">@username</div>
+          <div id="profile-meta" class="profile-meta">Joined --</div>
+          <div class="pill-row">
+            <span id="streak-pill" class="pill subtle">Current streak: 0</span>
+            <span id="submission-pill" class="pill subtle">0 submissions</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="solve-ring">
+          <div class="solve-ring-fill" id="solve-ring">
+            <div class="solve-ring-center">
+              <div id="stat-solved" class="ring-number">-</div>
+              <div class="ring-label">Solved</div>
+            </div>
+          </div>
+        </div>
+        <div class="solve-legend" id="solve-legend">
+          <div class="legend-row"><span class="legend-dot easy"></span><span>Easy</span><span class="legend-value" id="stat-easy">-</span></div>
+          <div class="legend-row"><span class="legend-dot medium"></span><span>Medium</span><span class="legend-value" id="stat-medium">-</span></div>
+          <div class="legend-row"><span class="legend-dot hard"></span><span>Hard</span><span class="legend-value" id="stat-hard">-</span></div>
+        </div>
+      </div>
+    </section>
 
-  <section class="activity-section">
-    <h2>Activity</h2>
-    <div id="activity-grid" class="activity-grid"></div>
-  </section>
+    <section class="profile-card stats-wrap">
+      <div class="stats-grid profile-stats-grid">
+        <div class="stat-card highlight">
+          <div class="label">Total submissions</div>
+          <div class="value" id="stat-submissions">-</div>
+          <div class="stat-sub muted" id="stat-last-active">Last active —</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Current streak</div>
+          <div class="value" id="stat-streak">0</div>
+          <div class="stat-sub muted" id="stat-best-streak">Best streak —</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Acceptance</div>
+          <div class="value" id="stat-acceptance">-</div>
+          <div class="stat-sub muted">Based on recent submissions</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Active days</div>
+          <div class="value" id="stat-active-days">0</div>
+          <div class="stat-sub muted">Last 26 weeks</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="profile-grid-two">
+      <div class="profile-card activity-card">
+        <header class="card-head">
+          <div>
+            <div class="card-title">Activity</div>
+            <div class="card-sub">Past 26 weeks</div>
+          </div>
+          <div class="card-meta" id="activity-total">0 submissions</div>
+        </header>
+        <div id="activity-grid" class="heatmap-grid" aria-label="Activity heatmap"></div>
+        <div class="activity-legend">
+          <span class="legend-dot level-0"></span><span class="muted">No activity</span>
+          <span class="legend-dot level-1"></span><span class="muted">1-2</span>
+          <span class="legend-dot level-2"></span><span class="muted">3-4</span>
+          <span class="legend-dot level-3"></span><span class="muted">5+</span>
+        </div>
+      </div>
+
+      <div class="profile-card recent-card">
+        <header class="card-head">
+          <div class="card-title">Recent submissions</div>
+          <a class="ghost-link" href="/submissions.html">View all</a>
+        </header>
+        <div id="recent-submissions" class="recent-list"></div>
+      </div>
+    </section>
+
+    <section class="profile-grid-two">
+      <div class="profile-card">
+        <header class="card-head">
+          <div class="card-title">Skills & languages</div>
+        </header>
+        <div id="skill-chips" class="chip-row"></div>
+      </div>
+      <div class="profile-card">
+        <header class="card-head">
+          <div class="card-title">Milestones</div>
+        </header>
+        <div id="badge-grid" class="badge-grid"></div>
+      </div>
+    </section>
+  </main>
 
   <script type="module">
     import { authApi, userApi } from "./js/api.js";
     import { requireAuth, logout } from "./js/auth.js";
+
     const ok = await requireAuth("/profile.html");
     if (!ok) return;
-    const profile = await authApi.me().catch(() => null);
-    if (profile) {
-      document.getElementById("profile-username").textContent = profile.username;
-      document.getElementById("profile-meta").textContent = `${profile.country || ""} · Joined ${profile.joined_at || ""}`;
-      document.getElementById("stat-solved").textContent = profile.solved_total ?? "-";
-      document.getElementById("stat-easy").textContent = profile.solved_easy ?? "-";
-      document.getElementById("stat-medium").textContent = profile.solved_medium ?? "-";
-      document.getElementById("stat-hard").textContent = profile.solved_hard ?? "-";
+
+    document.getElementById("logout-btn").addEventListener("click", logout);
+
+    const profileData = await authApi.me().catch(() => null);
+    const [activityRaw, submissionsRaw] = await Promise.all([
+      userApi.activity().catch(() => []),
+      userApi.submissions().catch(() => []),
+    ]);
+
+    renderProfile(profileData, submissionsRaw);
+    renderStats(profileData, activityRaw, submissionsRaw);
+    renderActivity(activityRaw);
+    renderRecent(submissionsRaw);
+    renderSkills(profileData);
+    renderBadges(activityRaw, submissionsRaw);
+
+    function renderProfile(profile, submissions) {
+      const name = profile?.username || "Guest";
+      document.getElementById("profile-username").textContent = name;
+      document.getElementById("profile-handle").textContent = profile?.email ? `@${profile.email.split("@")[0]}` : `@${name}`;
+      document.getElementById("profile-meta").textContent = `${profile?.country || "Unknown"} · Joined ${profile?.joined_at || "—"}`;
+      document.getElementById("profile-avatar").textContent = (name || "").slice(0, 1).toUpperCase();
+      document.getElementById("rank-badge").textContent = profile?.rank ? `Rank #${profile.rank}` : "Member";
+
+      const totalSubs = Array.isArray(submissions) ? submissions.length : 0;
+      document.getElementById("submission-pill").textContent = `${totalSubs} submissions`;
     }
-    const activity = await userApi.activity().catch(() => []);
-    renderActivity(activity);
+
+    function renderStats(profile, activity, submissions) {
+      const easy = Number(profile?.solved_easy || 0);
+      const medium = Number(profile?.solved_medium || 0);
+      const hard = Number(profile?.solved_hard || 0);
+      const solved = easy + medium + hard || Number(profile?.solved_total || 0);
+
+      document.getElementById("stat-solved").textContent = solved || "-";
+      document.getElementById("stat-easy").textContent = easy || "-";
+      document.getElementById("stat-medium").textContent = medium || "-";
+      document.getElementById("stat-hard").textContent = hard || "-";
+
+      renderSolveRing(easy, medium, hard, solved);
+
+      const totalSubs = Array.isArray(submissions) ? submissions.length : 0;
+      document.getElementById("stat-submissions").textContent = totalSubs || "-";
+
+      const successCount = Array.isArray(submissions)
+        ? submissions.filter((s) => ((s.status || s.verdict || "").toLowerCase() === "accepted")).length
+        : 0;
+      const acceptance = totalSubs ? Math.round((successCount / totalSubs) * 100) : null;
+      document.getElementById("stat-acceptance").textContent = acceptance !== null ? `${acceptance}%` : "-";
+
+      const activityDays = buildActivityDays(activity || []);
+      const streak = calcCurrentStreak(activityDays);
+      const bestStreak = calcBestStreak(activityDays);
+      document.getElementById("stat-streak").textContent = streak;
+      document.getElementById("streak-pill").textContent = `Current streak: ${streak} days`;
+      document.getElementById("stat-best-streak").textContent = `Best: ${bestStreak} days`;
+      document.getElementById("stat-active-days").textContent = activityDays.filter((d) => d.count > 0).length;
+      const lastActive = activityDays.filter((d) => d.count > 0).slice(-1)[0];
+      document.getElementById("stat-last-active").textContent = lastActive ? `Last active ${lastActive.date}` : "No activity yet";
+    }
+
+    function renderSolveRing(easy, medium, hard, solved) {
+      const total = Math.max(solved || 0, easy + medium + hard, 1);
+      const easyDeg = (easy / total) * 360;
+      const mediumDeg = (medium / total) * 360;
+      const hardDeg = (hard / total) * 360;
+      const ring = document.getElementById("solve-ring");
+      ring.style.background = `conic-gradient(
+        var(--arena-success) 0deg ${easyDeg}deg,
+        var(--arena-warning) ${easyDeg}deg ${easyDeg + mediumDeg}deg,
+        var(--arena-danger) ${easyDeg + mediumDeg}deg ${easyDeg + mediumDeg + hardDeg}deg,
+        rgba(255,255,255,0.04) ${easyDeg + mediumDeg + hardDeg}deg 360deg
+      )`;
+    }
 
     function renderActivity(items) {
+      const days = buildActivityDays(items || []);
       const container = document.getElementById("activity-grid");
       container.innerHTML = "";
-      items.forEach((item) => {
+      let total = 0;
+      days.forEach((day) => {
         const cell = document.createElement("div");
-        const count = item.count || 0;
-        cell.className = "activity-cell";
-        cell.style.opacity = Math.min(1, 0.2 + count * 0.15);
-        cell.title = `${item.date}: ${count} submissions`;
+        const level = activityLevel(day.count);
+        cell.className = `heat-cell level-${level}`;
+        cell.title = `${day.date}: ${day.count} submission${day.count === 1 ? "" : "s"}`;
         container.appendChild(cell);
+        total += day.count;
       });
+      document.getElementById("activity-total").textContent = `${total} submission${total === 1 ? "" : "s"}`;
+    }
+
+    function renderRecent(items) {
+      const container = document.getElementById("recent-submissions");
+      container.innerHTML = "";
+      const list = (items || []).slice(0, 5);
+      if (!list.length) {
+        container.innerHTML = `<div class="muted">No submissions yet. Run a problem to see it here.</div>`;
+        return;
+      }
+      list.forEach((s) => {
+        const status = (s.status || s.verdict || "").toLowerCase();
+        const state = status === "accepted" ? "success" : status.includes("error") || status.includes("wrong") ? "danger" : "pending";
+        const when = s.created_at ? new Date(s.created_at).toLocaleDateString() : "Recent";
+        const item = document.createElement("div");
+        item.className = "recent-item";
+        item.innerHTML = `
+          <div>
+            <div class="recent-title">${s.problem_title || s.problem_id || "Unknown"}</div>
+            <div class="muted recent-meta">${when}</div>
+          </div>
+          <span class="status-chip ${state}">${s.status || s.verdict || ""}</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function renderSkills(profile) {
+      const skills = profile?.skills || ["Python 3", "Algorithms", "Data Structures", "Hash Maps", "Two Pointers", "Dynamic Programming"];
+      const container = document.getElementById("skill-chips");
+      container.innerHTML = "";
+      skills.slice(0, 10).forEach((skill) => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = skill;
+        container.appendChild(chip);
+      });
+    }
+
+    function renderBadges(activity, submissions) {
+      const streak = calcCurrentStreak(buildActivityDays(activity || []));
+      const acceptedCount = Array.isArray(submissions)
+        ? submissions.filter((s) => ((s.status || s.verdict || "").toLowerCase() === "accepted")).length
+        : 0;
+      const badges = [
+        { label: "First AC", unlocked: acceptedCount > 0 },
+        { label: "7-day streak", unlocked: streak >= 7 },
+        { label: "30 submissions", unlocked: (submissions || []).length >= 30 },
+        { label: "Night Owl", unlocked: false },
+      ];
+      const grid = document.getElementById("badge-grid");
+      grid.innerHTML = "";
+      badges.forEach((b) => {
+        const card = document.createElement("div");
+        card.className = `badge-card-item ${b.unlocked ? "unlocked" : "locked"}`;
+        card.innerHTML = `
+          <div class="badge-dot"></div>
+          <div>
+            <div class="badge-title">${b.label}</div>
+            <div class="muted">${b.unlocked ? "Unlocked" : "Locked"}</div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function buildActivityDays(items) {
+      const map = new Map();
+      items.forEach((i) => {
+        if (!i?.date) return;
+        map.set(i.date.slice(0, 10), Number(i.count || 0));
+      });
+      const days = [];
+      const today = new Date();
+      for (let i = 182; i >= 0; i -= 1) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const iso = d.toISOString().slice(0, 10);
+        days.push({ date: iso, count: map.get(iso) || 0 });
+      });
+      return days;
+    }
+
+    function activityLevel(count) {
+      if (count >= 5) return 3;
+      if (count >= 3) return 2;
+      if (count >= 1) return 1;
+      return 0;
+    }
+
+    function calcCurrentStreak(days) {
+      let streak = 0;
+      for (let i = days.length - 1; i >= 0; i -= 1) {
+        if (days[i].count > 0) streak += 1; else break;
+      }
+      return streak;
+    }
+
+    function calcBestStreak(days) {
+      let best = 0;
+      let current = 0;
+      days.forEach((d) => {
+        if (d.count > 0) {
+          current += 1;
+          best = Math.max(best, current);
+        } else {
+          current = 0;
+        }
+      });
+      return best;
     }
   </script>
 </body>

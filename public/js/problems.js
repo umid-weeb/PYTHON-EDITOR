@@ -6,6 +6,7 @@ const state = {
   problems: [],
   current: null,
   cache: new Map(),
+  filter: { query: "", difficulty: "all" },
 };
 
 export async function loadProblemList(ui) {
@@ -26,7 +27,8 @@ export async function loadProblemList(ui) {
 
 export function renderProblemList(ui) {
   ui.listContainer.innerHTML = "";
-  state.problems.forEach((problem) => {
+  const filtered = applyFilters();
+  filtered.forEach((problem) => {
     const item = document.createElement("button");
     item.className = "problem-card";
     item.innerHTML = `
@@ -41,9 +43,13 @@ export function renderProblemList(ui) {
     item.addEventListener("click", () => openProblem(ui, problem.id));
     ui.listContainer.appendChild(item);
   });
+  if (ui.listMeta) {
+    ui.listMeta.textContent = filtered.length ? `${filtered.length} problem` : "No problems found";
+  }
 }
 
 export async function openProblem(ui, problemId) {
+  if (!problemId) return;
   if (state.cache.has(problemId)) {
     await renderProblemDetail(ui, state.cache.get(problemId));
     return;
@@ -64,6 +70,7 @@ export async function openProblem(ui, problemId) {
 
 async function renderProblemDetail(ui, data) {
   state.current = data;
+  localStorage.setItem("arena_last_problem", data.id);
   ui.title.textContent = data.title || data.id;
   ui.difficulty.textContent = (data.difficulty || "easy").toUpperCase();
   ui.difficulty.className = `pill pill-${(data.difficulty || "easy").toLowerCase()}`;
@@ -88,12 +95,45 @@ async function renderProblemDetail(ui, data) {
     `;
     ui.visibleTests.appendChild(block);
   });
-  setCode(data.starter_code);
+  if (ui.visibleCaseCount) {
+    ui.visibleCaseCount.textContent = `${(data.visible_testcases || []).length} case`;
+  }
+  setCode(data.starter_code, data.id);
   renderResultMessage(ui, "Ready. Write code and Run or Submit.");
+  highlightCurrentProblem(ui, data.id);
 }
 
 export function getCurrentProblemId() {
   return state.current?.id;
+}
+
+function highlightCurrentProblem(ui, problemId) {
+  Array.from(ui.listContainer.children).forEach((node) => {
+    if (node.querySelector(".problem-id")?.textContent === problemId) {
+      node.classList.add("is-active");
+    } else {
+      node.classList.remove("is-active");
+    }
+  });
+}
+
+export function updateSearch(query = "") {
+  state.filter.query = query.toLowerCase();
+}
+
+export function updateDifficulty(diff = "all") {
+  state.filter.difficulty = diff;
+}
+
+function applyFilters() {
+  return state.problems.filter((p) => {
+    const matchesQuery =
+      !state.filter.query ||
+      (p.title || "").toLowerCase().includes(state.filter.query) ||
+      (p.id || "").toLowerCase().includes(state.filter.query);
+    const matchesDiff = state.filter.difficulty === "all" || (p.difficulty || "all").toLowerCase() === state.filter.difficulty;
+    return matchesQuery && matchesDiff;
+  });
 }
 
 function escapeHtml(value) {

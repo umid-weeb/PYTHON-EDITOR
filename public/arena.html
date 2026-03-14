@@ -43,20 +43,14 @@
                     <div class="arena-sidebar-tools">
                         <div class="toolbar-row">
                             <label class="field-label" for="problem-search">Search</label>
-                            <input id="problem-search" class="arena-search" type="search" placeholder="Masala qidiring">
+                            <input id="problem-search" class="arena-search" type="search" placeholder="Search problems">
                         </div>
-                        <div class="toolbar-row toolbar-inline">
-                            <div class="toolbar-field">
-                                <label class="field-label" for="page-size">Per page</label>
-                                <select id="page-size" class="arena-select">
-                                    <option value="20">20</option>
-                                    <option value="50">50</option>
-                                    <option value="100">100</option>
-                                </select>
-                            </div>
-                            <button id="refresh-problems" class="arena-link-button" type="button">Refresh</button>
+                        <div class="toolbar-row difficulty-row">
+                            <button class="difficulty-chip is-active" data-difficulty="all" type="button">All</button>
+                            <button class="difficulty-chip diff-easy" data-difficulty="easy" type="button">Easy</button>
+                            <button class="difficulty-chip diff-medium" data-difficulty="medium" type="button">Medium</button>
+                            <button class="difficulty-chip diff-hard" data-difficulty="hard" type="button">Hard</button>
                         </div>
-                        <div class="filter-strip" id="tag-filters"></div>
                     </div>
 
                     <div class="arena-list-toolbar">
@@ -69,7 +63,12 @@
                     </div>
 
                     <div class="problem-list-viewport" id="problem-list-viewport">
-                        <div id="problem-list-skeleton" class="empty-state">Loading problems...</div>
+                        <div id="problem-list-skeleton" class="problem-skeleton-list">
+                            <div class="skeleton-line skeleton-line-lg"></div>
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                            <div class="skeleton-card"></div>
+                        </div>
                         <div class="problem-list-inner" id="problem-list-inner"></div>
                     </div>
                 </div>
@@ -143,6 +142,19 @@
                     </section>
                 </div>
             </section>
+        </div>
+    </div>
+
+    <div class="auth-modal" id="auth-modal" hidden>
+        <div class="auth-modal-body">
+            <button class="auth-modal-close" id="auth-modal-close" aria-label="Close modal">×</button>
+            <h2>Save Your Progress</h2>
+            <p>Create an account to submit solutions, track your progress, and appear on the leaderboard.</p>
+            <div class="auth-modal-actions">
+                <button id="auth-modal-signin" class="arena-button button-ghost" type="button">Sign In</button>
+                <button id="auth-modal-signup" class="arena-button button-submit" type="button">Create Account</button>
+                <button id="auth-modal-continue" class="arena-button button-run" type="button">Continue Exploring</button>
+            </div>
         </div>
     </div>
 </body>

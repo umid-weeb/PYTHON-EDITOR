@@ -1,5 +1,6 @@
 let monacoEditor = null;
 const DEFAULT_CODE = `class Solution:\n    def solve(self):\n        pass\n`;
+const DRAFT_PREFIX = "arena_draft_";
 
 export async function initEditor(hostElement) {
   await loadMonaco();
@@ -14,12 +15,25 @@ export async function initEditor(hostElement) {
   });
 }
 
-export function setCode(value) {
-  if (monacoEditor) monacoEditor.setValue(value || DEFAULT_CODE);
+export function setCode(value, problemId) {
+  const draft = problemId ? localStorage.getItem(DRAFT_PREFIX + problemId) : null;
+  const code = draft || value || DEFAULT_CODE;
+  if (monacoEditor) monacoEditor.setValue(code);
 }
 
 export function getCode() {
   return monacoEditor ? monacoEditor.getValue() : DEFAULT_CODE;
+}
+
+export function saveDraft(problemId) {
+  if (!problemId) return;
+  const code = getCode();
+  localStorage.setItem(DRAFT_PREFIX + problemId, code || "");
+}
+
+export function clearDraft(problemId) {
+  if (!problemId) return;
+  localStorage.removeItem(DRAFT_PREFIX + problemId);
 }
 
 async function loadMonaco() {
