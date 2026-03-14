@@ -44,6 +44,34 @@ export async function logout() {
   localStorage.removeItem("access_token");
   sessionStorage.clear();
   
+  // Update UI to show logged out state
+  updateUIForLogout();
+  
   // Redirect to arena page
   window.location.href = "/arena.html";
+}
+
+function updateUIForLogout() {
+  // Update the UI to reflect logged out state
+  const userPanel = document.getElementById("user-panel");
+  const userMenu = document.getElementById("user-menu");
+  const authActions = document.getElementById("auth-actions");
+  const usernameLabel = document.getElementById("navbar-username");
+  const userAvatarImg = document.getElementById("user-avatar-img");
+  const userAvatarFallback = document.getElementById("user-avatar-fallback");
+  
+  if (userPanel) userPanel.hidden = false;
+  if (userMenu) {
+    userMenu.innerHTML = `
+      <a href="/login.html">Login</a>
+      <a href="/register.html">Sign Up</a>
+    `;
+  }
+  if (authActions) authActions.hidden = true;
+  if (usernameLabel) usernameLabel.textContent = "";
+  if (userAvatarImg) userAvatarImg.hidden = true;
+  if (userAvatarFallback) {
+    userAvatarFallback.hidden = false;
+    userAvatarFallback.textContent = "U";
+  }
 }
