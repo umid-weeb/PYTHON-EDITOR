@@ -4,6 +4,7 @@ import { handleRun, handleSubmit, renderResultMessage } from "./runner.js";
 import { getToken } from "./api.js";
 
 const ui = {};
+let navSearchVersion = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
   collectUi();
@@ -120,10 +121,12 @@ function bindEvents() {
       if (!q) {
         ui.navSearchResults.hidden = true;
         ui.navSearchResults.innerHTML = "";
+        navSearchVersion += 1; // cancel inflight responses
         return;
       }
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => runUserSearch(q), 300);
+      const currentVersion = ++navSearchVersion;
+      searchTimer = setTimeout(() => runUserSearch(q, currentVersion), 300);
     });
   }
 }
@@ -174,13 +177,22 @@ function toggleUserMenu() {
   ui.userMenu.classList.toggle("is-open");
 }
 
-async function runUserSearch(query) {
+async function runUserSearch(query, version) {
   if (!ui.navSearchResults) return;
+  const currentInput = ui.navUserSearch?.value.trim() || "";
+  if (!currentInput) {
+    ui.navSearchResults.hidden = true;
+    ui.navSearchResults.innerHTML = "";
+    return;
+  }
   ui.navSearchResults.hidden = false;
   ui.navSearchResults.innerHTML = `<div class="muted">Searching...</div>`;
   try {
     const { userApi } = await import("./api.js");
     const results = await userApi.searchUsers(query);
+    if (version !== navSearchVersion || (ui.navUserSearch?.value.trim() || "") !== query) {
+      return; // stale response
+    }
     if (!results?.length) {
       ui.navSearchResults.innerHTML = `<div class="muted">No users found</div>`;
       return;
@@ -261,17 +273,43 @@ async function resumePendingAction() {
 }
 
 function showLoggedOutUI() {
-  if (ui.userPanel) ui.userPanel.hidden = true;
+  buildLoggedOutMenu();
+  if (ui.userPanel) ui.userPanel.hidden = false;
   if (ui.usernameLabel) ui.usernameLabel.textContent = "";
   if (ui.userAvatarImg) ui.userAvatarImg.hidden = true;
   if (ui.userAvatarFallback) {
     ui.userAvatarFallback.hidden = false;
     ui.userAvatarFallback.textContent = "U";
   }
-  if (ui.authActions) ui.authActions.hidden = false;
+  if (ui.authActions) ui.authActions.hidden = true;
 }
 
 function showLoggedInUI() {
+  buildLoggedInMenu();
   if (ui.userPanel) ui.userPanel.hidden = false;
   if (ui.authActions) ui.authActions.hidden = true;
+}
+
+function buildLoggedOutMenu() {
+  if (!ui.userMenu) return;
+  ui.userMenu.innerHTML = `
+    <a href="/login.html">Login</a>
+    <a href="/register.html">Sign Up</a>
+  `;
+}
+
+function buildLoggedInMenu() {
+  if (!ui.userMenu) return;
+  ui.userMenu.innerHTML = `
+    <a href="/profile.html">Profile</a>
+    <a href="/submissions.html">Submissions</a>
+    <a href="/leaderboard.html">Leaderboard</a>
+    <button type="button" id="logout-btn">Logout</button>
+  `;
+  ui.logoutBtn = document.getElementById("logout-btn");
+  if (ui.logoutBtn) {
+    ui.logoutBtn.addEventListener("click", () => {
+      import("./auth.js").then(({ logout }) => logout());
+    });
+  }
 }
