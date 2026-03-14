@@ -10,15 +10,17 @@ function authHeaders() {
 }
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || "";
+  return localStorage.getItem(TOKEN_KEY) || localStorage.getItem("access_token") || "";
 }
 
 export function setToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
+  if (token) localStorage.setItem("access_token", token);
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem("access_token");
 }
 
 export async function fetchJson(path, options = {}) {

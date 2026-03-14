@@ -35,7 +35,17 @@
           document.getElementById("username").value.trim(),
           document.getElementById("password").value
         );
-        window.location.href = next;
+        
+        // Handle pending actions after login
+        const pending = new URLSearchParams(window.location.search).get("pending");
+        const problem = new URLSearchParams(window.location.search).get("problem");
+        
+        if (pending === "submit" && problem) {
+          // Redirect to arena with pending action
+          window.location.href = `/arena.html?problem=${encodeURIComponent(problem)}&pending=submit`;
+        } else {
+          window.location.href = next;
+        }
       } catch (error) {
         statusEl.textContent = "Login failed";
       } finally {

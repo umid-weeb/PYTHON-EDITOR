@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else if (ui.listContainer.firstChild) {
     ui.listContainer.firstChild.click();
   }
+  await resumePendingAction();
   bindEvents();
   bindShortcuts();
 });
@@ -191,7 +192,7 @@ async function runUserSearch(query) {
         <div class="muted">${u.solved_total ?? "-"}</div>
       `;
       card.addEventListener("click", () => {
-        window.location.href = `/profile.html?user=${encodeURIComponent(u.username)}`;
+        window.location.href = `/profile.html?username=${encodeURIComponent(u.username)}`;
       });
       ui.navSearchResults.appendChild(card);
     });
@@ -220,9 +221,33 @@ export function closeAuthModal() {
 }
 
 function redirectToAuth(path) {
-  const params = new URLSearchParams(window.location.search);
-  const currentProblem = params.get("problem") || localStorage.getItem("arena_last_problem");
-  if (currentProblem) params.set("problem", currentProblem);
-  params.set("next", "/arena.html");
+  const params = new URLSearchParams();
+  const currentParams = new URLSearchParams(window.location.search);
+  const currentProblem = currentParams.get("problem") || localStorage.getItem("arena_last_problem");
+  let next = "/arena.html";
+  if (currentProblem) {
+    next += `?problem=${encodeURIComponent(currentProblem)}`;
+  }
+  const pending = localStorage.getItem("arena_pending_action");
+  if (pending) {
+    next += next.includes("?") ? `&pending=${encodeURIComponent(pending)}` : `?pending=${encodeURIComponent(pending)}`;
+  }
+  params.set("next", next);
   window.location.href = `/${path}?${params.toString()}`;
+}
+
+async function resumePendingAction() {
+  const pending = localStorage.getItem("arena_pending_action") || new URLSearchParams(window.location.search).get("pending");
+  if (pending !== "submit" || !getToken()) return;
+  const pendingProblem = localStorage.getItem("arena_pending_problem") || new URLSearchParams(window.location.search).get("problem");
+  if (pendingProblem) {
+    try {
+      await openProblem(ui, pendingProblem);
+    } catch (_) {
+      /* ignore open failures; we still attempt submit on current problem */
+    }
+  }
+  localStorage.removeItem("arena_pending_action");
+  localStorage.removeItem("arena_pending_problem");
+  setTimeout(() => handleSubmit(ui), 150);
 }

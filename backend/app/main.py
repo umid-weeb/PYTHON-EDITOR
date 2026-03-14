@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.health import router as health_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.users import router as user_router
 from app.api.routes.problems import router as problem_router
 from app.api.routes.submissions import router as submission_router
 from app.core.config import get_settings
@@ -45,6 +46,7 @@ app.include_router(problem_router, prefix=settings.api_prefix)
 app.include_router(submission_router, prefix=settings.api_prefix)
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(user_router, prefix=settings.api_prefix)
 
 
 @app.get("/")

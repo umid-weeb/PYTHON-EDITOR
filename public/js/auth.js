@@ -30,6 +30,9 @@ export async function register(payload) {
 
 export function logout() {
   clearToken();
+  localStorage.removeItem("arena_pending_action");
+  localStorage.removeItem("arena_pending_problem");
+  localStorage.removeItem("access_token");
   sessionStorage.clear();
   window.location.href = "/arena.html";
 }

@@ -32,6 +32,7 @@ export async function handleSubmit(ui) {
   }
   saveDraft(problemId);
   if (!getToken()) {
+    setPendingSubmit(problemId);
     openAuthModal();
     return;
   }
@@ -138,6 +139,10 @@ function toggleResultLoading(ui, isLoading, text = "Working...") {
 function openAuthModal() {
   const modal = document.getElementById("auth-modal");
   if (!modal) return;
+  const title = modal.querySelector("h2");
+  const desc = modal.querySelector("p");
+  if (title) title.textContent = "Login Required";
+  if (desc) desc.textContent = "Please login or create an account to submit your solution.";
   modal.removeAttribute("hidden");
 }
 
@@ -147,4 +152,11 @@ function currentLanguage(ui) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function setPendingSubmit(problemId) {
+  localStorage.setItem("arena_pending_action", "submit");
+  if (problemId) {
+    localStorage.setItem("arena_pending_problem", problemId);
+  }
 }
