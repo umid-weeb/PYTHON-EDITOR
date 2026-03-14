@@ -158,9 +158,12 @@ function hydrateUser() {
       .then((me) => {
         const letter = (me?.username || "U")[0].toUpperCase();
         ui.userAvatarFallback.textContent = letter;
-        if (me?.username) ui.usernameLabel.textContent = me.username;
         if (me?.avatar_url && ui.userAvatarImg) {
           ui.userAvatarImg.src = me.avatar_url;
+          ui.userAvatarImg.hidden = false;
+          ui.userAvatarFallback.hidden = true;
+        } else if (ui.userAvatarImg) {
+          ui.userAvatarImg.src = "/assets/default-avatar.png";
           ui.userAvatarImg.hidden = false;
           ui.userAvatarFallback.hidden = true;
         }
