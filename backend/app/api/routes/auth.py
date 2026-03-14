@@ -233,9 +233,9 @@ def update_password(request: PasswordUpdateRequest, user: User = Depends(get_cur
 
 
 @router.post("/profile/avatar")
-async def upload_avatar(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def upload_avatar(avatar: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Validate file type
-    if not file.content_type.startswith('image/'):
+    if not avatar.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
     
     # Create uploads directory if it doesn't exist
@@ -245,13 +245,13 @@ async def upload_avatar(file: UploadFile = File(...), user: User = Depends(get_c
     
     # Generate unique filename
     import uuid
-    file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+    file_extension = avatar.filename.split('.')[-1] if '.' in avatar.filename else 'jpg'
     filename = f"{user.id}_{uuid.uuid4().hex}.{file_extension}"
     file_path = os.path.join(upload_dir, filename)
     
     # Save file
     with open(file_path, "wb") as buffer:
-        content = await file.read()
+        content = await avatar.read()
         buffer.write(content)
     
     # Update or create profile
