@@ -42,7 +42,6 @@ function collectUi() {
   ui.userAvatarImg = document.getElementById("user-avatar-img");
   ui.userAvatarFallback = document.getElementById("user-avatar-fallback");
   ui.usernameLabel = document.getElementById("navbar-username");
-  ui.hamburger = document.getElementById("hamburger-btn");
   ui.userMenu = document.getElementById("user-menu");
   ui.logoutBtn = document.getElementById("logout-btn");
   ui.authModal = document.getElementById("auth-modal");
@@ -63,9 +62,6 @@ function bindEvents() {
   if (ui.userAvatar && ui.userMenu) {
     ui.userAvatar.addEventListener("click", toggleUserMenu);
   }
-  if (ui.hamburger && ui.userMenu) {
-    ui.hamburger.addEventListener("click", toggleUserMenu);
-  }
   if (ui.logoutBtn) {
     ui.logoutBtn.addEventListener("click", () => {
       import("./auth.js").then(({ logout }) => logout());
@@ -77,9 +73,9 @@ function bindEvents() {
   if (ui.authModalSignup) ui.authModalSignup.addEventListener("click", () => redirectToAuth("register.html"));
   document.addEventListener("click", (e) => {
     if (e.target === ui.authModal) closeAuthModal();
-    if (ui.userMenu && !ui.userMenu.hidden) {
-      const targetInside = e.target.closest("#user-menu") || e.target.closest("#user-avatar") || e.target.closest("#hamburger-btn");
-      if (!targetInside) ui.userMenu.hidden = true;
+    if (ui.userMenu && ui.userMenu.classList.contains("is-open")) {
+      const targetInside = e.target.closest("#user-menu") || e.target.closest("#user-avatar");
+      if (!targetInside) ui.userMenu.classList.remove("is-open");
     }
     if (ui.navSearchResults && !ui.navSearchResults.hidden) {
       const inside = e.target.closest("#nav-search-results") || e.target.closest("#nav-user-search");
@@ -139,8 +135,8 @@ function bindShortcuts() {
       e.preventDefault();
       ui.submitBtn.click();
     }
-    if (e.key === "Escape" && ui.userMenu && !ui.userMenu.hidden) {
-      ui.userMenu.hidden = true;
+    if (e.key === "Escape" && ui.userMenu && ui.userMenu.classList.contains("is-open")) {
+      ui.userMenu.classList.remove("is-open");
     }
   });
 }
@@ -166,7 +162,7 @@ function hydrateUser() {
 
 function toggleUserMenu() {
   if (!ui.userMenu) return;
-  ui.userMenu.hidden = !ui.userMenu.hidden;
+  ui.userMenu.classList.toggle("is-open");
 }
 
 async function runUserSearch(query) {

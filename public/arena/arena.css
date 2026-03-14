@@ -278,7 +278,7 @@ textarea {
   position: absolute;
   right: 0;
   top: 48px;
-  display: grid;
+  display: none;
   gap: 6px;
   padding: 10px;
   border-radius: 12px;
@@ -287,6 +287,10 @@ textarea {
   box-shadow: var(--arena-shadow);
   min-width: 180px;
   z-index: 30;
+}
+
+.user-menu.is-open {
+  display: grid;
 }
 
 .user-menu a,
