@@ -4,9 +4,6 @@ import { loadProblemList, openProblem } from "./problems.js";
 import { handleRun, handleSubmit, renderResultMessage } from "./runner.js";
 import { getToken } from "./api.js";
 
-// Import Vue authentication UI
-import "./auth-ui.js";
-
 const ui = {};
 let navSearchVersion = 0;
 
@@ -160,8 +157,13 @@ function bindShortcuts() {
 }
 
 function hydrateUser() {
-  // 1. Tell the teacher to check the "userToken" pocket immediately!
-  const mySticker = localStorage.getItem("userToken") || getToken();
+  // 1. Tell the teacher to check the pockets immediately!
+  const pocketSticker = localStorage.getItem("userToken");
+  const legacySticker = localStorage.getItem("token");
+  const mySticker = pocketSticker || legacySticker || getToken();
+
+  // Debug: see what's in the legacy pocket
+  console.log("Auth token:", localStorage.getItem("token"));
   
   if (!mySticker || mySticker === "undefined") {
     showLoggedOutUI();
@@ -333,7 +335,8 @@ function showDescriptionPane() {
 function buildLoggedOutMenu() {
   if (!ui.userMenu) return;
   ui.userMenu.innerHTML = `
-    <a href="/login.html" id="login-link">Login / Sign Up</a>
+    <a href="/login.html" id="login-link">Login</a>
+    <a href="/register.html" id="signup-link">Sign Up</a>
   `;
   ui.logoutBtn = null;
 }
