@@ -21,9 +21,11 @@ def main() -> int:
 
     Base.metadata.create_all(bind=engine)
 
+    print("Seeding problems...")
     with SessionLocal() as db:
         summary = seed_problem_catalog(db, force=args.force)
 
+    print(f"{summary.total_count} problems ready.")
     print(
         f"Seeded {summary.inserted_count} problems, skipped {summary.skipped_count}, total catalog size {summary.total_count}."
     )

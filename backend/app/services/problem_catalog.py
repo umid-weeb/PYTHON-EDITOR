@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
 import string
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from app.models.problem import Problem, TestCase
 
 VISIBLE_CASE_COUNT = 3
 HIDDEN_CASE_COUNT = 3
+logger = logging.getLogger(__name__)
 THEMES = [
     "Beacon",
     "Orbit",
@@ -101,9 +103,21 @@ def build_problem_catalog() -> list[ProblemSeed]:
 
 def ensure_problem_catalog_seeded(db: Session) -> SeedSummary:
     total_count = len(build_problem_catalog())
-    if db.query(Problem).count() > 0:
-        return SeedSummary(total_count=total_count, inserted_count=0, skipped_count=total_count, forced=False)
-    return seed_problem_catalog(db, force=False)
+    existing_count = db.query(Problem).count()
+
+    if existing_count >= total_count:
+        logger.info("%s problems ready.", total_count)
+        return SeedSummary(
+            total_count=total_count,
+            inserted_count=0,
+            skipped_count=total_count,
+            forced=False,
+        )
+
+    logger.info("Seeding problems...")
+    summary = seed_problem_catalog(db, force=False)
+    logger.info("%s problems ready.", summary.total_count)
+    return summary
 
 
 def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:

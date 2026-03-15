@@ -1,6 +1,7 @@
 import { Group as ResizablePanelGroup, Panel } from "react-resizable-panels";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
+import UserMenu from "../UserMenu.tsx";
 import UserQuickSearch from "../common/UserQuickSearch.jsx";
 import ResizeHandle from "./ResizeHandle.jsx";
 
@@ -28,45 +29,42 @@ export default function ArenaLayout({
       <div className="mb-4 flex shrink-0 items-center justify-between gap-[18px] max-[860px]:flex-col max-[860px]:items-stretch">
         <div className="flex items-center gap-4">
           <button
-            className="rounded-[18px] border border-arena-border bg-[rgba(8,16,30,0.78)] px-[18px] py-[14px] text-arena-text transition-colors hover:border-arena-borderStrong hover:bg-white/10"
+            className="group inline-flex items-center gap-2 rounded-full border border-arena-border/80 bg-[rgba(8,16,30,0.62)] px-4 py-3 text-sm font-medium text-arena-text transition hover:border-arena-borderStrong hover:bg-white/10 focus:outline-none focus-visible:border-arena-borderStrong focus-visible:ring-4 focus-visible:ring-[rgba(108,146,255,0.14)]"
             type="button"
             onClick={() => navigate("/")}
           >
-            Editor
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4 text-arena-muted transition group-hover:-translate-x-0.5 group-hover:text-arena-text"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.5"
+              />
+            </svg>
+            <span>Editor</span>
           </button>
           <div>
             <div className="text-[clamp(2rem,3vw,2.4rem)] font-bold tracking-[-0.06em]">Zone</div>
             <div className="mt-0.5 text-sm text-arena-muted">Competitive coding workspace</div>
           </div>
         </div>
-        <div className="flex items-center gap-3.5 max-[860px]:w-full max-[860px]:flex-wrap">
+        <div className="flex items-center gap-3.5 max-[860px]:w-full max-[860px]:flex-wrap max-[860px]:justify-between">
           <UserQuickSearch />
-          <div className="flex items-center gap-2.5 max-[860px]:w-full max-[860px]:flex-wrap">
-            <button
-              className="grid h-12 w-12 place-items-center rounded-2xl border border-arena-border bg-white/5 font-semibold text-arena-primaryStrong transition-colors hover:border-arena-borderStrong hover:bg-white/10"
-              type="button"
-              onClick={() => navigate("/profile")}
-            >
-              {(user?.username || "U").slice(0, 1).toUpperCase()}
-            </button>
-            <button
-              className="rounded-2xl border border-arena-border bg-white/5 px-[14px] py-3 text-arena-text transition-colors hover:border-arena-borderStrong hover:bg-white/10"
-              type="button"
-              onClick={() => navigate("/leaderboard")}
-            >
-              Rating
-            </button>
-            <button
-              className="rounded-2xl border border-arena-border bg-white/5 px-[14px] py-3 text-arena-text transition-colors hover:border-arena-borderStrong hover:bg-white/10"
-              type="button"
-              onClick={async () => {
-                await logout();
-                navigate("/login");
-              }}
-            >
-              Logout
-            </button>
-          </div>
+          <UserMenu
+            user={user}
+            onProfile={() => navigate("/profile")}
+            onRating={() => navigate("/leaderboard")}
+            onLogout={async () => {
+              await logout();
+              navigate("/login");
+            }}
+          />
         </div>
       </div>
 
