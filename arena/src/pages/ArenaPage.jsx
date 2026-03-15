@@ -174,7 +174,7 @@ export default function ArenaPage() {
           onSelect={setActiveCaseIndex}
         />
       }
-      result={<ResultPanel result={result} />}
+      result={<ResultPanel result={result} busy={isRunning || isSubmitting} />}
       authModal={
         <AuthPromptModal
           open={showAuthModal}

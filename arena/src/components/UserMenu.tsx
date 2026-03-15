@@ -1,4 +1,5 @@
 import { Fragment, useMemo } from "react";
+import type { ReactNode } from "react";
 import { Menu, MenuButton, MenuItem, MenuItems, Transition } from "@headlessui/react";
 import { API_BASE_URL } from "../lib/apiClient.js";
 
@@ -86,10 +87,22 @@ function LogoutIcon({ className = "" }: IconProps) {
 
 type ActionItemProps = {
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   onClick: () => void | Promise<void>;
   tone?: "default" | "danger";
 };
+
+function buildInitials(username?: string | null) {
+  const source = String(username || "User").trim();
+  if (!source) return "U";
+
+  const chunks = source.split(/[^a-zA-Z0-9]+/).filter(Boolean);
+  if (chunks.length >= 2) {
+    return `${chunks[0][0]}${chunks[1][0]}`.toUpperCase();
+  }
+
+  return source.slice(0, 2).toUpperCase();
+}
 
 function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps) {
   return (
@@ -123,12 +136,15 @@ function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps)
 
 export default function UserMenu({ user, onProfile, onRating, onLogout }: UserMenuProps) {
   const avatarSrc = useMemo(() => resolveAvatarSrc(user), [user]);
-  const initial = (user?.username || "U").slice(0, 1).toUpperCase();
+  const initials = buildInitials(user?.username);
 
   return (
     <Menu as="div" className="relative">
-      <MenuButton className="group flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-arena-border bg-white/5 text-arena-primaryStrong shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition hover:border-arena-borderStrong hover:bg-white/10 focus:outline-none focus-visible:border-arena-borderStrong focus-visible:ring-4 focus-visible:ring-[rgba(108,146,255,0.14)]">
-        <span className="sr-only">Open user menu</span>
+      <MenuButton
+        aria-label="User menu"
+        className="group flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-arena-border bg-white/5 text-arena-primaryStrong shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition hover:border-arena-borderStrong hover:bg-white/10 focus:outline-none focus-visible:border-arena-borderStrong focus-visible:ring-4 focus-visible:ring-[rgba(108,146,255,0.14)]"
+        type="button"
+      >
         {avatarSrc ? (
           <img
             alt={`${user?.username || "User"} avatar`}
@@ -136,7 +152,7 @@ export default function UserMenu({ user, onProfile, onRating, onLogout }: UserMe
             src={avatarSrc}
           />
         ) : (
-          <span className="text-base font-semibold">{initial}</span>
+          <span className="text-sm font-semibold tracking-[0.08em]">{initials}</span>
         )}
       </MenuButton>
 
@@ -157,17 +173,17 @@ export default function UserMenu({ user, onProfile, onRating, onLogout }: UserMe
 
           <div className="space-y-1">
             <ActionItem
-              icon={<ProfileIcon className="h-4.5 w-4.5" />}
+              icon={<ProfileIcon className="h-4 w-4" />}
               label="Profile"
               onClick={onProfile}
             />
             <ActionItem
-              icon={<TrophyIcon className="h-4.5 w-4.5" />}
+              icon={<TrophyIcon className="h-4 w-4" />}
               label="Rating"
               onClick={onRating}
             />
             <ActionItem
-              icon={<LogoutIcon className="h-4.5 w-4.5" />}
+              icon={<LogoutIcon className="h-4 w-4" />}
               label="Logout"
               onClick={onLogout}
               tone="danger"

@@ -37,6 +37,11 @@ export function ArenaProvider({ children }) {
   const [activeCaseIndex, setActiveCaseIndex] = useState(0);
   const cacheRef = useRef(new Map());
 
+  const getSubmissionProblemKey = useCallback(
+    () => selectedProblem?.slug || selectedProblemId,
+    [selectedProblem?.slug, selectedProblemId]
+  );
+
   const loadProblems = useCallback(async () => {
     setProblemsStatus("loading");
     try {
@@ -116,7 +121,9 @@ export function ArenaProvider({ children }) {
   }, []);
 
   const runCode = useCallback(async () => {
-    if (!selectedProblemId) {
+    const submissionProblemKey = getSubmissionProblemKey();
+
+    if (!submissionProblemKey) {
       setResult({
         tone: "warning",
         chip: "Info",
@@ -136,7 +143,10 @@ export function ArenaProvider({ children }) {
     });
 
     try {
-      const payload = await arenaApi.runSolution(selectedProblemId, code, language);
+      const submission = await arenaApi.runSolution(submissionProblemKey, code, language);
+      const payload = submission?.submission_id
+        ? await arenaApi.pollSubmission(submission.submission_id)
+        : submission;
       const formatted = buildResultState(payload, "run");
       setResult(formatted);
       return formatted;
@@ -151,11 +161,13 @@ export function ArenaProvider({ children }) {
     } finally {
       setIsRunning(false);
     }
-  }, [code, language, persistDraft, selectedProblemId]);
+  }, [code, getSubmissionProblemKey, language, persistDraft]);
 
   const submitCode = useCallback(
     async (token) => {
-      if (!selectedProblemId) {
+      const submissionProblemKey = getSubmissionProblemKey();
+
+      if (!submissionProblemKey) {
         setResult({
           tone: "warning",
           chip: "Info",
@@ -166,7 +178,7 @@ export function ArenaProvider({ children }) {
       }
 
       if (!token) {
-        setPendingSubmission(selectedProblemId);
+        setPendingSubmission(submissionProblemKey);
         setShowAuthModal(true);
         return null;
       }
@@ -181,8 +193,10 @@ export function ArenaProvider({ children }) {
       });
 
       try {
-        const submission = await arenaApi.submitSolution(selectedProblemId, code, language);
-        const payload = await arenaApi.pollSubmission(submission.submission_id, token);
+        const submission = await arenaApi.submitSolution(submissionProblemKey, code, language);
+        const payload = submission?.submission_id
+          ? await arenaApi.pollSubmission(submission.submission_id, token)
+          : submission;
         clearPendingSubmission();
         const formatted = buildResultState(payload, "submit");
         setResult(formatted);
@@ -199,7 +213,7 @@ export function ArenaProvider({ children }) {
         setIsSubmitting(false);
       }
     },
-    [code, language, persistDraft, selectedProblemId]
+    [code, getSubmissionProblemKey, language, persistDraft]
   );
 
   const filteredProblems = useMemo(

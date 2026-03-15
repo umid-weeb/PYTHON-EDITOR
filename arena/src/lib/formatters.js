@@ -6,11 +6,15 @@ export function formatJoinedDate(value) {
 }
 
 export function formatRuntime(runtimeMs) {
-  return runtimeMs ? `${runtimeMs} ms` : "--";
+  if (runtimeMs == null) return "--";
+  if (runtimeMs >= 1000) return `${(runtimeMs / 1000).toFixed(2)} s`;
+  return `${runtimeMs} ms`;
 }
 
 export function formatMemory(memoryKb) {
-  return memoryKb ? `${Math.round(memoryKb)} KB` : "--";
+  if (memoryKb == null) return "--";
+  if (memoryKb >= 1024) return `${(memoryKb / 1024).toFixed(1)} MB`;
+  return `${Math.round(memoryKb)} KB`;
 }
 
 export function formatCaseResults(cases = []) {
@@ -20,11 +24,22 @@ export function formatCaseResults(cases = []) {
     return {
       id: `${index + 1}`,
       label: `Case ${index + 1}`,
-      verdict,
+      verdict: entry.error ? `${verdict}: ${entry.error}` : verdict,
       runtime: formatRuntime(entry.runtime_ms),
       memory: formatMemory(entry.memory_kb),
     };
   });
+}
+
+function resolveResultTone(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized.includes("accepted")) return "success";
+  if (normalized.includes("wrong")) return "danger";
+  if (normalized.includes("runtime")) return "warning";
+  if (normalized.includes("time")) return "warning";
+  if (normalized.includes("memory")) return "warning";
+  if (normalized.includes("compilation")) return "warning";
+  return "info";
 }
 
 export function buildResultState(payload, mode = "run") {
@@ -37,28 +52,25 @@ export function buildResultState(payload, mode = "run") {
     };
   }
 
-  const status =
-    mode === "submit"
-      ? payload.verdict || payload.status || "Result"
-      : payload.status || (payload.ok ? "Accepted" : "Output");
-  const normalized = status.toLowerCase();
-  let tone = "info";
-  if (normalized.includes("accepted")) tone = "success";
-  else if (normalized.includes("wrong")) tone = "danger";
-  else if (normalized.includes("runtime")) tone = "warning";
-  else if (normalized.includes("time")) tone = "warning";
+  const status = payload.verdict || payload.status || (payload.ok ? "Accepted" : "Result");
+  const details = payload.output
+    ? [{ id: "output", label: "Console Output", verdict: payload.output, runtime: "", memory: "" }]
+    : formatCaseResults(payload.case_results);
 
-  const details =
-    mode === "submit"
-      ? formatCaseResults(payload.case_results)
-      : payload.output
-        ? [{ id: "output", label: "Console Output", verdict: payload.output, runtime: "", memory: "" }]
-        : formatCaseResults(payload.case_results);
+  const summaryParts = [];
+  if (typeof payload.passed_count === "number" && typeof payload.total_count === "number") {
+    summaryParts.push(`Passed ${payload.passed_count}/${payload.total_count}`);
+  }
+  summaryParts.push(`Runtime: ${formatRuntime(payload.runtime_ms)}`);
+  summaryParts.push(`Memory: ${formatMemory(payload.memory_kb)}`);
 
   return {
-    tone,
+    tone: resolveResultTone(status),
     chip: status,
-    summary: `${status} • Runtime: ${formatRuntime(payload.runtime_ms)} • Memory: ${formatMemory(payload.memory_kb)}`,
+    summary:
+      payload.error_text && String(status).toLowerCase() !== "accepted"
+        ? payload.error_text
+        : summaryParts.join(" | ") || (mode === "submit" ? "Submission finished." : "Execution finished."),
     details,
   };
 }

@@ -110,16 +110,16 @@ export const arenaApi = {
       throw error;
     }
   },
-  runSolution(problemId, code, language) {
+  runSolution(problemSlug, code, language) {
     return request("/api/run", {
       method: "POST",
-      body: JSON.stringify({ problem_id: problemId, code, language }),
+      body: JSON.stringify(buildSubmissionPayload(problemSlug, code, language)),
     });
   },
-  submitSolution(problemId, code, language) {
+  submitSolution(problemSlug, code, language) {
     return request("/api/submit", {
       method: "POST",
-      body: JSON.stringify({ problem_id: problemId, code, language }),
+      body: JSON.stringify(buildSubmissionPayload(problemSlug, code, language)),
     });
   },
   getSubmission(submissionId, token) {
@@ -194,4 +194,13 @@ export const userApi = {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildSubmissionPayload(problemSlug, code, language) {
+  return {
+    code,
+    language,
+    problemSlug,
+    problem_id: problemSlug,
+  };
 }

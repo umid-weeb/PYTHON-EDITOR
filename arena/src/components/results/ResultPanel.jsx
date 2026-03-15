@@ -5,7 +5,13 @@ const toneClass = {
   info: "text-arena-primaryStrong",
 };
 
-export default function ResultPanel({ result }) {
+function Spinner() {
+  return (
+    <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+  );
+}
+
+export default function ResultPanel({ result, busy = false }) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
       <div className="flex shrink-0 items-start justify-between gap-3 border-b border-arena-border px-[22px] py-[18px]">
@@ -15,14 +21,21 @@ export default function ResultPanel({ result }) {
         </div>
         <span
           className={[
-            "whitespace-nowrap rounded-full border border-arena-border bg-white/5 px-3 py-2.5 text-sm",
+            "inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-arena-border bg-white/5 px-3 py-2.5 text-sm",
             toneClass[result.tone] || "",
           ].join(" ")}
         >
+          {busy ? <Spinner /> : null}
           {result.chip}
         </span>
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-auto px-[22px] pb-[22px] pt-[18px]">
+        {busy && !result.details?.length ? (
+          <div className="flex items-center gap-3 rounded-[18px] border border-arena-border bg-white/5 px-4 py-[14px] text-sm text-arena-muted">
+            <Spinner />
+            <span>Waiting for the judge to finish execution...</span>
+          </div>
+        ) : null}
         {result.details?.length ? (
           result.details.map((entry) => (
             <div

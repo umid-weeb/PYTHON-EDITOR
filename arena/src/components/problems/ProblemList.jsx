@@ -5,11 +5,23 @@ const difficulties = [
   { id: "hard", label: "Hard" },
 ];
 
-const filterToneClass = {
-  all: "text-arena-text",
-  easy: "text-arena-success",
-  medium: "text-arena-warning",
-  hard: "text-arena-danger",
+const filterChipClass = {
+  all: {
+    idle: "border-arena-border bg-white/[0.03] text-arena-muted hover:border-arena-borderStrong hover:text-arena-text",
+    active: "border-arena-borderStrong bg-[rgba(108,146,255,0.14)] text-arena-text",
+  },
+  easy: {
+    idle: "border-[rgba(87,223,180,0.18)] bg-[rgba(87,223,180,0.04)] text-arena-success hover:border-[rgba(87,223,180,0.34)] hover:bg-[rgba(87,223,180,0.1)]",
+    active: "border-[rgba(87,223,180,0.38)] bg-[rgba(87,223,180,0.16)] text-arena-success",
+  },
+  medium: {
+    idle: "border-[rgba(255,214,102,0.18)] bg-[rgba(255,214,102,0.04)] text-arena-warning hover:border-[rgba(255,214,102,0.34)] hover:bg-[rgba(255,214,102,0.1)]",
+    active: "border-[rgba(255,214,102,0.38)] bg-[rgba(255,214,102,0.16)] text-arena-warning",
+  },
+  hard: {
+    idle: "border-[rgba(255,123,143,0.18)] bg-[rgba(255,123,143,0.04)] text-arena-danger hover:border-[rgba(255,123,143,0.34)] hover:bg-[rgba(255,123,143,0.1)]",
+    active: "border-[rgba(255,123,143,0.38)] bg-[rgba(255,123,143,0.16)] text-arena-danger",
+  },
 };
 
 const difficultyPillClass = {
@@ -39,15 +51,13 @@ export default function ProblemList({
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
         />
-        <div className="my-4 grid grid-cols-2 gap-2.5">
+        <div className="my-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {difficulties.map((item) => (
             <button
               key={item.id}
               className={[
-                "rounded-full border px-3.5 py-3 text-sm transition",
-                difficulty === item.id
-                  ? "border-arena-borderStrong bg-[rgba(108,146,255,0.14)] text-arena-text"
-                  : `border-arena-border bg-transparent ${filterToneClass[item.id]}`,
+                "shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition",
+                difficulty === item.id ? filterChipClass[item.id].active : filterChipClass[item.id].idle,
               ].join(" ")}
               type="button"
               onClick={() => onDifficultyChange(item.id)}
