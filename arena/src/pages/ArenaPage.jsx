@@ -51,7 +51,7 @@ export default function ArenaPage() {
       if (!mounted || !items.length) return;
 
       const requestedProblem = params.get("problem");
-      const fallbackProblem = readLastProblem() || items[0]?.id;
+      const fallbackProblem = readLastProblem() || items[0]?.slug || items[0]?.id;
       const target = requestedProblem || fallbackProblem;
       if (target) {
         await selectProblem(target);
@@ -102,8 +102,8 @@ export default function ArenaPage() {
 
   const visibleCases = selectedProblem?.visible_testcases || [];
   const currentProblemId = useMemo(
-    () => selectedProblem?.id || selectedProblemId,
-    [selectedProblem?.id, selectedProblemId]
+    () => selectedProblem?.slug || selectedProblemId,
+    [selectedProblem?.slug, selectedProblemId]
   );
 
   async function handleProblemSelect(problemId) {

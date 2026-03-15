@@ -19,8 +19,8 @@ def test_list_problems_supports_pagination_and_query() -> None:
         "/api/problems",
         params={
             "page": 1,
-            "per_page": 1,
-            "q": "two",
+            "per_page": 200,
+            "q": "divisible",
             "tags": "array",
         },
     )
@@ -28,24 +28,42 @@ def test_list_problems_supports_pagination_and_query() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["page"] == 1
-    assert payload["per_page"] == 1
-    assert payload["total"] >= 1
+    assert payload["per_page"] == 200
+    assert payload["total"] == 10
     assert payload["total_pages"] >= 1
     assert payload["selected_tags"] == ["array"]
-    assert payload["items"][0]["id"] == "two_sum"
+    assert payload["easy_only"] is False
+    assert len(payload["items"]) == 10
+    assert payload["items"][0]["slug"].startswith("divisible-sum-")
 
 
-def test_get_problem_returns_detail_without_hidden_tests() -> None:
-    response = client.get("/api/problem/two_sum")
+def test_problem_catalog_contains_expected_distribution() -> None:
+    response = client.get("/api/problems", params={"page": 1, "per_page": 200})
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["id"] == "two_sum"
-    assert payload["title"] == "Two Sum"
-    assert payload["function_name"] == "twoSum"
-    assert payload["hidden_testcase_count"] >= 0
+    assert payload["total"] == 120
+
+    counts = {"easy": 0, "medium": 0, "hard": 0}
+    for item in payload["items"]:
+        counts[item["difficulty"]] += 1
+
+    assert counts == {"easy": 50, "medium": 50, "hard": 20}
+
+
+def test_get_problem_returns_detail_without_hidden_tests() -> None:
+    response = client.get("/api/problems/divisible-sum-01")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["slug"] == "divisible-sum-01"
+    assert payload["title"] == "Beacon Divisible Sum"
+    assert payload["difficulty"] == "easy"
+    assert payload["function_name"] == "solve"
+    assert payload["hidden_testcase_count"] == 3
     assert "hidden_testcases" not in payload
-    assert len(payload["visible_testcases"]) == 4
+    assert len(payload["visible_testcases"]) == 3
+    assert "divisible by 2" in payload["description"].lower()
 
 
 def test_health_endpoints_report_ok() -> None:

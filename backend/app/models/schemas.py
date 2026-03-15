@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class ProblemSummary(BaseModel):
     id: str
+    slug: str
     title: str
     difficulty: str
     tags: list[str] = Field(default_factory=list)
@@ -45,7 +46,7 @@ class ProblemListResponse(BaseModel):
     selected_tags: list[str] = Field(default_factory=list)
     available_tags: list[str] = Field(default_factory=list)
     source: str
-    easy_only: bool = True
+    easy_only: bool = False
 
 
 class SubmissionRequest(BaseModel):

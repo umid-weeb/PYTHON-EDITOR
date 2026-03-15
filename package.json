@@ -7,11 +7,17 @@
     "start": "serve .",
     "arena:dev": "npm --prefix arena run dev",
     "arena:build": "npm --prefix arena run build",
+    "seed:problems": "tsx scripts/seedProblems.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Sizning Ismingiz",
   "license": "MIT",
   "dependencies": {
     "python": "^0.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

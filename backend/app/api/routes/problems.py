@@ -20,7 +20,7 @@ logger = logging.getLogger("pyzone.arena.problems")
 @router.get("/problems", response_model=ProblemListResponse)
 async def list_problems(
     page: int = 1,
-    per_page: int = 20,
+    per_page: int = 200,
     q: str = "",
     tags: str = "",
     refresh: bool = False,
@@ -44,9 +44,8 @@ async def list_problems(
     )
 
     logger.info(
-        "problems.list source=%s github_fetch=%s refresh=%s cache=%s page=%s per_page=%s query=%r tags=%s loaded=%s total=%s latency_ms=%.2f",
+        "problems.list source=%s refresh=%s cache=%s page=%s per_page=%s query=%r tags=%s loaded=%s total=%s latency_ms=%.2f",
         service.source_label,
-        service.source.last_fetch_status,
         refresh,
         "hit" if cache_hit else "miss",
         payload["page"],
@@ -68,7 +67,7 @@ async def list_problems(
         selected_tags=payload["selected_tags"],
         available_tags=payload["available_tags"],
         source=service.source_label,
-        easy_only=True,
+        easy_only=False,
     )
 
 
@@ -76,7 +75,7 @@ async def list_problems(
 async def search_problems(
     q: str,
     page: int = 1,
-    per_page: int = 20,
+    per_page: int = 200,
     tags: str = "",
     service: ProblemService = Depends(get_problem_service),
 ) -> ProblemListResponse:
@@ -103,13 +102,13 @@ async def search_problems(
         selected_tags=payload["selected_tags"],
         available_tags=payload["available_tags"],
         source=service.source_label,
-        easy_only=True,
+        easy_only=False,
     )
 
 
-@router.get("/problem/{problem_id}", response_model=ProblemDetail)
+@router.get("/problems/{problem_slug}", response_model=ProblemDetail)
 async def get_problem(
-    problem_id: str,
+    problem_slug: str,
     refresh: bool = False,
     service: ProblemService = Depends(get_problem_service),
 ) -> ProblemDetail:
@@ -117,17 +116,16 @@ async def get_problem(
     cache_hit = False
     if not refresh:
         try:
-            cache_hit = service.cache.load_problem(problem_id) is not None
+            cache_hit = service.cache.load_problem(problem_slug) is not None
         except Exception:
             cache_hit = False
 
     try:
-        problem = await service.get_problem(problem_id, force_refresh=refresh)
+        problem = await service.get_problem(problem_slug, force_refresh=refresh)
         logger.info(
-            "problems.detail problem_id=%s source=%s github_fetch=%s refresh=%s cache=%s visible=%s hidden=%s latency_ms=%.2f",
-            problem_id,
+            "problems.detail problem=%s source=%s refresh=%s cache=%s visible=%s hidden=%s latency_ms=%.2f",
+            problem_slug,
             service.source_label,
-            service.source.last_fetch_status,
             refresh,
             "hit" if cache_hit else "miss",
             len(problem.visible_testcases),
@@ -137,11 +135,19 @@ async def get_problem(
         return problem
     except ProblemNotFoundError as error:
         logger.warning(
-            "problems.detail.not_found problem_id=%s source=%s github_fetch=%s refresh=%s cache=%s",
-            problem_id,
+            "problems.detail.not_found problem=%s source=%s refresh=%s cache=%s",
+            problem_slug,
             service.source_label,
-            "enabled" if service.settings.github_enabled else "local-fallback",
             refresh,
             "hit" if cache_hit else "miss",
         )
         raise HTTPException(status_code=404, detail="Problem topilmadi.") from error
+
+
+@router.get("/problem/{problem_key}", response_model=ProblemDetail)
+async def get_problem_legacy(
+    problem_key: str,
+    refresh: bool = False,
+    service: ProblemService = Depends(get_problem_service),
+) -> ProblemDetail:
+    return await get_problem(problem_slug=problem_key, refresh=refresh, service=service)

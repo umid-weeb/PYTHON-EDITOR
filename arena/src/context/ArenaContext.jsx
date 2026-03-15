@@ -209,7 +209,7 @@ export function ArenaProvider({ children }) {
         const matchesQuery =
           !query ||
           String(problem.title || "").toLowerCase().includes(query) ||
-          String(problem.id || "").toLowerCase().includes(query);
+          String(problem.slug || problem.id || "").toLowerCase().includes(query);
         const matchesDifficulty =
           difficulty === "all" ||
           String(problem.difficulty || "easy").toLowerCase() === difficulty;

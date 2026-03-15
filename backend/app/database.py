@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from urllib.parse import quote_plus, urlparse, urlunparse
 
 from dotenv import load_dotenv
@@ -13,10 +14,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Load environment variables from .env if present (useful for local dev)
 load_dotenv()
 
+_default_sqlite_path = Path(__file__).resolve().parents[1] / ".data" / "app.db"
+_default_sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+
 raw_db_url = os.getenv(
     "DATABASE_URL",
-    # Safe fallback for local development if not provided
-    "sqlite:///./.data/app.db",
+    f"sqlite:///{_default_sqlite_path.as_posix()}",
 )
 
 

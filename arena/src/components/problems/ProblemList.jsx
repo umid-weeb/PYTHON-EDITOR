@@ -71,15 +71,15 @@ export default function ProblemList({
             ))
           : problems.map((problem) => (
               <button
-                key={problem.id}
+                key={problem.slug || problem.id}
                 className={[
                   "grid w-full gap-3 rounded-[20px] border p-4 text-left text-arena-text transition",
-                  selectedProblemId === problem.id
+                  selectedProblemId === (problem.slug || problem.id)
                     ? "border-arena-borderStrong bg-[rgba(108,146,255,0.1)]"
                     : "border-arena-border bg-white/5 hover:border-arena-borderStrong hover:bg-[rgba(108,146,255,0.1)]",
                 ].join(" ")}
                 type="button"
-                onClick={() => onSelect(problem.id)}
+                onClick={() => onSelect(problem.slug || problem.id)}
               >
                 <div className="font-semibold">{problem.title || problem.id}</div>
                 <div className="flex items-center justify-between gap-3 text-sm text-arena-muted">
@@ -91,7 +91,7 @@ export default function ProblemList({
                   >
                     {String(problem.difficulty || "easy").toUpperCase()}
                   </span>
-                  <span>{problem.id}</span>
+                  <span>{problem.slug || problem.id}</span>
                 </div>
               </button>
             ))}

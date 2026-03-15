@@ -15,6 +15,9 @@ from app.api.routes.submissions import router as submission_router
 from app.core.config import get_settings
 from app.repositories.submissions import SubmissionRepository
 from app.database import Base, engine
+from app.database import SessionLocal
+from app import models as _models  # noqa: F401
+from app.services.problem_catalog import ensure_problem_catalog_seeded
 
 
 settings = get_settings()
@@ -29,6 +32,8 @@ async def lifespan(_: FastAPI):
     SubmissionRepository(settings.submissions_db_path)
     # Ensure SQLAlchemy models are created (Supabase/Postgres or fallback SQLite)
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        ensure_problem_catalog_seeded(db)
     yield
 
 

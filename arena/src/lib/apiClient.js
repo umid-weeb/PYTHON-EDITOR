@@ -97,11 +97,11 @@ export const authApi = {
 
 export const arenaApi = {
   async getProblems() {
-    const data = await request("/api/problems");
+    const data = await request("/api/problems?per_page=200");
     return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
   },
-  getProblem(problemId) {
-    return request(`/api/problem/${encodeURIComponent(problemId)}`);
+  getProblem(problemKey) {
+    return request(`/api/problems/${encodeURIComponent(problemKey)}`);
   },
   runSolution(problemId, code, language) {
     return request("/api/run", {
