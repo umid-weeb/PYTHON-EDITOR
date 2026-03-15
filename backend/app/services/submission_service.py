@@ -114,6 +114,18 @@ class SubmissionService:
         except Exception as error:
             self.repository.mark_failed(submission_id, str(error))
             self.logger.exception("submission.failed id=%s error=%s", submission_id, error)
+            if submission.get("mode") == "submit":
+                with SessionLocal() as db:
+                    record = (
+                        db.query(UserSubmission)
+                        .filter(UserSubmission.submission_id == submission_id)
+                        .first()
+                    )
+                    if record:
+                        record.verdict = "Runtime Error"
+                        record.runtime_ms = None
+                        record.memory_kb = None
+                        db.commit()
 
     def get_submission(self, submission_id: str) -> dict | None:
         return self.repository.get(submission_id)

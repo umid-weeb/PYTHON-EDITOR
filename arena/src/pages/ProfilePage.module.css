@@ -23,15 +23,15 @@
 }
 
 .avatar {
-  width: 74px;
-  height: 74px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: rgba(108, 146, 255, 0.1);
   border: 1px solid var(--arena-border);
   color: var(--arena-primary-strong);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
 }
 

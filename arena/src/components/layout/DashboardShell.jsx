@@ -31,7 +31,14 @@ export default function DashboardShell({ eyebrow, title, subtitle, actions, chil
         <div className={styles.tools}>
           <UserQuickSearch />
           <div className={styles.account}>
-            <span className={styles.avatar}>{(user?.username || "U").slice(0, 1).toUpperCase()}</span>
+            <button
+              type="button"
+              className={styles.avatar}
+              onClick={() => navigate("/profile")}
+              aria-label="Open profile"
+            >
+              {(user?.username || "U").slice(0, 2).toUpperCase()}
+            </button>
             <button
               className={styles.logout}
               type="button"
