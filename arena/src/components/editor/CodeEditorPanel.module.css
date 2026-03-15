@@ -1,0 +1,66 @@
+.panel {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--arena-border);
+}
+
+.meta,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.select {
+  border: 1px solid var(--arena-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--arena-text);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.chip {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(108, 146, 255, 0.12);
+  color: var(--arena-primary-strong);
+}
+
+.muted {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--arena-muted);
+}
+
+.runButton {
+  border: 1px solid rgba(87, 223, 180, 0.2);
+  border-radius: 18px;
+  padding: 14px 20px;
+  background: rgba(87, 223, 180, 0.12);
+  color: var(--arena-text);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.runButton:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.editorWrap {
+  min-height: 430px;
+}
+
+.editorWrap :global(.monaco-editor),
+.editorWrap :global(.overflow-guard) {
+  border-radius: 0 0 var(--arena-radius-lg) var(--arena-radius-lg);
+}

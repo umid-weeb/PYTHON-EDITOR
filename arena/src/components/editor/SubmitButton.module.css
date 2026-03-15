@@ -1,0 +1,14 @@
+.button {
+  border: 0;
+  border-radius: 18px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #5b84ff, #7fa0ff);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}

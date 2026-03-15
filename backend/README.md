@@ -6,8 +6,8 @@ This backend adds a LeetCode-style problem solving arena to the existing Python 
 
 Architecture:
 
-- Frontend arena page: `public/arena.html` served at `/zone`, `public/arena/arena.css`, `public/arena/arena.js`
-- Runtime config: `public/arena-config.js`
+- Frontend arena app source: `arena/` (React + Vite)
+- Production arena build output: `public/arena-spa/`
 - API layer: FastAPI routes under `backend/app/api/routes`
 - Problem source: GitHub API or local sample repository for visible assets
 - Hidden testcase source: secure local directory or private GitHub repository
@@ -185,10 +185,10 @@ Windows shortcut:
 ./start-api.ps1
 ```
 
-7. In development, frontend can talk to backend directly because `public/arena-config.js` defaults to:
+7. In development, frontend can talk to backend directly by setting `VITE_ARENA_API_BASE`. The React app defaults to:
 
 ```js
-window.ARENA_API_BASE = "http://127.0.0.1:8000/api"
+VITE_ARENA_API_BASE=http://127.0.0.1:8000
 ```
 
 when loaded from `localhost` or `127.0.0.1`.

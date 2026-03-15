@@ -4,7 +4,9 @@
   "description": "Browserda Python kodini bajaruvchi online editor",
   "main": "index.js",
   "scripts": {
-    "start": "serve .", 
+    "start": "serve .",
+    "arena:dev": "npm --prefix arena run dev",
+    "arena:build": "npm --prefix arena run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Sizning Ismingiz",

@@ -1,0 +1,105 @@
+.panel {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.header {
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--arena-border);
+}
+
+.headerMain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.headerMain h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  letter-spacing: -0.04em;
+}
+
+.badge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.easy {
+  color: var(--arena-success);
+}
+
+.medium {
+  color: var(--arena-warning);
+}
+
+.hard {
+  color: var(--arena-danger);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--arena-muted);
+}
+
+.body {
+  padding: 22px 24px;
+  overflow: auto;
+  line-height: 1.7;
+  color: var(--arena-text);
+}
+
+.body :global(h1),
+.body :global(h2),
+.body :global(h3) {
+  margin-top: 1.5em;
+}
+
+.body :global(pre) {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: auto;
+}
+
+.body :global(code) {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.loading,
+.empty {
+  padding: 24px;
+}
+
+.lineLarge,
+.line,
+.card {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  margin-bottom: 14px;
+}
+
+.lineLarge {
+  height: 26px;
+  width: 72%;
+}
+
+.line {
+  height: 16px;
+  width: 90%;
+}
+
+.card {
+  height: 96px;
+}
+
+.empty {
+  color: var(--arena-muted);
+}

@@ -1,0 +1,68 @@
+.shell {
+  position: relative;
+  min-width: min(100%, 300px);
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--arena-border);
+  background: rgba(4, 10, 22, 0.64);
+  color: var(--arena-text);
+  padding: 13px 16px;
+  border-radius: 16px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--arena-border-strong);
+  box-shadow: 0 0 0 4px rgba(108, 146, 255, 0.1);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  z-index: 15;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid var(--arena-border);
+  background: rgba(10, 18, 34, 0.97);
+  box-shadow: var(--arena-shadow);
+}
+
+.state {
+  color: var(--arena-muted);
+  padding: 6px 8px;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--arena-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.result:hover {
+  background: rgba(108, 146, 255, 0.12);
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--arena-border);
+  color: var(--arena-primary-strong);
+  background: rgba(108, 146, 255, 0.08);
+}

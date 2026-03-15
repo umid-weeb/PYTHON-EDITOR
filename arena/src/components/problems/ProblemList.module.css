@@ -1,0 +1,135 @@
+.panel {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.header {
+  padding: 22px;
+  border-bottom: 1px solid var(--arena-border);
+}
+
+.eyebrow {
+  margin-bottom: 10px;
+  color: var(--arena-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.search {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--arena-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--arena-text);
+  outline: none;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.filter {
+  padding: 12px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--arena-border);
+  background: transparent;
+  color: var(--arena-muted);
+  cursor: pointer;
+}
+
+.active {
+  border-color: rgba(108, 146, 255, 0.34);
+  background: rgba(108, 146, 255, 0.14);
+  color: var(--arena-text);
+}
+
+.meta {
+  color: var(--arena-muted);
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  overflow: auto;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--arena-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--arena-text);
+  cursor: pointer;
+}
+
+.card:hover,
+.selected {
+  border-color: rgba(108, 146, 255, 0.34);
+  background: rgba(108, 146, 255, 0.1);
+}
+
+.cardTitle {
+  font-weight: 600;
+}
+
+.cardMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--arena-muted);
+  font-size: 0.92rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.72rem;
+}
+
+.easy {
+  color: var(--arena-success);
+}
+
+.medium {
+  color: var(--arena-warning);
+}
+
+.hard {
+  color: var(--arena-danger);
+}
+
+.skeleton {
+  height: 110px;
+  border-radius: 22px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+.empty {
+  color: var(--arena-muted);
+  padding: 8px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}

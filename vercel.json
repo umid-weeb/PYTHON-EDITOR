@@ -35,20 +35,81 @@
       "source": "/register/",
       "destination": "/register",
       "permanent": true
+    },
+    {
+      "source": "/profile.html",
+      "destination": "/profile",
+      "permanent": true
+    },
+    {
+      "source": "/submissions.html",
+      "destination": "/submissions",
+      "permanent": true
+    },
+    {
+      "source": "/leaderboard.html",
+      "destination": "/leaderboard",
+      "permanent": true
+    },
+    {
+      "source": "/settings.html",
+      "destination": "/settings",
+      "permanent": true
+    },
+    {
+      "source": "/rating.html",
+      "destination": "/leaderboard",
+      "permanent": true
+    },
+    {
+      "source": "/profile/",
+      "destination": "/profile",
+      "permanent": true
+    },
+    {
+      "source": "/submissions/",
+      "destination": "/submissions",
+      "permanent": true
+    },
+    {
+      "source": "/leaderboard/",
+      "destination": "/leaderboard",
+      "permanent": true
+    },
+    {
+      "source": "/settings/",
+      "destination": "/settings",
+      "permanent": true
     }
   ],
   "rewrites": [
     {
       "source": "/zone",
-      "destination": "/arena.html"
+      "destination": "/arena-spa/index.html"
     },
     {
       "source": "/login",
-      "destination": "/login.html"
+      "destination": "/arena-spa/index.html"
     },
     {
       "source": "/register",
-      "destination": "/register.html"
+      "destination": "/arena-spa/index.html"
+    },
+    {
+      "source": "/profile",
+      "destination": "/arena-spa/index.html"
+    },
+    {
+      "source": "/submissions",
+      "destination": "/arena-spa/index.html"
+    },
+    {
+      "source": "/leaderboard",
+      "destination": "/arena-spa/index.html"
+    },
+    {
+      "source": "/settings",
+      "destination": "/arena-spa/index.html"
     }
   ]
 }
