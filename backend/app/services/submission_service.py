@@ -8,8 +8,10 @@ import logging
 from app.core.config import get_settings
 from app.judge.runner import JudgeRunner
 from app.models.schemas import SubmissionRequest
+from app.models.submission_stats import UserSubmission
 from app.repositories.submissions import SubmissionRepository
 from app.services.problem_service import ProblemService, get_problem_service
+from app.database import SessionLocal
 
 
 class SubmissionService:
@@ -20,7 +22,7 @@ class SubmissionService:
         self.judge = JudgeRunner(self.settings)
         self.logger = logging.getLogger("pyzone.arena.submission")
 
-    def create_submission(self, payload: SubmissionRequest, mode: str) -> str:
+    def create_submission(self, payload: SubmissionRequest, mode: str, user_id: int | None = None) -> str:
         submission_id = self.repository.create(
             problem_id=payload.problem_id,
             code=payload.code,
@@ -34,6 +36,18 @@ class SubmissionService:
             mode,
             self.settings.use_inline_execution,
         )
+        if user_id is not None and mode == "submit":
+            with SessionLocal() as db:
+                record = UserSubmission(
+                    user_id=user_id,
+                    problem_id=payload.problem_id,
+                    submission_id=submission_id,
+                    verdict=None,
+                    runtime_ms=None,
+                    memory_kb=None,
+                )
+                db.add(record)
+                db.commit()
         return submission_id
 
     def enqueue_submission(self, submission_id: str) -> None:
@@ -85,6 +99,18 @@ class SubmissionService:
                 result.get("passed_count"),
                 result.get("total_count"),
             )
+            if submission.get("mode") == "submit":
+                with SessionLocal() as db:
+                    record = (
+                        db.query(UserSubmission)
+                        .filter(UserSubmission.submission_id == submission_id)
+                        .first()
+                    )
+                    if record:
+                        record.verdict = result.get("verdict")
+                        record.runtime_ms = result.get("runtime_ms")
+                        record.memory_kb = result.get("memory_kb")
+                        db.commit()
         except Exception as error:
             self.repository.mark_failed(submission_id, str(error))
             self.logger.exception("submission.failed id=%s error=%s", submission_id, error)

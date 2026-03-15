@@ -56,6 +56,10 @@ class MeResponse(BaseModel):
     bio: str | None = None
     github: str | None = None
     linkedin: str | None = None
+    solved_total: int = 0
+    solved_easy: int = 0
+    solved_medium: int = 0
+    solved_hard: int = 0
 
 
 def get_password_hash(password: str) -> str:
@@ -148,10 +152,43 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+
+    from app.models.problem import Problem
+    from app.models.submission_stats import UserSubmission
+
+    stats = (
+        db.query(
+            Problem.difficulty,
+            func.count(func.distinct(UserSubmission.problem_id)).label("count"),
+        )
+        .join(Problem, Problem.id == UserSubmission.problem_id)
+        .filter(UserSubmission.user_id == user.id, UserSubmission.verdict == "Accepted")
+        .group_by(Problem.difficulty)
+        .all()
+    )
+
+    solved_total = 0
+    solved_easy = 0
+    solved_medium = 0
+    solved_hard = 0
+    for row in stats:
+        difficulty = (row.difficulty or "").lower()
+        solved_total += int(row.count or 0)
+        if difficulty == "easy":
+            solved_easy += int(row.count or 0)
+        elif difficulty == "medium":
+            solved_medium += int(row.count or 0)
+        elif difficulty == "hard":
+            solved_hard += int(row.count or 0)
+
     return MeResponse(
         username=user.username,
         country=user.country,
         created_at=user.created_at,
+        solved_total=solved_total,
+        solved_easy=solved_easy,
+        solved_medium=solved_medium,
+        solved_hard=solved_hard,
     )
 
 

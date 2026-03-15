@@ -52,7 +52,7 @@ class ProblemListResponse(BaseModel):
 class SubmissionRequest(BaseModel):
     problem_id: str
     code: str
-    language: Literal["python"] = "python"
+    language: Literal["python", "javascript", "cpp"] = "python"
 
 
 class SubmissionCreated(BaseModel):

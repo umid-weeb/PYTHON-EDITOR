@@ -16,11 +16,13 @@ from fastapi import (
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
+from app.models.problem import Problem
+from app.models.submission_stats import UserSubmission
 from app.api.routes.auth import (
     ALGORITHM,
     SECRET_KEY,
@@ -166,11 +168,89 @@ def upload_avatar(
 
 @account_router.get("/user/activity")
 def user_activity(current_user: User = Depends(get_current_user)) -> list:
-    # Placeholder activity; real implementation can pull from submissions
-    return []
+    with SessionLocal() as db:
+        rows = (
+            db.query(
+                func.date(UserSubmission.created_at).label("date"),
+                func.count().label("count"),
+            )
+            .filter(UserSubmission.user_id == current_user.id)
+            .group_by(func.date(UserSubmission.created_at))
+            .order_by(func.date(UserSubmission.created_at))
+            .all()
+        )
+        return [{"date": str(row.date), "count": int(row.count)} for row in rows]
 
 
 @account_router.get("/user/submissions")
 def user_submissions(current_user: User = Depends(get_current_user)) -> list:
-    # Placeholder submissions; real implementation can pull from submissions storage
-    return []
+    with SessionLocal() as db:
+        rows = (
+            db.query(
+                UserSubmission.problem_id,
+                UserSubmission.verdict,
+                UserSubmission.runtime_ms,
+                UserSubmission.memory_kb,
+                UserSubmission.created_at,
+                Problem.title.label("problem_title"),
+            )
+            .outerjoin(Problem, Problem.id == UserSubmission.problem_id)
+            .filter(UserSubmission.user_id == current_user.id)
+            .order_by(UserSubmission.created_at.desc())
+            .limit(200)
+            .all()
+        )
+
+        return [
+            {
+                "problem_id": row.problem_id,
+                "problem_title": row.problem_title,
+                "verdict": row.verdict,
+                "runtime_ms": row.runtime_ms,
+                "memory_kb": row.memory_kb,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "status": row.verdict,
+            }
+            for row in rows
+        ]
+
+
+@router.get("/leaderboard")
+def leaderboard(db: Session = Depends(get_db)) -> list:
+    """
+    Simple global leaderboard sorted by number of distinct solved problems.
+    """
+    subq = (
+        db.query(
+            UserSubmission.user_id.label("user_id"),
+            func.count(func.distinct(UserSubmission.problem_id)).label("solved"),
+            func.count().label("submissions"),
+            func.min(UserSubmission.runtime_ms).label("fastest_ms"),
+        )
+        .filter(UserSubmission.verdict == "Accepted")
+        .group_by(UserSubmission.user_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            User.username,
+            subq.c.solved,
+            subq.c.submissions,
+            subq.c.fastest_ms,
+        )
+        .join(subq, subq.c.user_id == User.id)
+        .order_by(subq.c.solved.desc(), User.username.asc())
+        .limit(100)
+        .all()
+    )
+
+    return [
+        {
+            "username": row.username,
+            "solved": int(row.solved or 0),
+            "submissions": int(row.submissions or 0),
+            "fastest_ms": int(row.fastest_ms) if row.fastest_ms is not None else None,
+        }
+        for row in rows
+    ]

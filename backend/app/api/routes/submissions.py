@@ -4,7 +4,9 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.routes.auth import get_current_user
 from app.models.schemas import SubmissionCreated, SubmissionRequest, SubmissionStatus
+from app.models.user import User
 from app.services.submission_service import SubmissionService, get_submission_service
 
 
@@ -26,11 +28,12 @@ async def run_solution(
 @router.post("/submit", response_model=SubmissionCreated, status_code=status.HTTP_202_ACCEPTED)
 async def submit_solution(
     payload: SubmissionRequest,
+    user: User = Depends(get_current_user),
     service: SubmissionService = Depends(get_submission_service),
 ) -> SubmissionCreated:
     if not payload.code.strip():
         raise HTTPException(status_code=400, detail="Kod bo'sh bo'lishi mumkin emas.")
-    submission_id = service.create_submission(payload, mode="submit")
+    submission_id = service.create_submission(payload, mode="submit", user_id=user.id)
     service.enqueue_submission(submission_id)
     return SubmissionCreated(submission_id=submission_id, status="queued")
 

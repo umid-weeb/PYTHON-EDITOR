@@ -21,10 +21,15 @@ export function formatCaseResults(cases = []) {
   if (!cases.length) return [];
   return cases.map((entry, index) => {
     const verdict = entry.verdict || (entry.passed ? "Accepted" : "Wrong Answer");
+    const actual = entry.actual_output;
+    const verdictText =
+      actual && entry.passed
+        ? `${verdict}: Natija → ${String(actual).slice(0, 120)}`
+        : verdict;
     return {
       id: `${index + 1}`,
       label: `Case ${index + 1}`,
-      verdict: entry.error ? `${verdict}: ${entry.error}` : verdict,
+      verdict: entry.error ? `${verdict}: ${entry.error}` : verdictText,
       runtime: formatRuntime(entry.runtime_ms),
       memory: formatMemory(entry.memory_kb),
     };

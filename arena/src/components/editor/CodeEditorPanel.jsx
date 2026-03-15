@@ -1,6 +1,43 @@
 import Editor from "@monaco-editor/react";
 import SubmitButton from "./SubmitButton.jsx";
 
+function formatCode(value, language) {
+  if (!value) return "";
+  const lines = value.replace(/\t/g, "    ").split("\n");
+
+  if (language === "python") {
+    // Simple indentation/whitespace normalization for Python
+    return lines
+      .map((line) => {
+        const trimmed = line.replace(/\s+$/u, "");
+        if (!trimmed) return "";
+        return trimmed.replace(/^ {1,3}/u, "    ");
+      })
+      .join("\n")
+      .trimEnd();
+  }
+
+  if (language === "javascript") {
+    // Basic JS formatting: trim right, collapse multiple blank lines
+    const cleaned = lines.map((line) => line.replace(/\s+$/u, ""));
+    const result = [];
+    let blankStreak = 0;
+    cleaned.forEach((line) => {
+      if (!line.trim()) {
+        blankStreak += 1;
+        if (blankStreak <= 1) result.push("");
+      } else {
+        blankStreak = 0;
+        result.push(line);
+      }
+    });
+    return result.join("\n").trimEnd();
+  }
+
+  // Fallback: trim trailing spaces
+  return lines.map((line) => line.replace(/\s+$/u, "")).join("\n").trimEnd();
+}
+
 const languageMap = {
   python: "python",
   javascript: "javascript",
@@ -39,6 +76,19 @@ export default function CodeEditorPanel({
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            className="rounded-[18px] border border-arena-border bg-white/5 px-4 py-[10px] text-sm text-arena-muted transition hover:border-arena-borderStrong hover:text-arena-text disabled:opacity-60"
+            disabled={isRunning || isSubmitting}
+            type="button"
+            onClick={() => {
+              const next = formatCode(code, language);
+              if (next !== code) {
+                onChange(next);
+              }
+            }}
+          >
+            Format
+          </button>
           <button
             className="rounded-[18px] border border-[rgba(87,223,180,0.2)] bg-[rgba(87,223,180,0.12)] px-5 py-[14px] font-bold text-arena-text transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
             disabled={isRunning}

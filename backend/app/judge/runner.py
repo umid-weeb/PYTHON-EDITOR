@@ -11,6 +11,7 @@ from typing import Any
 from app.core.config import Settings, get_settings
 from app.judge.comparator import compare_expected_to_actual, stringify_value
 from app.judge.parser import parse_arguments
+from app.judge.judge0_client import Judge0Client, get_judge0_settings
 
 
 HARNESS_CODE = """\
@@ -106,6 +107,7 @@ class JudgeRunner:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.docker_available = shutil.which("docker") is not None
+        self.judge0 = Judge0Client(get_judge0_settings())
 
     def run_submission(
         self,
@@ -180,6 +182,109 @@ class JudgeRunner:
         code: str,
         testcase: dict[str, Any],
     ) -> dict[str, Any]:
+        # For now, only Python uses the local harness. Other languages are
+        # routed through Judge0 when it is configured; otherwise we return a
+        # friendly runtime error explaining that the language is disabled.
+        language = problem.get("language", "python")
+        if language != "python":
+            settings = get_judge0_settings()
+            if not settings.enabled:
+                return {
+                    "verdict": "Runtime Error",
+                    "passed": False,
+                    "runtime_ms": 0,
+                    "memory_kb": 0,
+                    "actual_output": "",
+                    "error": "Bu til hozircha qo'llab-quvvatlanmaydi. Faqat Python ishlaydi.",
+                }
+
+            # Judge0 integration scaffold – choose a language_id mapping here.
+            language_id_map = {
+                "javascript": 63,  # JavaScript (Node.js 16.x)
+                "cpp": 54,  # C++ (GCC 9.2)
+            }
+            language_id = language_id_map.get(language)
+            if language_id is None:
+                return {
+                    "verdict": "Runtime Error",
+                    "passed": False,
+                    "runtime_ms": 0,
+                    "memory_kb": 0,
+                    "actual_output": "",
+                    "error": "Bu til hozircha qo'llab-quvvatlanmaydi.",
+                }
+
+            try:
+                token = self.judge0.submit(
+                    source_code=code,
+                    language_id=language_id,
+                    stdin=testcase.get("input", ""),
+                )
+                payload = self.judge0.get_result(token)
+            except TimeoutError as exc:
+                return {
+                    "verdict": "Time Limit Exceeded",
+                    "passed": False,
+                    "runtime_ms": int(problem.get("time_limit_seconds", 1.0) * 1000),
+                    "memory_kb": 0,
+                    "actual_output": "",
+                    "error": str(exc),
+                }
+            except Exception as exc:  # pragma: no cover - defensive
+                return {
+                    "verdict": "Runtime Error",
+                    "passed": False,
+                    "runtime_ms": 0,
+                    "memory_kb": 0,
+                    "actual_output": "",
+                    "error": str(exc),
+                }
+
+            stdout = (payload.get("stdout") or "").strip()
+            stderr = (payload.get("stderr") or "").strip()
+            status = (payload.get("status") or {}).get("description", "")
+            time_ms = int(float(payload.get("time") or 0) * 1000)
+            memory_kb = int(payload.get("memory") or 0)
+
+            if status.lower().startswith("time limit"):
+                return {
+                    "verdict": "Time Limit Exceeded",
+                    "passed": False,
+                    "runtime_ms": time_ms,
+                    "memory_kb": memory_kb,
+                    "actual_output": stdout,
+                    "error": stderr or status,
+                }
+
+            if status.lower().startswith("memory limit"):
+                return {
+                    "verdict": "Memory Limit Exceeded",
+                    "passed": False,
+                    "runtime_ms": time_ms,
+                    "memory_kb": memory_kb,
+                    "actual_output": stdout,
+                    "error": stderr or status,
+                }
+
+            if status.lower() not in {"accepted"}:
+                return {
+                    "verdict": "Runtime Error",
+                    "passed": False,
+                    "runtime_ms": time_ms,
+                    "memory_kb": memory_kb,
+                    "actual_output": stdout,
+                    "error": stderr or status,
+                }
+
+            return {
+                "verdict": "Accepted",
+                "passed": True,
+                "runtime_ms": time_ms,
+                "memory_kb": memory_kb,
+                "actual_output": stdout,
+                "error": None,
+            }
+
         args = parse_arguments(testcase.get("input", ""))
 
         with tempfile.TemporaryDirectory(prefix="arena-judge-") as temp_dir:
