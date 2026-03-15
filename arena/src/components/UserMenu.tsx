@@ -1,4 +1,5 @@
-import { Fragment, useMemo, type ReactNode } from "react";
+import { Fragment, useMemo } from "react";
+import type { ReactNode } from "react";
 import { Menu, MenuButton, MenuItem, MenuItems, Transition } from "@headlessui/react";
 import { API_BASE_URL } from "../lib/apiClient.js";
 
@@ -110,9 +111,9 @@ function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps)
     <MenuItem>
       <button
         className={cx(
-          "group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-medium transition",
-          "text-arena-text data-[focus]:bg-white/10 data-[focus]:outline-none",
-          tone === "danger" && "text-[#ffb7c3] data-[focus]:bg-[rgba(255,123,143,0.12)]"
+          "group flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition",
+          "text-arena-text data-[focus]:bg-white/5 data-[focus]:outline-none",
+          tone === "danger" && "text-[#ffb7c3] data-[focus]:bg-[rgba(255,123,143,0.1)]"
         )}
         type="button"
         onClick={() => {
@@ -121,10 +122,10 @@ function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps)
       >
         <span
           className={cx(
-            "flex h-9 w-9 items-center justify-center rounded-xl border border-arena-border bg-white/5 text-arena-muted transition",
+            "flex h-8 w-8 items-center justify-center rounded-md border border-arena-border bg-white/5 text-arena-muted transition",
             "group-data-[focus]:border-arena-borderStrong group-data-[focus]:text-arena-text",
             tone === "danger" &&
-              "text-[#ffb7c3] group-data-[focus]:border-[rgba(255,123,143,0.28)] group-data-[focus]:text-[#ffd7de]"
+              "text-[#ffb7c3] group-data-[focus]:border-[rgba(255,123,143,0.2)] group-data-[focus]:text-[#ffd7de]"
           )}
         >
           {icon}
@@ -169,7 +170,7 @@ export default function UserMenu({ user, onProfile, onSettings, onLogout, onLogi
         leaveFrom="translate-y-0 scale-100 opacity-100"
         leaveTo="translate-y-1 scale-95 opacity-0"
       >
-        <MenuItems className="absolute right-0 z-30 mt-3 w-60 origin-top-right rounded-[18px] border border-arena-border bg-[rgba(15,23,42,0.95)] p-2.5 shadow-[0_24px_40px_rgba(0,0,0,0.4)] focus:outline-none">
+        <MenuItems className="absolute right-0 top-[calc(100%+12px)] z-30 w-44 origin-top-right rounded-xl border border-arena-border bg-[rgba(15,23,42,0.98)] p-2 shadow-[0_10px_25px_rgba(0,0,0,0.35)] focus:outline-none">
           {isAuthenticated ? (
             <div className="space-y-1">
               <ActionItem

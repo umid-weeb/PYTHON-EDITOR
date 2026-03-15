@@ -25,11 +25,11 @@ export default function ArenaLayout({
   const { logout, user } = useAuth();
 
   return (
-    <div className="mx-auto flex h-screen w-[min(1500px,calc(100vw-20px))] max-w-full flex-col overflow-hidden py-3 max-[860px]:w-[min(100vw-12px,100%)]">
-      <div className="mb-2 flex shrink-0 items-center justify-between gap-3 max-[860px]:flex-col max-[860px]:items-stretch">
+    <div className="mx-auto flex h-screen w-[min(1500px,calc(100vw-20px))] max-w-full flex-col overflow-hidden py-[10px] max-[860px]:w-[min(100vw-12px,100%)]">
+      <div className="mb-2 flex h-[72px] shrink-0 items-center justify-between gap-3 px-1 max-[860px]:h-auto max-[860px]:flex-col max-[860px]:items-stretch">
         <div className="flex items-center gap-4">
           <button
-            className="group inline-flex items-center gap-2 rounded-full border border-arena-border/80 bg-[rgba(8,16,30,0.62)] px-3 py-2 text-sm font-medium text-arena-text transition hover:border-arena-borderStrong hover:bg-white/10 focus:outline-none focus-visible:border-arena-borderStrong focus-visible:ring-4 focus-visible:ring-[rgba(108,146,255,0.14)]"
+            className="group inline-flex items-center gap-2 rounded-full border border-arena-border/80 bg-[rgba(8,16,30,0.62)] px-4 py-2.5 text-sm font-medium text
             type="button"
             onClick={() => navigate("/")}
           >
