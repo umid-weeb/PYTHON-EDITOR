@@ -1,6 +1,6 @@
 import { authApi, clearToken, getToken, setToken, fetchJson } from "./api.js";
 
-export async function requireAuth(redirectBack = "/arena.html") {
+export async function requireAuth(redirectBack = "/zone") {
   const token = getToken();
   if (!token) {
     window.location.href = `/login.html?next=${encodeURIComponent(redirectBack)}`;
@@ -79,7 +79,7 @@ export async function logout() {
   updateUIForLogout();
   
   // Redirect to arena page
-  window.location.href = "/arena.html";
+  window.location.href = "/zone";
 }
 
 function updateUIForLogout() {

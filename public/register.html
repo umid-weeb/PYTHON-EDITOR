@@ -54,13 +54,13 @@
         await register(payload);
         
         // Handle pending actions after registration
-        const next = new URLSearchParams(window.location.search).get("next") || "/arena.html";
+        const next = new URLSearchParams(window.location.search).get("next") || "/zone";
         const pending = new URLSearchParams(window.location.search).get("pending");
         const problem = new URLSearchParams(window.location.search).get("problem");
         
         if (pending === "submit" && problem) {
           // Redirect to arena with pending action
-          window.location.href = `/arena.html?problem=${encodeURIComponent(problem)}&pending=submit`;
+          window.location.href = `/zone?problem=${encodeURIComponent(problem)}&pending=submit`;
         } else {
           window.location.href = next;
         }

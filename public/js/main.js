@@ -397,7 +397,7 @@ function redirectToAuth(path) {
   const params = new URLSearchParams();
   const currentParams = new URLSearchParams(window.location.search);
   const currentProblem = currentParams.get("problem") || localStorage.getItem("arena_last_problem");
-  let next = "/arena.html";
+  let next = "/zone";
   if (currentProblem) {
     next += `?problem=${encodeURIComponent(currentProblem)}`;
   }

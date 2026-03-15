@@ -1402,7 +1402,7 @@ function setupBreakpoints() {
 }
 
 function openArena() {
-  window.open("./arena.html", "_blank", "noopener,noreferrer");
+  window.open("/zone", "_blank", "noopener,noreferrer");
 }
 
 function isStackedPanelLayout() {

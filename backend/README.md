@@ -6,7 +6,7 @@ This backend adds a LeetCode-style problem solving arena to the existing Python 
 
 Architecture:
 
-- Frontend arena page: `public/arena.html`, `public/arena/arena.css`, `public/arena/arena.js`
+- Frontend arena page: `public/arena.html` served at `/zone`, `public/arena/arena.css`, `public/arena/arena.js`
 - Runtime config: `public/arena-config.js`
 - API layer: FastAPI routes under `backend/app/api/routes`
 - Problem source: GitHub API or local sample repository for visible assets
@@ -49,7 +49,7 @@ Architecture:
 ```text
 Browser
   |
-  |  GET /, /arena.html, /assets
+  |  GET /, /zone, /assets
   v
 Nginx reverse proxy
   |-------------------------------> static frontend files (public/)
