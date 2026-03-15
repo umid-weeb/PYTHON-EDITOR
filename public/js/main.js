@@ -1,6 +1,6 @@
 
-import { initEditor } from "./editor.js";
-import { loadProblemList, openProblem } from "./problems.js";
+import { initEditor, getCode, setCode, saveDraft } from "./editor.js";
+import { loadProblemList, openProblem, getCurrentProblemId } from "./problems.js";
 import { handleRun, handleSubmit, renderResultMessage } from "./runner.js";
 import { getToken } from "./api.js";
 
@@ -175,6 +175,14 @@ function bindEvents() {
   if (ui.mobileDrawerOverlay) {
     ui.mobileDrawerOverlay.addEventListener("click", closeMobileMenu);
   }
+  if (ui.mobileDrawer) {
+    ui.mobileDrawer.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      performDrawerAction(btn.dataset.action);
+      closeMobileMenu();
+    });
+  }
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && document.body.classList.contains("mobile-menu-open")) {
       closeMobileMenu();
@@ -264,6 +272,62 @@ function toggleMobileMenu() {
 
 function closeMobileMenu() {
   document.body.classList.remove("mobile-menu-open");
+}
+
+function performDrawerAction(action) {
+  switch (action) {
+    case "run":
+      ui.runBtn?.click();
+      break;
+    case "submit":
+      ui.submitBtn?.click();
+      break;
+    case "save": {
+      const pid = getCurrentProblemId();
+      saveDraft(pid);
+      break;
+    }
+    case "load": {
+      const pid = getCurrentProblemId();
+      if (pid) {
+        const draft = localStorage.getItem(`arena_draft_${pid}`) || "";
+        setCode(draft, pid);
+      }
+      break;
+    }
+    case "clear": {
+      const pid = getCurrentProblemId();
+      setCode("", pid);
+      break;
+    }
+    case "download": {
+      const code = getCode();
+      const blob = new Blob([code], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "solution.py";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      break;
+    }
+    case "upload": {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".py,.txt,.js,.cpp,.java,.rs,.go,.ts";
+      input.addEventListener("change", () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        file.text().then((text) => {
+          const pid = getCurrentProblemId();
+          setCode(text, pid);
+        });
+      });
+      input.click();
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 async function runUserSearch(query, version) {
