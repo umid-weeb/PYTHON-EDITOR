@@ -100,8 +100,15 @@ export const arenaApi = {
     const data = await request("/api/problems?per_page=200");
     return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
   },
-  getProblem(problemKey) {
-    return request(`/api/problems/${encodeURIComponent(problemKey)}`);
+  async getProblem(problemKey) {
+    try {
+      return await request(`/api/problems/${encodeURIComponent(problemKey)}`);
+    } catch (error) {
+      if (error?.status === 404) {
+        return request(`/api/problem/${encodeURIComponent(problemKey)}`);
+      }
+      throw error;
+    }
   },
   runSolution(problemId, code, language) {
     return request("/api/run", {

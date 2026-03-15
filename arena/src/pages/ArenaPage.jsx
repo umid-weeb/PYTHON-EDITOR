@@ -43,6 +43,10 @@ export default function ArenaPage() {
   const [params, setParams] = useSearchParams();
   const resumedRef = useRef("");
 
+  function getProblemKey(problem) {
+    return problem?.slug || problem?.id || "";
+  }
+
   useEffect(() => {
     let mounted = true;
 
@@ -51,15 +55,24 @@ export default function ArenaPage() {
       if (!mounted || !items.length) return;
 
       const requestedProblem = params.get("problem");
-      const fallbackProblem = readLastProblem() || items[0]?.slug || items[0]?.id;
-      const target = requestedProblem || fallbackProblem;
-      if (target) {
-        await selectProblem(target);
-        if (!requestedProblem) {
-          const nextParams = new URLSearchParams(params);
-          nextParams.set("problem", target);
-          setParams(nextParams, { replace: true });
+      const availableKeys = new Set(items.map((item) => getProblemKey(item)).filter(Boolean));
+      const preferredFallback = readLastProblem();
+      const fallbackProblem = availableKeys.has(preferredFallback) ? preferredFallback : getProblemKey(items[0]);
+
+      if (requestedProblem && availableKeys.has(requestedProblem)) {
+        try {
+          await selectProblem(requestedProblem);
+          return;
+        } catch {
+          // Fall back to the first valid problem below.
         }
+      }
+
+      if (fallbackProblem) {
+        await selectProblem(fallbackProblem);
+        const nextParams = new URLSearchParams(params);
+        nextParams.set("problem", fallbackProblem);
+        setParams(nextParams, { replace: true });
       }
     }
 
@@ -71,9 +84,22 @@ export default function ArenaPage() {
 
   useEffect(() => {
     const requestedProblem = params.get("problem");
-    if (requestedProblem && requestedProblem !== selectedProblemId && problems.length) {
-      selectProblem(requestedProblem).catch(() => {});
+    if (!requestedProblem || !problems.length || requestedProblem === selectedProblemId) {
+      return;
     }
+
+    const availableKeys = new Set(problems.map((problem) => getProblemKey(problem)).filter(Boolean));
+    if (!availableKeys.has(requestedProblem)) {
+      const fallbackProblem = selectedProblemId || getProblemKey(problems[0]);
+      if (!fallbackProblem) return;
+
+      const nextParams = new URLSearchParams(params);
+      nextParams.set("problem", fallbackProblem);
+      setParams(nextParams, { replace: true });
+      return;
+    }
+
+    selectProblem(requestedProblem).catch(() => {});
   }, [params, problems.length, selectProblem, selectedProblemId]);
 
   useEffect(() => {
