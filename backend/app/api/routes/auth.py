@@ -9,6 +9,7 @@ from jose import JWTError, jwt
 import logging
 import bcrypt
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -65,6 +66,17 @@ class MeResponse(BaseModel):
     solved_hard: int = 0
 
 
+class PublicProfileResponse(BaseModel):
+    username: str
+    country: str | None = None
+    created_at: datetime
+    avatar_url: str | None = None
+    solved_total: int = 0
+    solved_easy: int = 0
+    solved_medium: int = 0
+    solved_hard: int = 0
+
+
 def get_password_hash(password: str) -> str:
     # Use the bcrypt library directly to avoid backend detection issues that caused 500s
     return bcrypt.hashpw(normalize_password(password), bcrypt.gensalt()).decode("utf-8")
@@ -86,6 +98,44 @@ def create_access_token(user: User) -> str:
         "exp": expire,
     }
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def calculate_user_stats(db: Session, user_id: int) -> dict:
+    from app.models.problem import Problem
+    from app.models.submission_stats import UserSubmission
+
+    stats = (
+        db.query(
+            Problem.difficulty,
+            func.count(func.distinct(UserSubmission.problem_id)).label("count"),
+        )
+        .join(Problem, Problem.id == UserSubmission.problem_id)
+        .filter(UserSubmission.user_id == user_id, UserSubmission.verdict == "Accepted")
+        .group_by(Problem.difficulty)
+        .all()
+    )
+
+    solved_total = 0
+    solved_easy = 0
+    solved_medium = 0
+    solved_hard = 0
+    for row in stats:
+        difficulty = (row.difficulty or "").lower()
+        count = int(row.count or 0)
+        solved_total += count
+        if difficulty == "easy":
+            solved_easy += count
+        elif difficulty == "medium":
+            solved_medium += count
+        elif difficulty == "hard":
+            solved_hard += count
+            
+    return {
+        "solved_total": solved_total,
+        "solved_easy": solved_easy,
+        "solved_medium": solved_medium,
+        "solved_hard": solved_hard,
+    }
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -182,33 +232,7 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    from app.models.problem import Problem
-    from app.models.submission_stats import UserSubmission
-
-    stats = (
-        db.query(
-            Problem.difficulty,
-            func.count(func.distinct(UserSubmission.problem_id)).label("count"),
-        )
-        .join(Problem, Problem.id == UserSubmission.problem_id)
-        .filter(UserSubmission.user_id == user.id, UserSubmission.verdict == "Accepted")
-        .group_by(Problem.difficulty)
-        .all()
-    )
-
-    solved_total = 0
-    solved_easy = 0
-    solved_medium = 0
-    solved_hard = 0
-    for row in stats:
-        difficulty = (row.difficulty or "").lower()
-        solved_total += int(row.count or 0)
-        if difficulty == "easy":
-            solved_easy += int(row.count or 0)
-        elif difficulty == "medium":
-            solved_medium += int(row.count or 0)
-        elif difficulty == "hard":
-            solved_hard += int(row.count or 0)
+    stats = calculate_user_stats(db, user.id)
 
     return MeResponse(
         id=user.id,
@@ -216,10 +240,10 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
         email=user.email,
         country=user.country,
         created_at=user.created_at,
-        solved_total=solved_total,
-        solved_easy=solved_easy,
-        solved_medium=solved_medium,
-        solved_hard=solved_hard,
+        solved_total=stats["solved_total"],
+        solved_easy=stats["solved_easy"],
+        solved_medium=stats["solved_medium"],
+        solved_hard=stats["solved_hard"],
     )
 
 
@@ -279,15 +303,19 @@ def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(
     return user
 
 
-@router.get("/user/profile")
-def get_user_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return {
-        "user": {
-            "username": user.username,
-            "country": user.country,
-            "created_at": user.created_at
-        }
-    }
+@router.get("/users/{username}", response_model=PublicProfileResponse)
+def get_public_user_profile(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    stats = calculate_user_stats(db, user.id)
+    return PublicProfileResponse(
+        username=user.username,
+        country=user.country,
+        created_at=user.created_at,
+        **stats
+    )
 
 
 @router.patch("/user/username")
