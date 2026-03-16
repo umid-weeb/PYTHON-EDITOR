@@ -1,7 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import UserQuickSearch from "../common/UserQuickSearch.jsx";
-import UserMenu from "../UserMenu.tsx";
 import styles from "./DashboardShell.module.css";
 
 const navItems = [
@@ -17,7 +16,7 @@ export default function DashboardShell({ eyebrow, title, subtitle, actions, chil
 
   return (
     <div className={styles.page}>
-      <header className={`${styles.header} relative z-[10000] border-b border-gray-800 bg-[#0b1220]`}>
+      <header className={styles.header}>
         <div className={styles.brand}>
           <button className={styles.back} type="button" onClick={() => navigate("/zone")}>
             Zone
@@ -30,20 +29,6 @@ export default function DashboardShell({ eyebrow, title, subtitle, actions, chil
         </div>
         <div className={styles.tools}>
           <UserQuickSearch />
-          <div className={styles.account}>
-            <UserMenu
-              user={user}
-              onProfile={() => navigate("/profile")}
-              onRating={() => navigate("/leaderboard")}
-              onSettings={() => navigate("/profile/settings")}
-              onLogin={() => navigate("/login")}
-              onRegister={() => navigate("/register")}
-              onLogout={async () => {
-                await logout();
-                navigate("/login");
-              }}
-            />
-          </div>
         </div>
       </header>
 
