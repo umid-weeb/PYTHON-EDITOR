@@ -227,7 +227,7 @@ export default function UserMenu({
         leaveFrom="translate-y-0 scale-100 opacity-100"
         leaveTo="translate-y-1 scale-95 opacity-0"
       >
-        <MenuItems className="absolute right-0 mt-2 w-60 origin-top-right rounded-xl border border-gray-700 bg-gray-900 text-gray-200 shadow-xl z-[10001] focus:outline-none">
+        <MenuItems className="absolute right-0 z-[10000] mt-3 w-60 origin-top-right rounded-xl border border-gray-700 bg-gray-900 text-gray-200 shadow-xl focus:outline-none">
           {isAuthenticated ? (
             <div className="space-y-1 p-2">
               <ActionItem
