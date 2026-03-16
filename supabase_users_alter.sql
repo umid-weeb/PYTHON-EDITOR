@@ -14,13 +14,12 @@ alter table public.users
 alter table public.users
   add column if not exists bio text;
 
--- Add uniqueness for email (if not already present).
--- Using an index is more robust across environments.
-create unique index if not exists users_email_unique_idx
-  on public.users (email)
-  where email is not null;
-
 -- Optional: ensure created_at exists with default.
 alter table public.users
   add column if not exists created_at timestamptz not null default now();
+
+-- Add uniqueness for email.
+-- Run only once; if constraint already exists, Supabase will report an error.
+alter table public.users
+  add constraint users_email_unique unique (email);
 

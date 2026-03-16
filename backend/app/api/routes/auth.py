@@ -32,6 +32,17 @@ def normalize_password(password: str) -> bytes:
     return (password or "").encode("utf-8")[:72]
 
 
+def normalize_username(raw: str) -> str:
+  """
+  Strip whitespace and leading '@' from usernames like '@isroilov0705'.
+  """
+  username = (raw or "").strip()
+  if username.startswith("@"):
+      # Remove all leading '@' characters to be safe.
+      username = username.lstrip("@")
+  return username
+
+
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: str | None = Field(default=None, max_length=255)
@@ -146,7 +157,7 @@ def calculate_user_stats(db: Session, user_id: int) -> dict:
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
     try:
-        username = payload.username.strip()
+        username = normalize_username(payload.username)
         if len(username) < 3:
             raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
 
@@ -193,7 +204,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     try:
-        identifier = (payload.username or "").strip()
+        identifier = normalize_username(payload.username)
         # Allow login by username or email
         user = (
             db.query(User)
