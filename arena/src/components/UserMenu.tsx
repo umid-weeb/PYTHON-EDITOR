@@ -113,7 +113,7 @@ function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps)
         className={cx(
           "group flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition",
           "text-arena-text data-[focus]:bg-white/5 data-[focus]:outline-none",
-          tone === "danger" && "text-[#ffb7c3] data-[focus]:bg-[rgba(255,123,143,0.1)]"
+          tone === "danger" && "text-[#ff6b81] data-[focus]:bg-[rgba(255,123,143,0.1)]"
         )}
         type="button"
         onClick={() => {
@@ -125,7 +125,7 @@ function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps)
             "flex h-8 w-8 items-center justify-center rounded-md border border-arena-border bg-white/5 text-arena-muted transition",
             "group-data-[focus]:border-arena-borderStrong group-data-[focus]:text-arena-text",
             tone === "danger" &&
-              "text-[#ffb7c3] group-data-[focus]:border-[rgba(255,123,143,0.2)] group-data-[focus]:text-[#ffd7de]"
+              "text-[#ff6b81] group-data-[focus]:border-[rgba(255,123,143,0.2)] group-data-[focus]:text-[#ffd7de]"
           )}
         >
           {icon}
@@ -171,7 +171,7 @@ export default function UserMenu({ user, onProfile, onSettings, onLogout, onLogi
         leaveFrom="translate-y-0 scale-100 opacity-100"
         leaveTo="translate-y-1 scale-95 opacity-0"
       >
-        <MenuItems className="absolute right-0 top-[calc(100%+12px)] z-30 w-44 origin-top-right rounded-xl border border-arena-border bg-[rgba(15,23,42,0.98)] p-2 shadow-[0_10px_25px_rgba(0,0,0,0.35)] focus:outline-none">
+        <MenuItems className="absolute right-0 z-[9999] mt-3 w-60 origin-top-right rounded-[24px] border border-arena-border bg-[#0b1220] p-2 shadow-2xl focus:outline-none">
           {isAuthenticated ? (
             <div className="space-y-1">
               <ActionItem
