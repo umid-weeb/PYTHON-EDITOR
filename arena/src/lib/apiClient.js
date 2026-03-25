@@ -140,6 +140,9 @@ export const arenaApi = {
     }
     throw new Error("Submission polling timed out");
   },
+  getDailyChallenge() {
+    return request("/api/daily-challenge");
+  },
 };
 
 export const userApi = {
@@ -154,6 +157,9 @@ export const userApi = {
   },
   getSubmissions() {
     return request("/api/user/submissions");
+  },
+  getMyStreak() {
+    return request("/api/user/streak");
   },
   getUserStatsById(userId) {
     return request(`/api/users/${encodeURIComponent(userId)}/stats`);

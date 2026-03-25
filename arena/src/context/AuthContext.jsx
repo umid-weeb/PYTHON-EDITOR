@@ -58,7 +58,7 @@ export function AuthProvider({ children }) {
         setToken(payload.token);
         const me = await authApi.me(payload.token);
         setUser(me);
-        writeStoredUsername(username);
+        writeStoredUsername(me.username);
         return me;
       },
       async register(data) {
@@ -66,7 +66,7 @@ export function AuthProvider({ children }) {
         setToken(payload.token);
         const me = await authApi.me(payload.token);
         setUser(me);
-        writeStoredUsername(data.username);
+        writeStoredUsername(me.username);
         return me;
       },
       async refreshUser() {

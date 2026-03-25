@@ -45,14 +45,14 @@ export default function UserQuickSearch() {
     <div className="relative w-full max-w-[300px]">
       <input
         className="w-full rounded-xl border border-gray-800 bg-gray-900 px-4 py-2.5 text-sm text-gray-200 outline-none transition focus:border-gray-700 focus:ring-2 focus:ring-gray-700"
-        placeholder="Search users"
+        placeholder="Search users..."
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
       {query ? (
         <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[10001] w-[320px] max-h-[260px] overflow-y-auto rounded-xl border border-gray-800 bg-gray-900 p-2 text-gray-200 shadow-xl">
-          {status === "loading" ? <div className="px-3 py-2 text-sm text-gray-400">Searching…</div> : null}
+          {status === "loading" ? <div className="px-3 py-2 text-sm text-gray-400">Searching...</div> : null}
           {status === "error" ? <div className="px-3 py-2 text-sm text-gray-400">Search unavailable</div> : null}
           {status === "ready" && results.length === 0 ? (
             <div className="px-3 py-2 text-sm text-gray-400">No users found</div>

@@ -1,15 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthCard from "../components/auth/AuthCard.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import styles from "./AuthPage.module.css";
 
+function normalizeNextPath(rawNext) {
+  if (!rawNext || typeof rawNext !== "string" || !rawNext.startsWith("/")) {
+    return "/";
+  }
+  if (rawNext.startsWith("/zone")) {
+    return rawNext.slice("/zone".length) || "/";
+  }
+  return rawNext;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/zone";
+  const next = useMemo(() => normalizeNextPath(params.get("next")), [params]);
   const { isAuthenticated, login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -22,10 +32,20 @@ export default function LoginPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
+
+    if (!identifier.trim()) {
+      setError("Username or email is required.");
+      return;
+    }
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await login(username.trim(), password);
+      await login(identifier.trim(), password);
       navigate(next, { replace: true });
     } catch (submitError) {
       setError(submitError.message || "Login failed");
@@ -50,13 +70,14 @@ export default function LoginPage() {
       }
     >
       <label className={styles.field}>
-        <span className={styles.label}>Username</span>
+        <span className={styles.label}>Username or Email</span>
         <input
           className={styles.input}
           autoComplete="username"
+          placeholder="isroilov0705 or you@example.com"
           type="text"
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
         />
       </label>
       <label className={styles.field}>
@@ -64,6 +85,7 @@ export default function LoginPage() {
         <input
           className={styles.input}
           autoComplete="current-password"
+          placeholder="Enter your password"
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}

@@ -2,6 +2,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS level TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS goal TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_hours TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Tashkent';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_solve_date DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_freeze INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 UPDATE users
 SET email = username
@@ -47,6 +57,29 @@ CREATE TABLE IF NOT EXISTS submissions (
   error_text TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS streak_history (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  solved INTEGER NOT NULL DEFAULT 0,
+  streak_day INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_streak_history_user_date UNIQUE(user_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_streak_history_user_id ON streak_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_streak_history_date ON streak_history(date);
+
+CREATE TABLE IF NOT EXISTS daily_challenges (
+  id SERIAL PRIMARY KEY,
+  problem_id VARCHAR(36) REFERENCES problems(id) ON DELETE CASCADE,
+  date DATE UNIQUE NOT NULL,
+  is_premium BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_challenges_problem_id ON daily_challenges(problem_id);
 
 CREATE INDEX IF NOT EXISTS idx_submissions_user_id ON submissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_problem_id ON submissions(problem_id);

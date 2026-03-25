@@ -6,7 +6,7 @@ type Props = {
   fallbackTo?: string;
 };
 
-export default function ProfileIndexRedirect({ fallbackTo = "/zone" }: Props) {
+export default function ProfileIndexRedirect({ fallbackTo = "/" }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
 

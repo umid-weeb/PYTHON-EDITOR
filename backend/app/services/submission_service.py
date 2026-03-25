@@ -10,9 +10,11 @@ from app.judge.runner import JudgeRunner
 from app.models.schemas import SubmissionRequest
 from app.models.submission_stats import UserSubmission
 from app.models.contest import ContestEntry, ContestSubmission
+from app.models.user import User
 from app.repositories.submissions import SubmissionRepository
 from app.services.problem_service import ProblemService, get_problem_service
 from app.database import SessionLocal
+from app.services.engagement_service import engagement_service
 from app.services.rating_service import rating_service
 from app.services.user_stats_service import user_stats_service
 
@@ -167,8 +169,16 @@ class SubmissionService:
                             submission_id=record.submission_id,
                             verdict=record.verdict,
                         )
+                        if (record.verdict or "").strip().lower() == "accepted":
+                            engagement_service.update_streak_for_accept(db, record.user_id)
+                        else:
+                            user = db.query(User).filter(User.id == record.user_id).first() if record.user_id else None
+                            if user is not None:
+                                engagement_service.touch_last_active(db, user)
                         user_stats_service.rebuild(db, record.user_id)
                     elif tracked_submission and tracked_submission.user_id is not None:
+                        if (tracked_submission.verdict or "").strip().lower() == "accepted":
+                            engagement_service.update_streak_for_accept(db, int(tracked_submission.user_id))
                         user_stats_service.rebuild(db, int(tracked_submission.user_id))
                     db.commit()
         except Exception as error:

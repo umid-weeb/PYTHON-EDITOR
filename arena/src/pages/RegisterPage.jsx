@@ -1,17 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthCard from "../components/auth/AuthCard.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import styles from "./AuthPage.module.css";
 
+function normalizeNextPath(rawNext) {
+  if (!rawNext || typeof rawNext !== "string" || !rawNext.startsWith("/")) {
+    return "/";
+  }
+  if (rawNext.startsWith("/zone")) {
+    return rawNext.slice("/zone".length) || "/";
+  }
+  return rawNext;
+}
+
+function isEmail(value) {
+  return !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/zone";
+  const next = useMemo(() => normalizeNextPath(params.get("next")), [params]);
   const { isAuthenticated, register } = useAuth();
   const [form, setForm] = useState({
     username: "",
+    email: "",
     password: "",
+    confirmPassword: "",
     country: "",
   });
   const [error, setError] = useState("");
@@ -25,13 +41,40 @@ export default function RegisterPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
+
+    const username = form.username.trim();
+    const email = form.email.trim().toLowerCase();
+    const country = form.country.trim();
+
+    if (!username) {
+      setError("Username is required.");
+      return;
+    }
+    if (username.length < 3) {
+      setError("Username must be at least 3 characters.");
+      return;
+    }
+    if (!isEmail(email)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
     try {
       await register({
-        username: form.username.trim(),
+        username,
+        email: email || undefined,
         password: form.password,
-        country: form.country.trim(),
+        country,
       });
       navigate(next, { replace: true });
     } catch (submitError) {
@@ -61,9 +104,21 @@ export default function RegisterPage() {
         <input
           className={styles.input}
           autoComplete="username"
+          placeholder="Choose a public handle"
           type="text"
           value={form.username}
           onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+        />
+      </label>
+      <label className={styles.field}>
+        <span className={styles.label}>Email</span>
+        <input
+          className={styles.input}
+          autoComplete="email"
+          placeholder="Optional, but recommended"
+          type="email"
+          value={form.email}
+          onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
         />
       </label>
       <label className={styles.field}>
@@ -71,9 +126,21 @@ export default function RegisterPage() {
         <input
           className={styles.input}
           autoComplete="new-password"
+          placeholder="At least 6 characters"
           type="password"
           value={form.password}
           onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+        />
+      </label>
+      <label className={styles.field}>
+        <span className={styles.label}>Confirm Password</span>
+        <input
+          className={styles.input}
+          autoComplete="new-password"
+          placeholder="Repeat your password"
+          type="password"
+          value={form.confirmPassword}
+          onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))}
         />
       </label>
       <label className={styles.field}>
@@ -81,6 +148,7 @@ export default function RegisterPage() {
         <input
           className={styles.input}
           autoComplete="country-name"
+          placeholder="Uzbekistan"
           type="text"
           value={form.country}
           onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))}

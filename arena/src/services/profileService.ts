@@ -14,6 +14,13 @@ export type PublicProfile = {
   solved_hard?: number;
   rating?: number | null;
   global_rank?: number | null;
+  level?: string | null;
+  goal?: string | null;
+  weekly_hours?: string | null;
+  streak?: number;
+  longest_streak?: number;
+  streak_freeze?: number;
+  timezone?: string | null;
 };
 
 export type SubmissionRow = {
@@ -48,6 +55,8 @@ export async function getUserStatsById(userId: number): Promise<{
   medium_solved: number;
   hard_solved: number;
   rating: number;
+  streak: number;
+  longest_streak: number;
 }> {
   return userApi.getUserStatsById(userId);
 }

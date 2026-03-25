@@ -13,6 +13,7 @@ from app.api.routes.users import router as user_router, account_router
 from app.api.routes.problems import router as problem_router
 from app.api.routes.submissions import router as submission_router
 from app.api.routes.contests import router as contest_router
+from app.api.routes.engagement import router as engagement_router
 from app.core.config import get_settings
 from app.repositories.submissions import SubmissionRepository
 from app.database import Base, engine
@@ -20,6 +21,7 @@ from app.database import SessionLocal
 from app import models as _models  # noqa: F401
 from app.services.problem_catalog import ensure_problem_catalog_seeded
 from app.services.db_bootstrap import run_startup_migrations
+from app.services.engagement_service import engagement_service
 from app.services.user_stats_service import user_stats_service
 
 
@@ -38,6 +40,7 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         ensure_problem_catalog_seeded(db)
+        engagement_service.ensure_upcoming_daily_challenges(db)
         user_stats_service.backfill_all(db)
         db.commit()
     yield
@@ -57,6 +60,7 @@ app.add_middleware(
 app.include_router(problem_router, prefix=settings.api_prefix)
 app.include_router(submission_router, prefix=settings.api_prefix)
 app.include_router(contest_router, prefix=settings.api_prefix)
+app.include_router(engagement_router, prefix=settings.api_prefix)
 app.include_router(health_router)
 app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(user_router, prefix=settings.api_prefix)

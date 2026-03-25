@@ -5,7 +5,7 @@ export default function AuthPromptModal({ open, problemId, onClose }) {
 
   if (!open) return null;
 
-  const next = problemId ? `/zone?problem=${encodeURIComponent(problemId)}&pending=submit` : "/zone?pending=submit";
+  const next = problemId ? `/?problem=${encodeURIComponent(problemId)}&pending=submit` : "/?pending=submit";
 
   return (
     <div

@@ -311,6 +311,8 @@ def get_user_stats_by_id(user_id: int, db: Session = Depends(get_db)) -> dict:
         "medium_solved": int(getattr(stats, "medium_solved", 0) or 0),
         "hard_solved": int(getattr(stats, "hard_solved", 0) or 0),
         "rating": int(getattr(stats, "rating", 1200) or 1200),
+        "streak": int(getattr(user, "streak", 0) or 0),
+        "longest_streak": int(getattr(user, "longest_streak", 0) or 0),
     }
 
 

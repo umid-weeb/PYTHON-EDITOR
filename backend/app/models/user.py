@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, String, Text, func, DateTime
+from sqlalchemy import Boolean, Column, Date, DateTime, Integer, String, Text, func
 
 from app.database import Base
 
@@ -16,4 +16,14 @@ class User(Base):
     avatar_url = Column(String(512), nullable=True)
     bio = Column(Text, nullable=True)
     country = Column(String(120), nullable=True)
+    level = Column(String(32), nullable=True)
+    goal = Column(String(64), nullable=True)
+    weekly_hours = Column(String(32), nullable=True)
+    notifications_enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+    timezone = Column(String(64), nullable=False, default="Asia/Tashkent", server_default="Asia/Tashkent")
+    streak = Column(Integer, nullable=False, default=0, server_default="0")
+    longest_streak = Column(Integer, nullable=False, default=0, server_default="0")
+    last_solve_date = Column(Date, nullable=True)
+    streak_freeze = Column(Integer, nullable=False, default=0, server_default="0")
+    last_active = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -66,7 +66,7 @@ def ensure_unique_username(db: Session, base_username: str) -> str:
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: str | None = Field(default=None, max_length=255)
-    password: str = Field(min_length=4, max_length=128)
+    password: str = Field(min_length=6, max_length=128)
     country: str | None = None
 
 
@@ -98,6 +98,13 @@ class MeResponse(BaseModel):
     solved_hard: int = 0
     rating: int = 1200
     global_rank: int | None = None
+    level: str | None = None
+    goal: str | None = None
+    weekly_hours: str | None = None
+    streak: int = 0
+    longest_streak: int = 0
+    streak_freeze: int = 0
+    timezone: str = "Asia/Tashkent"
 
 
 class PublicProfileResponse(BaseModel):
@@ -114,6 +121,9 @@ class PublicProfileResponse(BaseModel):
     solved_hard: int = 0
     rating: int = 1200
     global_rank: int | None = None
+    level: str | None = None
+    streak: int = 0
+    longest_streak: int = 0
 
 
 def get_password_hash(password: str) -> str:
@@ -228,6 +238,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
         )
         if not user or not verify_password(payload.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Invalid credentials")
+        user.last_active = datetime.now(timezone.utc)
+        db.commit()
         token = create_access_token(user)
         return TokenResponse(token=token, access_token=token)
     except HTTPException:
@@ -259,6 +271,8 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
         user = query.filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    user.last_active = datetime.now(timezone.utc)
+    db.commit()
 
     stats = calculate_user_stats(db, user.id)
     from app.services.rating_service import rating_service
@@ -279,6 +293,13 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
         solved_hard=stats["solved_hard"],
         rating=rating.rating,
         global_rank=rating.global_rank,
+        level=getattr(user, "level", None),
+        goal=getattr(user, "goal", None),
+        weekly_hours=getattr(user, "weekly_hours", None),
+        streak=int(getattr(user, "streak", 0) or 0),
+        longest_streak=int(getattr(user, "longest_streak", 0) or 0),
+        streak_freeze=int(getattr(user, "streak_freeze", 0) or 0),
+        timezone=getattr(user, "timezone", None) or "Asia/Tashkent",
     )
 
 
@@ -357,6 +378,9 @@ def get_public_user_profile(username: str, db: Session = Depends(get_db)):
         bio=getattr(user, "bio", None),
         rating=rating.rating,
         global_rank=rating.global_rank,
+        level=getattr(user, "level", None),
+        streak=int(getattr(user, "streak", 0) or 0),
+        longest_streak=int(getattr(user, "longest_streak", 0) or 0),
         **stats
     )
 
