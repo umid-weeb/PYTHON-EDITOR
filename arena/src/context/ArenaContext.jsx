@@ -38,8 +38,8 @@ export function ArenaProvider({ children }) {
   const cacheRef = useRef(new Map());
 
   const getSubmissionProblemKey = useCallback(
-    () => selectedProblem?.slug || selectedProblemId,
-    [selectedProblem?.slug, selectedProblemId]
+    () => selectedProblem?.id || selectedProblem?.slug || selectedProblemId,
+    [selectedProblem?.id, selectedProblem?.slug, selectedProblemId]
   );
 
   const loadProblems = useCallback(async () => {

@@ -23,7 +23,8 @@ export default function UserQuickSearch() {
     let cancelled = false;
 
     async function lookup() {
-      if (!debounced.trim()) {
+      const normalized = debounced.trim().replace(/^@+/, "");
+      if (!normalized) {
         setResults([]);
         setStatus("idle");
         return;
@@ -31,7 +32,7 @@ export default function UserQuickSearch() {
 
       setStatus("loading");
       try {
-        const items = await userApi.searchUsers(debounced.trim());
+        const items = await userApi.searchUsers(normalized);
         if (!cancelled) {
           setResults(items);
           setStatus("ready");

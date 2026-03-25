@@ -4,8 +4,11 @@ import {
   writeStoredToken,
 } from "./storage.js";
 
-export const API_BASE_URL =
-  import.meta.env.VITE_ARENA_API_BASE || "https://python-editor-b87c.onrender.com";
+const DEFAULT_API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
+
+export const API_BASE_URL = String(
+  import.meta.env.VITE_ARENA_API_BASE ?? DEFAULT_API_BASE
+).replace(/\/+$/, "");
 
 async function request(path, options = {}) {
   const token = options.token ?? readStoredToken();
@@ -146,8 +149,29 @@ export const arenaApi = {
 };
 
 export const userApi = {
-  searchUsers(query) {
-    return request(`/api/users/search?q=${encodeURIComponent(query)}`).then((payload) => payload?.users || []);
+  async searchUsers(query) {
+    const normalized = String(query || "").trim().replace(/^@+/, "");
+    if (!normalized) return [];
+
+    try {
+      const payload = await request(`/api/users/search?q=${encodeURIComponent(normalized)}`);
+      return payload?.users || [];
+    } catch (error) {
+      // Fallback for older backend deployments where /api/users/search is shadowed
+      // by /api/users/{username}. This keeps search usable until Render redeploys.
+      const board = await request("/api/leaderboard").catch(() => []);
+      return (Array.isArray(board) ? board : [])
+        .filter((user) => String(user?.username || "").toLowerCase().includes(normalized.toLowerCase()))
+        .slice(0, 10)
+        .map((user) => ({
+          id: user.user_id,
+          username: user.username,
+          display_name: user.username,
+          avatar_url: user.avatar_url || null,
+          rating: user.rating || 1200,
+          solved_count: user.solved_count || user.solved || 0,
+        }));
+    }
   },
   getPublicProfile(username) {
     return request(`/api/users/${encodeURIComponent(username)}`);
