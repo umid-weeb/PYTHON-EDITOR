@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useDebouncedValue from "../../hooks/useDebouncedValue.js";
-import { userApi } from "../../lib/apiClient.js";
+import { API_BASE_URL, userApi } from "../../lib/apiClient.js";
+
+function resolveAvatarSrc(candidate) {
+  if (!candidate) return "";
+  try {
+    return new URL(candidate, API_BASE_URL).toString();
+  } catch {
+    return candidate;
+  }
+}
 
 export default function UserQuickSearch() {
   const navigate = useNavigate();
@@ -68,10 +77,23 @@ export default function UserQuickSearch() {
                 navigate(`/profile/${encodeURIComponent(user.username)}`);
               }}
             >
-              <span className="grid h-9 w-9 place-items-center rounded-full border border-gray-800 bg-gray-950 text-xs font-semibold text-gray-200">
-                {user.username.slice(0, 1).toUpperCase()}
+              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-gray-800 bg-gray-950 text-xs font-semibold text-gray-200">
+                {user.avatar_url ? (
+                  <img
+                    alt={`${user.username} avatar`}
+                    className="h-full w-full object-cover"
+                    src={resolveAvatarSrc(user.avatar_url)}
+                  />
+                ) : (
+                  user.username.slice(0, 1).toUpperCase()
+                )}
               </span>
-              <span>{user.username}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{user.display_name || user.username}</span>
+                <span className="mt-0.5 block truncate text-xs text-gray-400">
+                  @{user.username} · {user.solved_count || 0} solved · {user.rating || 1200} rating
+                </span>
+              </span>
             </button>
           ))}
         </div>
