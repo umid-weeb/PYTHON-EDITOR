@@ -13,10 +13,31 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_solve_date DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_freeze INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
+CREATE TABLE IF NOT EXISTS users_backup AS
+SELECT * FROM users;
+
 UPDATE users
 SET email = username
 WHERE username LIKE '%@%'
   AND (email IS NULL OR email = '');
+
+UPDATE users
+SET email = LOWER(TRIM(email))
+WHERE email IS NOT NULL;
+
+UPDATE users
+SET email = NULL
+WHERE email IS NOT NULL
+  AND email NOT LIKE '%@%.%';
+
+DELETE FROM users
+WHERE id NOT IN (
+  SELECT MIN(id)
+  FROM users
+  WHERE email IS NOT NULL
+  GROUP BY LOWER(email)
+)
+AND email IS NOT NULL;
 
 UPDATE users
 SET username = LEFT(
