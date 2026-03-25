@@ -21,11 +21,9 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 
 from app.database import get_db
-from app.database import SessionLocal
 from app.models.user import User
 from app.models.problem import Problem
-from app.models.rating import UserRating
-from app.models.submission_stats import UserSubmission
+from app.models.submission_stats import SubmissionRecord, UserStats, UserSubmission
 from app.api.routes.auth import (
     ALGORITHM,
     SECRET_KEY,
@@ -201,56 +199,55 @@ def upload_avatar(
 
 
 @account_router.get("/user/activity")
-def user_activity(current_user: User = Depends(get_current_user)) -> list:
-    with SessionLocal() as db:
-        rows = (
-            db.query(
-                func.date(UserSubmission.created_at).label("date"),
-                func.count().label("count"),
-            )
-            .filter(UserSubmission.user_id == current_user.id)
-            .group_by(func.date(UserSubmission.created_at))
-            .order_by(func.date(UserSubmission.created_at))
-            .all()
+def user_activity(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list:
+    rows = (
+        db.query(
+            func.date(UserSubmission.created_at).label("date"),
+            func.count().label("count"),
         )
-        return [{"date": str(row.date), "count": int(row.count)} for row in rows]
+        .filter(UserSubmission.user_id == current_user.id)
+        .group_by(func.date(UserSubmission.created_at))
+        .order_by(func.date(UserSubmission.created_at))
+        .all()
+    )
+    return [{"date": str(row.date), "count": int(row.count)} for row in rows]
 
 
 @account_router.get("/user/submissions")
-def user_submissions(current_user: User = Depends(get_current_user)) -> list:
-    with SessionLocal() as db:
-        rows = (
-            db.query(
-                UserSubmission.problem_id,
-                UserSubmission.language,
-                UserSubmission.verdict,
-                UserSubmission.runtime_ms,
-                UserSubmission.memory_kb,
-                UserSubmission.created_at,
-                Problem.title.label("problem_title"),
-                Problem.difficulty.label("difficulty"),
-            )
-            .outerjoin(Problem, Problem.id == UserSubmission.problem_id)
-            .filter(UserSubmission.user_id == current_user.id)
-            .order_by(UserSubmission.created_at.desc())
-            .limit(200)
-            .all()
+def user_submissions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list:
+    rows = (
+        db.query(
+            SubmissionRecord.problem_id,
+            SubmissionRecord.language,
+            SubmissionRecord.verdict,
+            SubmissionRecord.runtime,
+            SubmissionRecord.memory_kb,
+            SubmissionRecord.created_at,
+            SubmissionRecord.status,
+            Problem.title.label("problem_title"),
+            Problem.difficulty.label("difficulty"),
         )
+        .outerjoin(Problem, Problem.id == SubmissionRecord.problem_id)
+        .filter(SubmissionRecord.user_id == current_user.id)
+        .order_by(SubmissionRecord.created_at.desc())
+        .limit(200)
+        .all()
+    )
 
-        return [
-            {
-                "problem_id": row.problem_id,
-                "problem_title": row.problem_title,
-                "language": row.language,
-                "difficulty": row.difficulty,
-                "verdict": row.verdict,
-                "runtime_ms": row.runtime_ms,
-                "memory_kb": row.memory_kb,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-                "status": row.verdict,
-            }
-            for row in rows
-        ]
+    return [
+        {
+            "problem_id": row.problem_id,
+            "problem_title": row.problem_title,
+            "language": row.language,
+            "difficulty": row.difficulty,
+            "verdict": row.verdict,
+            "runtime_ms": int(row.runtime) if row.runtime is not None else None,
+            "memory_kb": row.memory_kb,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "status": row.status or row.verdict,
+        }
+        for row in rows
+    ]
 
 
 @router.get("/leaderboard")
@@ -260,38 +257,99 @@ def leaderboard(db: Session = Depends(get_db)) -> list:
     """
     subq = (
         db.query(
-            UserSubmission.user_id.label("user_id"),
-            func.count(func.distinct(UserSubmission.problem_id)).label("solved"),
+            SubmissionRecord.user_id.label("user_id"),
             func.count().label("submissions"),
-            func.min(UserSubmission.runtime_ms).label("fastest_ms"),
+            func.min(SubmissionRecord.runtime).label("fastest_ms"),
         )
-        .filter(UserSubmission.verdict == "Accepted")
-        .group_by(UserSubmission.user_id)
+        .filter(SubmissionRecord.user_id.isnot(None))
+        .group_by(SubmissionRecord.user_id)
         .subquery()
     )
 
     rows = (
         db.query(
+            User.id.label("user_id"),
             User.username,
-            func.coalesce(UserRating.rating, 800).label("rating"),
-            subq.c.solved,
+            func.coalesce(UserStats.rating, 1200).label("rating"),
+            func.coalesce(UserStats.solved_count, 0).label("solved"),
             subq.c.submissions,
             subq.c.fastest_ms,
         )
-        .join(subq, subq.c.user_id == User.id)
-        .outerjoin(UserRating, UserRating.user_id == User.id)
-        .order_by(func.coalesce(UserRating.rating, 800).desc(), subq.c.solved.desc(), User.username.asc())
-        .limit(100)
+        .outerjoin(UserStats, UserStats.user_id == User.id)
+        .outerjoin(subq, subq.c.user_id == User.id)
+        .order_by(func.coalesce(UserStats.rating, 1200).desc(), func.coalesce(UserStats.solved_count, 0).desc(), User.username.asc())
+        .limit(50)
         .all()
     )
 
     return [
         {
+            "user_id": int(row.user_id),
             "username": row.username,
-            "rating": int(row.rating or 800),
+            "rating": int(row.rating or 1200),
             "solved": int(row.solved or 0),
+            "solved_count": int(row.solved or 0),
             "submissions": int(row.submissions or 0),
             "fastest_ms": int(row.fastest_ms) if row.fastest_ms is not None else None,
+        }
+        for row in rows
+    ]
+
+
+@router.get("/users/{user_id}/stats")
+def get_user_stats_by_id(user_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    stats = db.query(UserStats).filter(UserStats.user_id == user_id).first()
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "solved_count": int(getattr(stats, "solved_count", 0) or 0),
+        "easy_solved": int(getattr(stats, "easy_solved", 0) or 0),
+        "medium_solved": int(getattr(stats, "medium_solved", 0) or 0),
+        "hard_solved": int(getattr(stats, "hard_solved", 0) or 0),
+        "rating": int(getattr(stats, "rating", 1200) or 1200),
+    }
+
+
+@router.get("/users/{user_id}/submissions")
+def get_user_submissions_by_id(user_id: int, db: Session = Depends(get_db)) -> list:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    rows = (
+        db.query(
+            SubmissionRecord.problem_id,
+            SubmissionRecord.language,
+            SubmissionRecord.verdict,
+            SubmissionRecord.runtime,
+            SubmissionRecord.memory_kb,
+            SubmissionRecord.created_at,
+            SubmissionRecord.status,
+            Problem.title.label("problem_title"),
+            Problem.difficulty.label("difficulty"),
+        )
+        .outerjoin(Problem, Problem.id == SubmissionRecord.problem_id)
+        .filter(SubmissionRecord.user_id == user_id)
+        .order_by(SubmissionRecord.created_at.desc())
+        .limit(200)
+        .all()
+    )
+
+    return [
+        {
+            "problem_id": row.problem_id,
+            "problem_title": row.problem_title,
+            "language": row.language,
+            "difficulty": row.difficulty,
+            "verdict": row.verdict,
+            "runtime_ms": int(row.runtime) if row.runtime is not None else None,
+            "memory_kb": row.memory_kb,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "status": row.status or row.verdict,
         }
         for row in rows
     ]

@@ -19,6 +19,8 @@ from app.database import Base, engine
 from app.database import SessionLocal
 from app import models as _models  # noqa: F401
 from app.services.problem_catalog import ensure_problem_catalog_seeded
+from app.services.db_bootstrap import run_startup_migrations
+from app.services.user_stats_service import user_stats_service
 
 
 settings = get_settings()
@@ -31,10 +33,13 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     SubmissionRepository(settings.submissions_db_path)
+    run_startup_migrations(engine)
     # Ensure SQLAlchemy models are created (Supabase/Postgres or fallback SQLite)
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         ensure_problem_catalog_seeded(db)
+        user_stats_service.backfill_all(db)
+        db.commit()
     yield
 
 

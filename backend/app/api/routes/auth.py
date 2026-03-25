@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
@@ -13,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.submission_stats import UserStats
 from app.models.user import User
 
 
@@ -41,6 +43,24 @@ def normalize_username(raw: str) -> str:
       # Remove all leading '@' characters to be safe.
       username = username.lstrip("@")
   return username
+
+
+def derive_username_from_email(email: str) -> str:
+    local_part = (email or "").split("@", 1)[0].strip().lower()
+    candidate = re.sub(r"[^a-z0-9_]", "_", local_part)
+    candidate = re.sub(r"_+", "_", candidate).strip("_") or "user"
+    if len(candidate) < 3:
+        candidate = f"{candidate}_user"
+    return candidate[:40]
+
+
+def ensure_unique_username(db: Session, base_username: str) -> str:
+    candidate = base_username
+    suffix = 1
+    while db.query(User.id).filter(User.username == candidate).first():
+        candidate = f"{base_username[:42]}_{suffix}"
+        suffix += 1
+    return candidate[:50]
 
 
 class RegisterRequest(BaseModel):
@@ -76,9 +96,12 @@ class MeResponse(BaseModel):
     solved_easy: int = 0
     solved_medium: int = 0
     solved_hard: int = 0
+    rating: int = 1200
+    global_rank: int | None = None
 
 
 class PublicProfileResponse(BaseModel):
+    id: int
     username: str
     display_name: str | None = None
     country: str | None = None
@@ -117,35 +140,18 @@ def create_access_token(user: User) -> str:
 
 
 def calculate_user_stats(db: Session, user_id: int) -> dict:
-    from app.models.problem import Problem
-    from app.models.submission_stats import UserSubmission
+    stats_row = db.query(UserStats).filter(UserStats.user_id == user_id).first()
+    if stats_row:
+        solved_total = int(stats_row.solved_count or 0)
+        solved_easy = int(stats_row.easy_solved or 0)
+        solved_medium = int(stats_row.medium_solved or 0)
+        solved_hard = int(stats_row.hard_solved or 0)
+    else:
+        solved_total = 0
+        solved_easy = 0
+        solved_medium = 0
+        solved_hard = 0
 
-    stats = (
-        db.query(
-            Problem.difficulty,
-            func.count(func.distinct(UserSubmission.problem_id)).label("count"),
-        )
-        .join(Problem, Problem.id == UserSubmission.problem_id)
-        .filter(UserSubmission.user_id == user_id, UserSubmission.verdict == "Accepted")
-        .group_by(Problem.difficulty)
-        .all()
-    )
-
-    solved_total = 0
-    solved_easy = 0
-    solved_medium = 0
-    solved_hard = 0
-    for row in stats:
-        difficulty = (row.difficulty or "").lower()
-        count = int(row.count or 0)
-        solved_total += count
-        if difficulty == "easy":
-            solved_easy += count
-        elif difficulty == "medium":
-            solved_medium += count
-        elif difficulty == "hard":
-            solved_hard += count
-            
     return {
         "solved_total": solved_total,
         "solved_easy": solved_easy,
@@ -158,6 +164,12 @@ def calculate_user_stats(db: Session, user_id: int) -> dict:
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
     try:
         username = normalize_username(payload.username)
+        email = payload.email.strip().lower() if payload.email else None
+
+        if "@" in username:
+            email = email or username.lower()
+            username = ensure_unique_username(db, derive_username_from_email(email))
+
         if len(username) < 3:
             raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
 
@@ -167,15 +179,15 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
             raise HTTPException(status_code=400, detail="Username already exists")
 
         # Email must be unique when provided
-        if payload.email:
-            email_existing = db.query(User).filter(User.email == payload.email.strip().lower()).first()
+        if email:
+            email_existing = db.query(User).filter(User.email == email).first()
             if email_existing:
                 raise HTTPException(status_code=400, detail="Email already exists")
 
         # Create user with hashed password
         user = User(
             username=username,
-            email=payload.email.strip().lower() if payload.email else None,
+            email=email,
             password_hash=get_password_hash(payload.password),
             country=payload.country,
         )
@@ -265,6 +277,8 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
         solved_easy=stats["solved_easy"],
         solved_medium=stats["solved_medium"],
         solved_hard=stats["solved_hard"],
+        rating=rating.rating,
+        global_rank=rating.global_rank,
     )
 
 
@@ -334,6 +348,7 @@ def get_public_user_profile(username: str, db: Session = Depends(get_db)):
     from app.services.rating_service import rating_service
     rating = rating_service.snapshot(db, user.id)
     return PublicProfileResponse(
+        id=user.id,
         username=user.username,
         display_name=getattr(user, "display_name", None),
         country=user.country,

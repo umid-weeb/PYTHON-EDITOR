@@ -155,6 +155,12 @@ export const userApi = {
   getSubmissions() {
     return request("/api/user/submissions");
   },
+  getUserStatsById(userId) {
+    return request(`/api/users/${encodeURIComponent(userId)}/stats`);
+  },
+  getUserSubmissionsById(userId) {
+    return request(`/api/users/${encodeURIComponent(userId)}/submissions`);
+  },
   getLeaderboard() {
     return request("/api/leaderboard");
   },

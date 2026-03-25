@@ -28,7 +28,7 @@ export default function Leaderboard({ entries = [], error }) {
               <td>{index + 1}</td>
               <td>{entry.username}</td>
               <td>{entry.rating ?? "--"}</td>
-              <td>{entry.solved || 0}</td>
+              <td>{entry.solved_count ?? entry.solved ?? 0}</td>
               <td>{entry.submissions || 0}</td>
               <td>{entry.fastest_ms ? `${entry.fastest_ms} ms` : "--"}</td>
             </tr>

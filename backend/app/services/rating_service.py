@@ -6,8 +6,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.problem import Problem
-from app.models.rating import RatingHistory, UserRating
-from app.models.submission_stats import UserSubmission
+from app.models.rating import RatingHistory
+from app.models.submission_stats import UserStats, UserSubmission
 
 
 @dataclass(frozen=True)
@@ -33,11 +33,11 @@ class RatingService:
     this uses a conservative "first AC per problem gives delta" model.
     """
 
-    def get_or_create(self, db: Session, user_id: int) -> UserRating:
-        row = db.query(UserRating).filter(UserRating.user_id == user_id).first()
+    def get_or_create(self, db: Session, user_id: int) -> UserStats:
+        row = db.query(UserStats).filter(UserStats.user_id == user_id).first()
         if row:
             return row
-        row = UserRating(user_id=user_id, rating=1200, max_rating=1200)
+        row = UserStats(user_id=user_id, rating=1200)
         db.add(row)
         db.flush()
         return row
@@ -80,9 +80,9 @@ class RatingService:
         delta = _difficulty_delta(difficulty)
 
         rating_row = self.get_or_create(db, user_id)
-        rating_after = int(rating_row.rating) + int(delta)
+        base_rating = int(rating_row.rating or 1200)
+        rating_after = base_rating + int(delta)
         rating_row.rating = rating_after
-        rating_row.max_rating = max(int(rating_row.max_rating), rating_after)
 
         db.add(
             RatingHistory(
@@ -97,9 +97,18 @@ class RatingService:
     def snapshot(self, db: Session, user_id: int) -> RatingSnapshot:
         row = self.get_or_create(db, user_id)
         # Dense rank by rating desc.
-        higher = db.query(func.count(UserRating.user_id)).filter(UserRating.rating > row.rating).scalar() or 0
+        higher = db.query(func.count(UserStats.user_id)).filter(UserStats.rating > row.rating).scalar() or 0
+        max_rating = (
+            db.query(func.max(RatingHistory.rating_after))
+            .filter(RatingHistory.user_id == user_id)
+            .scalar()
+        )
         global_rank = int(higher) + 1
-        return RatingSnapshot(rating=int(row.rating), max_rating=int(row.max_rating), global_rank=global_rank)
+        return RatingSnapshot(
+            rating=int(row.rating or 1200),
+            max_rating=int(max_rating or row.rating or 1200),
+            global_rank=global_rank,
+        )
 
 
 rating_service = RatingService()

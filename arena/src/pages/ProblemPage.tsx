@@ -54,7 +54,7 @@ export default function ProblemPage() {
         return;
       }
       // If unknown slug, fall back to Arena list.
-      navigate("/zone", { replace: true });
+      navigate("/", { replace: true });
     }
     bootstrap().catch(() => {});
     return () => {

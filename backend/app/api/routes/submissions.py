@@ -6,7 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.routes.auth import get_current_user
 from app.models.schemas import SubmissionCreated, SubmissionRequest, SubmissionStatus
+from app.models.submission_stats import SubmissionRecord
 from app.models.user import User
+from app.database import get_db
+from sqlalchemy.orm import Session
 from app.services.submission_service import SubmissionService, get_submission_service
 
 
@@ -63,3 +66,40 @@ async def get_submission(
         error_text=submission["error_text"],
         case_results=submission["case_results"],
     )
+
+
+@router.get("/submissions/{submission_id}", response_model=SubmissionStatus)
+async def get_submission_rest(
+    submission_id: str,
+    service: SubmissionService = Depends(get_submission_service),
+) -> SubmissionStatus:
+    return await get_submission(submission_id=submission_id, service=service)
+
+
+@router.get("/submissions/my")
+def get_my_submissions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    rows = (
+        db.query(SubmissionRecord)
+        .filter(SubmissionRecord.user_id == current_user.id)
+        .order_by(SubmissionRecord.created_at.desc())
+        .limit(200)
+        .all()
+    )
+
+    return [
+        {
+            "id": row.id,
+            "submission_id": row.external_submission_id,
+            "problem_id": row.problem_id,
+            "language": row.language,
+            "status": row.status,
+            "verdict": row.verdict,
+            "runtime_ms": int(row.runtime) if row.runtime is not None else None,
+            "memory_kb": row.memory_kb,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in rows
+    ]

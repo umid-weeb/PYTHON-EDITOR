@@ -14,6 +14,7 @@ from app.repositories.submissions import SubmissionRepository
 from app.services.problem_service import ProblemService, get_problem_service
 from app.database import SessionLocal
 from app.services.rating_service import rating_service
+from app.services.user_stats_service import user_stats_service
 
 
 class SubmissionService:
@@ -40,6 +41,15 @@ class SubmissionService:
         )
         if user_id is not None and mode == "submit":
             with SessionLocal() as db:
+                user_stats_service.record_submission(
+                    db,
+                    external_submission_id=submission_id,
+                    user_id=user_id,
+                    problem_id=payload.problem_id,
+                    code=payload.code,
+                    language=payload.language,
+                    status="pending",
+                )
                 record = UserSubmission(
                     user_id=user_id,
                     problem_id=payload.problem_id,
@@ -124,6 +134,14 @@ class SubmissionService:
             )
             if submission.get("mode") == "submit":
                 with SessionLocal() as db:
+                    tracked_submission = user_stats_service.finalize_submission(
+                        db,
+                        external_submission_id=submission_id,
+                        verdict=result.get("verdict"),
+                        runtime_ms=result.get("runtime_ms"),
+                        memory_kb=result.get("memory_kb"),
+                        error_text=result.get("error_text"),
+                    )
                     record = (
                         db.query(UserSubmission)
                         .filter(UserSubmission.submission_id == submission_id)
@@ -149,12 +167,23 @@ class SubmissionService:
                             submission_id=record.submission_id,
                             verdict=record.verdict,
                         )
-                        db.commit()
+                        user_stats_service.rebuild(db, record.user_id)
+                    elif tracked_submission and tracked_submission.user_id is not None:
+                        user_stats_service.rebuild(db, int(tracked_submission.user_id))
+                    db.commit()
         except Exception as error:
             self.repository.mark_failed(submission_id, str(error))
             self.logger.exception("submission.failed id=%s error=%s", submission_id, error)
             if submission.get("mode") == "submit":
                 with SessionLocal() as db:
+                    user_stats_service.finalize_submission(
+                        db,
+                        external_submission_id=submission_id,
+                        verdict="Runtime Error",
+                        runtime_ms=None,
+                        memory_kb=None,
+                        error_text=str(error),
+                    )
                     record = (
                         db.query(UserSubmission)
                         .filter(UserSubmission.submission_id == submission_id)
@@ -173,7 +202,7 @@ class SubmissionService:
                             contest_row.verdict = "Runtime Error"
                             contest_row.runtime_ms = None
                             contest_row.memory_kb = None
-                        db.commit()
+                    db.commit()
 
     def get_submission(self, submission_id: str) -> dict | None:
         return self.repository.get(submission_id)

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
@@ -22,15 +22,19 @@ class ContestProblem(Base):
 class ContestRegistration(Base):
     __tablename__ = "contest_registrations"
     contest_id = Column(UUID(as_uuid=True), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     registered_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 class ContestSubmission(Base):
     __tablename__ = "contest_submissions"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     contest_id = Column(UUID(as_uuid=True), ForeignKey("contests.id", ondelete="CASCADE"))
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     problem_id = Column(String, nullable=False)
+    submission_id = Column(String, nullable=True)
+    verdict = Column(String, nullable=True)
+    runtime_ms = Column(Integer, nullable=True)
+    memory_kb = Column(Integer, nullable=True)
     penalty_minutes = Column(Integer, default=0)
     is_first_solve = Column(Boolean, default=False)
     is_accepted = Column(Boolean, default=False)
@@ -39,8 +43,12 @@ class ContestSubmission(Base):
 class ContestStanding(Base):
     __tablename__ = "contest_standings"
     contest_id = Column(UUID(as_uuid=True), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     username = Column(String, nullable=False)
     total_solved = Column(Integer, default=0)
     total_penalty = Column(Integer, default=0) # ICPC format penalty in minutes
     last_submit = Column(DateTime(timezone=True))
+
+
+# Backwards-compatible alias used by parts of the current service layer.
+ContestEntry = ContestRegistration
