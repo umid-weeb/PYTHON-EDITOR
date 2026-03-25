@@ -72,8 +72,12 @@ def get_settings() -> Settings:
     cache_dir.mkdir(parents=True, exist_ok=True)
     hidden_test_root.mkdir(parents=True, exist_ok=True)
 
-    cors_raw = os.getenv("ARENA_CORS_ALLOW_ORIGINS", "*")
-    cors_allow_origins = [item.strip() for item in cors_raw.split(",") if item.strip()]
+    cors_raw = os.getenv("ARENA_CORS_ALLOW_ORIGINS", "")
+    cors_allow_origins = [
+        item.strip()
+        for item in cors_raw.split(",")
+        if item.strip() and item.strip() != "*"
+    ]
 
     return Settings(
         app_name=os.getenv("ARENA_APP_NAME", "Pyzone Arena Backend"),
@@ -107,5 +111,5 @@ def get_settings() -> Settings:
         frontend_api_base=os.getenv("ARENA_FRONTEND_API_BASE", "/api"),
         log_level=os.getenv("ARENA_LOG_LEVEL", "INFO").upper(),
         jwt_secret=os.getenv("ARENA_JWT_SECRET", "dev-secret-change-me"),
-        cors_allow_origins=cors_allow_origins or ["*"],
+        cors_allow_origins=cors_allow_origins,
     )

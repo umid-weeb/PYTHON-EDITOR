@@ -48,10 +48,23 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
 
+default_cors_origins = [
+    "https://pyzone.uz",
+    "https://www.pyzone.uz",
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
+allowed_origins = sorted({*default_cors_origins, *settings.cors_allow_origins})
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allow_origins
-    or ["https://pyzone.uz", "https://www.pyzone.uz", "http://localhost", "http://localhost:3000"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"^https://([a-z0-9-]+\.)?pyzone\.uz$|^https://[a-z0-9-]+\.vercel\.app$|^http://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,9 +75,9 @@ app.include_router(submission_router, prefix=settings.api_prefix)
 app.include_router(contest_router, prefix=settings.api_prefix)
 app.include_router(engagement_router, prefix=settings.api_prefix)
 app.include_router(health_router)
-app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(user_router, prefix=settings.api_prefix)
 app.include_router(account_router, prefix=settings.api_prefix)
+app.include_router(auth_router, prefix=settings.api_prefix)
 
 # Serve uploaded avatars
 uploads_root = settings.backend_root / "uploads"

@@ -5,8 +5,11 @@ import threading
 from functools import lru_cache
 import logging
 
+from sqlalchemy import or_
+
 from app.core.config import get_settings
 from app.judge.runner import JudgeRunner
+from app.models.problem import Problem
 from app.models.schemas import SubmissionRequest
 from app.models.submission_stats import UserSubmission
 from app.models.contest import ContestEntry, ContestSubmission
@@ -27,6 +30,15 @@ class SubmissionService:
         self.judge = JudgeRunner(self.settings)
         self.logger = logging.getLogger("pyzone.arena.submission")
 
+    @staticmethod
+    def _resolve_problem_id(db, problem_key: str) -> str:
+        problem_id = (
+            db.query(Problem.id)
+            .filter(or_(Problem.id == problem_key, Problem.slug == problem_key))
+            .scalar()
+        )
+        return str(problem_id or problem_key)
+
     def create_submission(self, payload: SubmissionRequest, mode: str, user_id: int | None = None) -> str:
         submission_id = self.repository.create(
             problem_id=payload.problem_id,
@@ -43,18 +55,19 @@ class SubmissionService:
         )
         if user_id is not None and mode == "submit":
             with SessionLocal() as db:
+                canonical_problem_id = self._resolve_problem_id(db, payload.problem_id)
                 user_stats_service.record_submission(
                     db,
                     external_submission_id=submission_id,
                     user_id=user_id,
-                    problem_id=payload.problem_id,
+                    problem_id=canonical_problem_id,
                     code=payload.code,
                     language=payload.language,
                     status="pending",
                 )
                 record = UserSubmission(
                     user_id=user_id,
-                    problem_id=payload.problem_id,
+                    problem_id=canonical_problem_id,
                     submission_id=submission_id,
                     language=payload.language,
                     verdict=None,
@@ -75,7 +88,7 @@ class SubmissionService:
                         ContestSubmission(
                             contest_id=payload.contest_id,
                             user_id=user_id,
-                            problem_id=payload.problem_id,
+                            problem_id=canonical_problem_id,
                             submission_id=submission_id,
                             verdict=None,
                             runtime_ms=None,

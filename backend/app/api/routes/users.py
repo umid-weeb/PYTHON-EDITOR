@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 from pathlib import Path
@@ -36,11 +37,16 @@ from app.api.routes.auth import get_current_user
 
 router = APIRouter(tags=["users"])
 account_router = APIRouter(tags=["account"])
+LOGGER = logging.getLogger("pyzone.arena.users")
 
 
 class UserSearchItem(BaseModel):
     id: int
     username: str
+    display_name: str | None = None
+    avatar_url: str | None = None
+    rating: int = 1200
+    solved_count: int = 0
 
 
 class UserSearchResponse(BaseModel):
@@ -80,13 +86,34 @@ def search_users(
 
     pattern = f"%{query}%"
     stmt = (
-        select(User.id, User.username)
-        .where(User.username.ilike(pattern))
+        select(
+            User.id,
+            User.username,
+            User.display_name,
+            User.avatar_url,
+            func.coalesce(UserStats.rating, 1200).label("rating"),
+            func.coalesce(UserStats.solved_count, 0).label("solved_count"),
+        )
+        .outerjoin(UserStats, UserStats.user_id == User.id)
+        .where(
+            User.username.ilike(pattern)
+            | User.display_name.ilike(pattern)
+        )
         .order_by(User.username.asc())
         .limit(10)
     )
     rows = db.execute(stmt).mappings().all()
-    users = [UserSearchItem(id=row["id"], username=row["username"]) for row in rows]
+    users = [
+        UserSearchItem(
+            id=int(row["id"]),
+            username=row["username"],
+            display_name=row.get("display_name"),
+            avatar_url=row.get("avatar_url"),
+            rating=int(row.get("rating") or 1200),
+            solved_count=int(row.get("solved_count") or 0),
+        )
+        for row in rows
+    ]
     return UserSearchResponse(users=users)
 
 
@@ -166,22 +193,33 @@ def upload_avatar(
     avatar_url: str
 
     supabase_url = os.getenv("SUPABASE_URL") or os.getenv("ARENA_SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("ARENA_SUPABASE_SERVICE_ROLE_KEY")
+    supabase_key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or os.getenv("ARENA_SUPABASE_SERVICE_ROLE_KEY")
+        or os.getenv("SUPABASE_KEY")
+        or os.getenv("ARENA_SUPABASE_KEY")
+    )
     bucket = os.getenv("ARENA_SUPABASE_AVATAR_BUCKET", "avatars")
 
     if supabase_url and supabase_key:
-        from supabase import create_client
+        try:
+            from supabase import create_client
 
-        client = create_client(supabase_url, supabase_key)
-        object_path = f"{current_user.id}/{uuid4().hex}{suffix}"
-        client.storage.from_(bucket).upload(
-            path=object_path,
-            file=content,
-            file_options={"content-type": file.content_type or "application/octet-stream", "upsert": "true"},
-        )
-        # Public bucket recommended for avatars; otherwise switch to signed URLs.
-        avatar_url = client.storage.from_(bucket).get_public_url(object_path)
+            client = create_client(supabase_url, supabase_key)
+            object_path = f"{current_user.id}/{uuid4().hex}{suffix}"
+            client.storage.from_(bucket).upload(
+                path=object_path,
+                file=content,
+                file_options={"content-type": file.content_type or "application/octet-stream", "upsert": "true"},
+            )
+            avatar_url = client.storage.from_(bucket).get_public_url(object_path)
+        except Exception as exc:
+            LOGGER.exception("Supabase avatar upload failed, falling back to local storage: %s", exc)
+            avatar_url = ""
     else:
+        avatar_url = ""
+
+    if not avatar_url:
         upload_root = Path(os.getenv("ARENA_UPLOAD_ROOT", Path(__file__).resolve().parents[3] / "uploads"))
         avatar_dir = upload_root / "avatars"
         avatar_dir.mkdir(parents=True, exist_ok=True)

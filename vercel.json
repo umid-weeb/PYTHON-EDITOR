@@ -15,6 +15,14 @@
 ],
 "rewrites": [
   {
+    "source": "/api/(.*)",
+    "destination": "https://python-editor-b87c.onrender.com/api/$1"
+  },
+  {
+    "source": "/uploads/(.*)",
+    "destination": "https://python-editor-b87c.onrender.com/uploads/$1"
+  },
+  {
     "source": "/zone",
     "destination": "/zone/index.html"
   },
