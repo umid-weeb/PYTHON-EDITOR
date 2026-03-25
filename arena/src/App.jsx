@@ -23,7 +23,7 @@ export default function App() {
   return (
     <AppFrame>
       <Routes>
-        <Route path="/zone" element={<ArenaPage />} />
+        <Route path="/" element={<ArenaPage />} />
         <Route path="/problems" element={<ProblemsPage />} />
         <Route path="/problems/:slug" element={<ProblemPage />} />
         <Route path="/roadmap" element={<RoadmapPage />} />
@@ -124,7 +124,7 @@ export default function App() {
           }
         />
         <Route path="/rating" element={<Navigate to="/leaderboard" replace />} />
-        <Route path="*" element={<Navigate to="/problems" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppFrame>
   );

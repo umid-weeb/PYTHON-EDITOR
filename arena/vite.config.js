@@ -4,9 +4,10 @@ import path from "node:path";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/",
+  base: "/zone/",
   build: {
     outDir: "dist",
+    emptyOutDir: true,
   },
   resolve: {
     alias: {

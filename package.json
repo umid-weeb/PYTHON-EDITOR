@@ -7,6 +7,8 @@
     "start": "serve .",
     "arena:dev": "npm --prefix arena run dev",
     "arena:build": "npm --prefix arena run build",
+    "build": "npm --prefix arena install && npm --prefix arena run build && node scripts/sync-arena-build.mjs",
+    "vercel-build": "npm run build",
     "seed:problems": "tsx scripts/seedProblems.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

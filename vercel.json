@@ -1,32 +1,33 @@
 {
 "$schema": "https://openapi.vercel.sh/vercel.json",
-
+"cleanUrls": true,
 "redirects": [
-{
-"source": "/arena",
-"destination": "/zone",
-"permanent": true
-},
-{
-"source": "/arena.html",
-"destination": "/zone",
-"permanent": true
-},
-{
-"source": "/zone/",
-"destination": "/zone",
-"permanent": true
-}
+  {
+    "source": "/arena",
+    "destination": "/zone",
+    "permanent": true
+  },
+  {
+    "source": "/arena/(.*)",
+    "destination": "/zone/$1",
+    "permanent": true
+  }
 ],
-
 "rewrites": [
-{
-"source": "/zone",
-"destination": "/index.html"
-},
-{
-"source": "/zone/(.*)",
-"destination": "/index.html"
-}
+  {
+    "source": "/zone",
+    "destination": "/zone/index.html"
+  },
+  {
+    "source": "/zone/(.*)",
+    "has": [
+      {
+        "type": "header",
+        "key": "accept",
+        "value": ".*text/html.*"
+      }
+    ],
+    "destination": "/zone/index.html"
+  }
 ]
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
 import { contestService, type ContestDetail } from "../../services/contestService";
 
@@ -34,12 +34,12 @@ export default function ContestPage() {
       title={contest?.title || "Contest"}
       subtitle="This is the contest shell (problems + timer + join state)."
       actions={
-        <a
+        <Link
           className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-arena-text hover:bg-white/10"
-          href={`/contest/${encodeURIComponent(id)}/leaderboard`}
+          to={`/contest/${encodeURIComponent(id)}/leaderboard`}
         >
           Open leaderboard
-        </a>
+        </Link>
       }
     >
       {status === "loading" ? (
@@ -64,14 +64,14 @@ export default function ContestPage() {
             <div className="mt-3 space-y-2">
               {contest.problems.length === 0 ? <div className="text-sm text-arena-muted">No problems yet.</div> : null}
               {contest.problems.map((p) => (
-                <a
+                <Link
                   key={p.problem_slug}
                   className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 hover:bg-white/10"
-                  href={`/problems/${encodeURIComponent(p.problem_slug)}?contest=${encodeURIComponent(id)}`}
+                  to={`/problems/${encodeURIComponent(p.problem_slug)}?contest=${encodeURIComponent(id)}`}
                 >
                   <div className="text-sm font-medium text-arena-text">{p.title || p.problem_slug}</div>
                   <div className="text-xs text-arena-muted">{p.difficulty || "--"}</div>
-                </a>
+                </Link>
               ))}
             </div>
           </div>
