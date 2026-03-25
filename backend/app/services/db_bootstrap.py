@@ -177,6 +177,55 @@ POSTGRES_BOOTSTRAP_SQL = [
     CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
     """,
     """
+    CREATE TABLE IF NOT EXISTS contests (
+      id VARCHAR(64) PRIMARY KEY,
+      title TEXT NOT NULL,
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      is_rated BOOLEAN NOT NULL DEFAULT FALSE
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS contest_problems (
+      contest_id VARCHAR(64) REFERENCES contests(id) ON DELETE CASCADE,
+      problem_id VARCHAR(36) REFERENCES problems(id) ON DELETE CASCADE,
+      points INTEGER NOT NULL DEFAULT 100,
+      order_num INTEGER NOT NULL,
+      PRIMARY KEY (contest_id, problem_id)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS contest_registrations (
+      contest_id VARCHAR(64) REFERENCES contests(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (contest_id, user_id)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS contest_submissions (
+      id VARCHAR(64) PRIMARY KEY,
+      contest_id VARCHAR(64) REFERENCES contests(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      problem_id VARCHAR(36) REFERENCES problems(id) ON DELETE CASCADE,
+      penalty_minutes INTEGER NOT NULL DEFAULT 0,
+      is_first_solve BOOLEAN NOT NULL DEFAULT FALSE,
+      is_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS contest_standings (
+      contest_id VARCHAR(64) REFERENCES contests(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      username TEXT NOT NULL,
+      total_solved INTEGER NOT NULL DEFAULT 0,
+      total_penalty INTEGER NOT NULL DEFAULT 0,
+      last_submit TIMESTAMPTZ,
+      PRIMARY KEY (contest_id, user_id)
+    );
+    """,
+    """
     ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS submission_id TEXT;
     """,
     """

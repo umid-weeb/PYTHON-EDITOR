@@ -1,12 +1,11 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
 class Contest(Base):
     __tablename__ = "contests"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=False)
     starts_at = Column(DateTime(timezone=True), nullable=False)
     ends_at = Column(DateTime(timezone=True), nullable=False)
@@ -14,21 +13,21 @@ class Contest(Base):
 
 class ContestProblem(Base):
     __tablename__ = "contest_problems"
-    contest_id = Column(UUID(as_uuid=True), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
+    contest_id = Column(String(64), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
     problem_id = Column(String, nullable=False, primary_key=True) # Problem slug or ID
     points = Column(Integer, default=100)
     order_num = Column(Integer, nullable=False)
 
 class ContestRegistration(Base):
     __tablename__ = "contest_registrations"
-    contest_id = Column(UUID(as_uuid=True), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
+    contest_id = Column(String(64), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     registered_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 class ContestSubmission(Base):
     __tablename__ = "contest_submissions"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    contest_id = Column(UUID(as_uuid=True), ForeignKey("contests.id", ondelete="CASCADE"))
+    id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    contest_id = Column(String(64), ForeignKey("contests.id", ondelete="CASCADE"))
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     problem_id = Column(String, nullable=False)
     submission_id = Column(String, nullable=True)
@@ -42,7 +41,7 @@ class ContestSubmission(Base):
 
 class ContestStanding(Base):
     __tablename__ = "contest_standings"
-    contest_id = Column(UUID(as_uuid=True), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
+    contest_id = Column(String(64), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     username = Column(String, nullable=False)
     total_solved = Column(Integer, default=0)

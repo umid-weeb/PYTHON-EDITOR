@@ -65,7 +65,7 @@ class SubmissionService:
                 if payload.contest_id:
                     # Ensure the user is registered as a contest entry.
                     exists = (
-                        db.query(ContestEntry.id)
+                        db.query(ContestEntry)
                         .filter(ContestEntry.contest_id == payload.contest_id, ContestEntry.user_id == user_id)
                         .first()
                     )
