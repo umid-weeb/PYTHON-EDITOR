@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import AuthPromptModal from "../components/common/AuthPromptModal.jsx";
 import CodeEditorPanel from "../components/editor/CodeEditorPanel.jsx";
 import ArenaLayout from "../components/layout/ArenaLayout.jsx";
-import ProblemList from "../components/problems/ProblemList.jsx";
-import ProblemViewer from "../components/problems/ProblemViewer.jsx";
+import ProblemWorkspacePanel from "../components/problems/ProblemWorkspacePanel.jsx";
 import ResultPanel from "../components/results/ResultPanel.jsx";
 import TestCasePanel from "../components/results/TestCasePanel.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useArena } from "../context/ArenaContext.jsx";
+import { arenaApi } from "../lib/apiClient.js";
 import { readLastProblem, readPendingSubmission } from "../lib/storage.js";
 
 export default function ArenaPage() {
+  const [dailyChallenge, setDailyChallenge] = useState(null);
   const {
     filteredProblems,
     problems,
@@ -39,7 +40,7 @@ export default function ArenaPage() {
     submitCode,
     dismissAuthModal,
   } = useArena();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [params, setParams] = useSearchParams();
   const resumedRef = useRef("");
 
@@ -126,6 +127,27 @@ export default function ArenaPage() {
       });
   }, [params, selectedProblemId, setParams, submitCode, token]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    arenaApi
+      .getDailyChallenge()
+      .then((payload) => {
+        if (!cancelled) {
+          setDailyChallenge(payload);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDailyChallenge(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const visibleCases = selectedProblem?.visible_testcases || [];
   const currentProblemId = useMemo(
     () => selectedProblem?.slug || selectedProblemId,
@@ -140,21 +162,31 @@ export default function ArenaPage() {
     await selectProblem(problemId);
   }
 
+  async function handleDailyOpen() {
+    const dailyProblemKey = dailyChallenge?.problem?.slug || dailyChallenge?.problem?.id;
+    if (!dailyProblemKey) return;
+    await handleProblemSelect(dailyProblemKey);
+  }
+
   return (
     <ArenaLayout
-      sidebar={
-        <ProblemList
-          problems={filteredProblems}
-          loading={problemsStatus === "loading"}
-          search={search}
+      viewer={
+        <ProblemWorkspacePanel
+          dailyChallenge={dailyChallenge}
           difficulty={difficulty}
+          loading={problemStatus === "loading" || problemsStatus === "loading"}
+          problem={selectedProblem}
+          problems={filteredProblems}
+          result={result}
+          search={search}
           selectedProblemId={selectedProblemId}
-          onSearchChange={setSearch}
+          user={user}
           onDifficultyChange={setDifficulty}
-          onSelect={handleProblemSelect}
+          onOpenDaily={handleDailyOpen}
+          onSearchChange={setSearch}
+          onSelectProblem={handleProblemSelect}
         />
       }
-      viewer={<ProblemViewer problem={selectedProblem} loading={problemStatus === "loading"} />}
       editor={
         <CodeEditorPanel
           code={code}

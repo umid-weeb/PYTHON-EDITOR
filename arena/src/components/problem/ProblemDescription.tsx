@@ -18,6 +18,7 @@ type Problem = {
 type Props = {
   problem: Problem | null;
   loading: boolean;
+  embedded?: boolean;
 };
 
 function difficultyStyles(difficulty?: string) {
@@ -28,7 +29,7 @@ function difficultyStyles(difficulty?: string) {
   return "bg-[var(--bg-subtle)] text-[var(--text-secondary)]";
 }
 
-export default function ProblemDescription({ problem, loading }: Props) {
+export default function ProblemDescription({ problem, loading, embedded = false }: Props) {
   if (loading) {
     return (
       <div className="space-y-3 p-4">
@@ -50,7 +51,12 @@ export default function ProblemDescription({ problem, loading }: Props) {
   const examples = (problem.visible_testcases || []).slice(0, 3);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col border border-[color:var(--border)] bg-[var(--bg-surface)]">
+    <div
+      className={[
+        "flex h-full min-h-0 min-w-0 flex-col bg-[var(--bg-surface)]",
+        embedded ? "" : "border border-[color:var(--border)]",
+      ].join(" ")}
+    >
       <div className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/95 px-4 py-3 backdrop-blur">
         <div className="mb-2 flex items-center gap-3">
           <span
