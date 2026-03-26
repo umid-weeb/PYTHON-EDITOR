@@ -74,20 +74,6 @@ function TrophyIcon({ className = "" }: IconProps) {
   );
 }
 
-function ListIcon({ className = "" }: IconProps) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      <path
-        d="M8.25 6.75h12m-12 5.25h12m-12 5.25h12M3.75 6.75h.75v.75h-.75v-.75Zm0 5.25h.75v.75h-.75V12Zm0 5.25h.75v.75h-.75V17.25Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
 function SettingsIcon({ className = "" }: IconProps) {
   return (
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
@@ -161,9 +147,9 @@ function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps)
     <MenuItem>
       <button
         className={cx(
-          "group flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition",
-          "text-gray-200 outline-none hover:bg-gray-800 hover:text-white data-[focus]:bg-gray-800 data-[focus]:text-white",
-          tone === "danger" && "text-[#ff6b81] hover:text-white"
+          "group flex h-9 w-full items-center gap-3 rounded-[var(--radius-md)] px-3 text-left text-[13px] font-medium transition",
+          "text-[var(--text-primary)] outline-none hover:bg-[var(--bg-overlay)] data-[focus]:bg-[var(--bg-overlay)]",
+          tone === "danger" && "text-[var(--error)] hover:text-[var(--text-primary)]"
         )}
         type="button"
         onClick={() => {
@@ -172,8 +158,8 @@ function ActionItem({ label, icon, onClick, tone = "default" }: ActionItemProps)
       >
         <span
           className={cx(
-            "flex h-8 w-8 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-400 transition",
-            "group-hover:text-gray-200 group-data-[focus]:text-gray-200"
+            "flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] transition",
+            "group-hover:text-[var(--text-primary)] group-data-[focus]:text-[var(--text-primary)]"
           )}
         >
           {icon}
@@ -202,7 +188,7 @@ export default function UserMenu({
     <Menu as="div" className="relative">
       <MenuButton
         aria-label="User menu"
-        className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gray-800 text-gray-200 transition hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-[var(--radius-pill)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
         type="button"
       >
         {isAuthenticated && avatarSrc ? (
@@ -212,8 +198,8 @@ export default function UserMenu({
             src={avatarSrc}
           />
         ) : (
-          <span className="text-sm font-semibold tracking-[0.08em]">
-            {isAuthenticated ? initials : "☰"}
+          <span className="text-[11px] font-semibold tracking-[0.08em]">
+            {isAuthenticated ? initials : (storedUsername ? buildInitials(storedUsername) : "PZ")}
           </span>
         )}
       </MenuButton>
@@ -227,43 +213,18 @@ export default function UserMenu({
         leaveFrom="translate-y-0 scale-100 opacity-100"
         leaveTo="translate-y-1 scale-95 opacity-0"
       >
-        <MenuItems className="absolute right-0 z-[10000] mt-3 w-60 origin-top-right rounded-xl border border-gray-700 bg-gray-900 text-gray-200 shadow-xl focus:outline-none">
+        <MenuItems className="absolute right-0 z-[10000] mt-2 w-60 origin-top-right rounded-[var(--radius-lg)] border border-[color:var(--border-strong)] bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-[var(--shadow-md)] focus:outline-none">
           {isAuthenticated ? (
             <div className="space-y-1 p-2">
-              <ActionItem
-                icon={<ProfileIcon className="h-4 w-4" />}
-                label="Profile"
-                onClick={onProfile}
-              />
-              <ActionItem
-                icon={<ChartIcon className="h-4 w-4" />}
-                label="Rating"
-                onClick={onRating}
-              />
-              <ActionItem
-                icon={<SettingsIcon className="h-4 w-4" />}
-                label="Settings"
-                onClick={onSettings}
-              />
-              <ActionItem
-                icon={<LogoutIcon className="h-4 w-4" />}
-                label="Log out"
-                onClick={onLogout}
-                tone="danger"
-              />
+              <ActionItem icon={<ProfileIcon className="h-4 w-4" />} label="Profile" onClick={onProfile} />
+              <ActionItem icon={<ChartIcon className="h-4 w-4" />} label="Rating" onClick={onRating} />
+              <ActionItem icon={<SettingsIcon className="h-4 w-4" />} label="Settings" onClick={onSettings} />
+              <ActionItem icon={<LogoutIcon className="h-4 w-4" />} label="Log out" onClick={onLogout} tone="danger" />
             </div>
           ) : (
             <div className="space-y-1 p-2">
-              <ActionItem
-                icon={<ProfileIcon className="h-4 w-4" />}
-                label="Login"
-                onClick={onLogin}
-              />
-              <ActionItem
-                icon={<TrophyIcon className="h-4 w-4" />}
-                label="Create account"
-                onClick={onRegister}
-              />
+              <ActionItem icon={<ProfileIcon className="h-4 w-4" />} label="Login" onClick={onLogin} />
+              <ActionItem icon={<TrophyIcon className="h-4 w-4" />} label="Create account" onClick={onRegister} />
             </div>
           )}
         </MenuItems>

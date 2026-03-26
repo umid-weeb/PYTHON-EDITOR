@@ -1,65 +1,60 @@
-const toneClass = {
-  success: "text-arena-success",
-  danger: "text-arena-danger",
-  warning: "text-arena-warning",
-  info: "text-arena-primaryStrong",
-};
-
 function Spinner() {
   return (
-    <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+    <span className="inline-flex h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
   );
 }
 
+function statusTone(tone) {
+  if (tone === "success") return "text-[var(--success)]";
+  if (tone === "danger") return "text-[var(--error)]";
+  if (tone === "warning") return "text-[var(--warning)]";
+  return "text-[var(--text-primary)]";
+}
+
 export default function ResultPanel({ result, busy = false }) {
-  const hasDetails = Boolean(result.details?.length);
+  const details = Array.isArray(result?.details) ? result.details : [];
+  const hasDetails = details.length > 0;
+
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
-      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-arena-border px-[22px] py-[18px]">
-        <div>
-          <h3 className="m-0 text-xl font-semibold">Result</h3>
-          <p className="mt-2 text-sm leading-6 text-arena-muted">{result.summary}</p>
-        </div>
-        <span
-          className={[
-            "inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-arena-border bg-white/5 px-3 py-2.5 text-sm",
-            toneClass[result.tone] || "",
-          ].join(" ")}
-        >
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-[var(--bg-surface)]">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-[10px]">
+        <div className="flex items-center gap-3">
+          <span className={["text-[14px] font-semibold", statusTone(result?.tone)].join(" ")}>
+            {result?.chip || "Result"}
+          </span>
+          <span className="text-[12px] text-[var(--text-muted)]">{result?.summary || "Run or submit to see the verdict."}</span>
           {busy ? <Spinner /> : null}
-          {result.chip}
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 space-y-3 overflow-auto px-[22px] pb-[22px] pt-[18px]">
+        </div>
+
         {busy && !hasDetails ? (
-          <div className="flex items-center gap-3 rounded-[18px] border border-arena-border bg-white/5 px-4 py-[14px] text-sm text-arena-muted">
-            <Spinner />
-            <span>Waiting for the judge to finish execution...</span>
+          <div className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+            Waiting for the judge to finish execution...
           </div>
         ) : null}
+
         {hasDetails ? (
-          result.details.map((entry) => (
-            <div
-              key={entry.id}
-              className="flex items-start justify-between gap-3 rounded-[18px] border border-arena-border bg-white/5 px-4 py-[14px]"
-            >
-              <div>
-                <div className="mb-1.5 font-semibold">{entry.label}</div>
-                <div className="text-sm text-arena-muted">{entry.verdict}</div>
-              </div>
-              {(entry.runtime || entry.memory) && (
-                <div className="grid gap-1 text-right text-sm text-arena-primaryStrong">
-                  {entry.runtime ? <span>{entry.runtime}</span> : null}
-                  {entry.memory ? <span>{entry.memory}</span> : null}
+          <div className="flex flex-col gap-1">
+            {details.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 py-[6px]"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-medium text-[var(--text-primary)]">{entry.label}</div>
+                  <div className="truncate text-[11px] text-[var(--text-secondary)]">{entry.verdict}</div>
                 </div>
-              )}
-            </div>
-          ))
-        ) : (
-          <div className="text-sm text-arena-muted">
-            Run or submit a solution to see the verdict and test details.
+                <div className="shrink-0 text-right text-[11px] text-[var(--text-muted)]">
+                  {entry.runtime ? <div>{entry.runtime}</div> : null}
+                  {entry.memory ? <div>{entry.memory}</div> : null}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+        ) : !busy ? (
+          <div className="text-[12px] text-[var(--text-secondary)]">
+            Run or submit a solution to inspect each test result.
+          </div>
+        ) : null}
       </div>
     </div>
   );

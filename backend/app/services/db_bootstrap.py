@@ -123,6 +123,17 @@ POSTGRES_BOOTSTRAP_SQL = [
     );
     """,
     """
+    CREATE TABLE IF NOT EXISTS user_progress (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      problem_id VARCHAR(36) NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+      solved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      attempts INTEGER NOT NULL DEFAULT 1,
+      best_runtime INTEGER,
+      best_memory INTEGER,
+      PRIMARY KEY (user_id, problem_id)
+    );
+    """,
+    """
     CREATE TABLE IF NOT EXISTS submissions (
       id SERIAL PRIMARY KEY,
       external_submission_id TEXT UNIQUE NOT NULL,
@@ -175,6 +186,12 @@ POSTGRES_BOOTSTRAP_SQL = [
     """,
     """
     CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_user_progress_user_id ON user_progress(user_id);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_user_progress_problem_id ON user_progress(problem_id);
     """,
     """
     CREATE TABLE IF NOT EXISTS contests (

@@ -157,15 +157,8 @@ class SubmissionService:
                         memory_kb=result.get("memory_kb"),
                         error_text=result.get("error_text"),
                     )
-                    record = (
-                        db.query(UserSubmission)
-                        .filter(UserSubmission.submission_id == submission_id)
-                        .first()
-                    )
+                    record = user_stats_service.sync_submission_history(db, tracked_submission) if tracked_submission else None
                     if record:
-                        record.verdict = result.get("verdict")
-                        record.runtime_ms = result.get("runtime_ms")
-                        record.memory_kb = result.get("memory_kb")
                         contest_row = (
                             db.query(ContestSubmission)
                             .filter(ContestSubmission.submission_id == submission_id)
@@ -183,6 +176,14 @@ class SubmissionService:
                             verdict=record.verdict,
                         )
                         if (record.verdict or "").strip().lower() == "accepted":
+                            user_stats_service.record_accepted_progress(
+                                db,
+                                user_id=record.user_id,
+                                problem_id=record.problem_id,
+                                runtime_ms=record.runtime_ms,
+                                memory_kb=record.memory_kb,
+                                solved_at=tracked_submission.created_at if tracked_submission else None,
+                            )
                             engagement_service.update_streak_for_accept(db, record.user_id)
                         else:
                             user = db.query(User).filter(User.id == record.user_id).first() if record.user_id else None
@@ -191,6 +192,15 @@ class SubmissionService:
                         user_stats_service.rebuild(db, record.user_id)
                     elif tracked_submission and tracked_submission.user_id is not None:
                         if (tracked_submission.verdict or "").strip().lower() == "accepted":
+                            if tracked_submission.problem_id:
+                                user_stats_service.record_accepted_progress(
+                                    db,
+                                    user_id=int(tracked_submission.user_id),
+                                    problem_id=str(tracked_submission.problem_id),
+                                    runtime_ms=int(round(tracked_submission.runtime)) if tracked_submission.runtime is not None else None,
+                                    memory_kb=tracked_submission.memory_kb,
+                                    solved_at=tracked_submission.created_at,
+                                )
                             engagement_service.update_streak_for_accept(db, int(tracked_submission.user_id))
                         user_stats_service.rebuild(db, int(tracked_submission.user_id))
                     db.commit()
@@ -199,7 +209,7 @@ class SubmissionService:
             self.logger.exception("submission.failed id=%s error=%s", submission_id, error)
             if submission.get("mode") == "submit":
                 with SessionLocal() as db:
-                    user_stats_service.finalize_submission(
+                    tracked_submission = user_stats_service.finalize_submission(
                         db,
                         external_submission_id=submission_id,
                         verdict="Runtime Error",
@@ -207,15 +217,8 @@ class SubmissionService:
                         memory_kb=None,
                         error_text=str(error),
                     )
-                    record = (
-                        db.query(UserSubmission)
-                        .filter(UserSubmission.submission_id == submission_id)
-                        .first()
-                    )
+                    record = user_stats_service.sync_submission_history(db, tracked_submission) if tracked_submission else None
                     if record:
-                        record.verdict = "Runtime Error"
-                        record.runtime_ms = None
-                        record.memory_kb = None
                         contest_row = (
                             db.query(ContestSubmission)
                             .filter(ContestSubmission.submission_id == submission_id)

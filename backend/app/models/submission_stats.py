@@ -22,6 +22,21 @@ class UserSubmission(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = relationship("User", backref="submissions")
+    problem = relationship("Problem", backref="user_submissions")
+
+
+class UserProgress(Base):
+    __tablename__ = "user_progress"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    problem_id = Column(String(36), ForeignKey("problems.id", ondelete="CASCADE"), primary_key=True)
+    solved_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    attempts = Column(Integer, nullable=False, default=1, server_default="1")
+    best_runtime = Column(Integer, nullable=True)
+    best_memory = Column(Integer, nullable=True)
+
+    user = relationship("User", backref="progress_rows")
+    problem = relationship("Problem", backref="progress_rows")
 
 
 class SubmissionRecord(Base):

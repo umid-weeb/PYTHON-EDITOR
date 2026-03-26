@@ -54,23 +54,23 @@ export default function UserQuickSearch() {
   return (
     <div className="relative w-full max-w-[300px]">
       <input
-        className="w-full rounded-xl border border-gray-800 bg-gray-900 px-4 py-2.5 text-sm text-gray-200 outline-none transition focus:border-gray-700 focus:ring-2 focus:ring-gray-700"
+        className="h-[var(--h-input)] w-full rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[var(--bg-input)] px-3 text-[12px] text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
         placeholder="Search users..."
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
       {query ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[10001] w-[320px] max-h-[260px] overflow-y-auto rounded-xl border border-gray-800 bg-gray-900 p-2 text-gray-200 shadow-xl">
-          {status === "loading" ? <div className="px-3 py-2 text-sm text-gray-400">Searching...</div> : null}
-          {status === "error" ? <div className="px-3 py-2 text-sm text-gray-400">Search unavailable</div> : null}
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[10001] w-[320px] max-h-[260px] overflow-y-auto rounded-[var(--radius-lg)] border border-[color:var(--border-strong)] bg-[var(--bg-elevated)] p-2 text-[var(--text-primary)] shadow-[var(--shadow-md)]">
+          {status === "loading" ? <div className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">Searching...</div> : null}
+          {status === "error" ? <div className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">Search unavailable</div> : null}
           {status === "ready" && results.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-400">No users found</div>
+            <div className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">No users found</div>
           ) : null}
           {results.map((user) => (
             <button
               key={user.id}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-200 transition hover:bg-gray-800 hover:text-white"
+              className="flex w-full items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-left text-[12px] text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)]"
               type="button"
               onClick={() => {
                 setQuery("");
@@ -78,7 +78,7 @@ export default function UserQuickSearch() {
                 navigate(`/profile/${encodeURIComponent(user.username)}`);
               }}
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-gray-800 bg-gray-950 text-xs font-semibold text-gray-200">
+              <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-pill)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[11px] font-semibold text-[var(--text-primary)]">
                 {user.avatar_url ? (
                   <img
                     alt={`${user.username} avatar`}
@@ -91,7 +91,7 @@ export default function UserQuickSearch() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{user.display_name || user.username}</span>
-                <span className="mt-0.5 block truncate text-xs text-gray-400">
+                <span className="mt-0.5 block truncate text-[11px] text-[var(--text-secondary)]">
                   @{user.username} · {user.solved_count || 0} solved · {user.rating || 1200} rating
                 </span>
               </span>

@@ -359,6 +359,27 @@ def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(
     return user
 
 
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if credentials is None:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        username: str | None = payload.get("username") or payload.get("sub")
+    except JWTError:
+        return None
+    if not (user_id or username):
+        return None
+
+    query = db.query(User)
+    if user_id is not None:
+        return query.filter(User.id == int(user_id)).first()
+    return query.filter(User.username == username).first()
+
+
 @router.get("/users/{username}", response_model=PublicProfileResponse)
 def get_public_user_profile(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()

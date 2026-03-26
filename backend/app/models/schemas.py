@@ -15,6 +15,7 @@ class ProblemSummary(BaseModel):
     preview: str | None = None
     acceptance_rate: int | None = None
     is_solved: bool = False
+    is_attempted: bool = False
     time_limit_seconds: float | None = None
     memory_limit_mb: int | None = None
 

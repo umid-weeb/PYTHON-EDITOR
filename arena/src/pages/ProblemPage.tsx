@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Group as ResizablePanelGroup, Panel, useDefaultLayout } from "react-resizable-panels";
 import AuthPromptModal from "../components/common/AuthPromptModal.jsx";
 import CodeEditorPanel from "../components/editor/CodeEditorPanel.jsx";
+import ResizeHandle from "../components/layout/ResizeHandle.jsx";
 import ProblemDescription from "../components/problem/ProblemDescription.tsx";
 import TestTabs from "../components/tests/TestTabs.tsx";
 import { useArena } from "../context/ArenaContext.jsx";
@@ -15,13 +17,9 @@ export default function ProblemPage() {
   const resumedRef = useRef("");
 
   const {
-    filteredProblems,
-    problemsStatus,
     problemStatus,
     selectedProblemId,
     selectedProblem,
-    search,
-    difficulty,
     language,
     code,
     result,
@@ -29,8 +27,6 @@ export default function ProblemPage() {
     isSubmitting,
     showAuthModal,
     activeCaseIndex,
-    setSearch,
-    setDifficulty,
     setLanguage,
     setCode,
     setActiveCaseIndex,
@@ -42,9 +38,12 @@ export default function ProblemPage() {
   } = useArena();
 
   const problemKey = useMemo(() => slug || selectedProblem?.slug || selectedProblemId, [selectedProblem?.slug, selectedProblemId, slug]);
+  const horizontalLayout = useDefaultLayout({ id: "pyzone-problem-horizontal" });
+  const verticalLayout = useDefaultLayout({ id: "pyzone-problem-vertical" });
 
   useEffect(() => {
     let mounted = true;
+
     async function bootstrap() {
       const items = await loadProblems();
       if (!mounted || !items.length) return;
@@ -53,9 +52,9 @@ export default function ProblemPage() {
         await selectProblem(slug);
         return;
       }
-      // If unknown slug, fall back to Arena list.
-      navigate("/", { replace: true });
+      navigate("/problems", { replace: true });
     }
+
     bootstrap().catch(() => {});
     return () => {
       mounted = false;
@@ -83,37 +82,57 @@ export default function ProblemPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-40px)] min-h-[600px] bg-gray-950 text-gray-200">
-        <div className="w-1/2 min-w-0 border-r border-gray-800">
-          <ProblemDescription problem={selectedProblem} loading={problemStatus === "loading"} />
-        </div>
-        <div className="flex w-1/2 min-w-0 flex-col">
-          <div className="flex-1 border-b border-gray-800">
-            <CodeEditorPanel
-              code={code}
-              language={language}
-              hiddenTestCount={selectedProblem?.hidden_testcase_count || 0}
-              isRunning={isRunning}
-              isSubmitting={isSubmitting}
-              onChange={setCode}
-              onLanguageChange={setLanguage}
-              onRun={() => runCode().catch(() => {})}
-              onSubmit={() => submitCode(token).catch(() => {})}
-            />
-          </div>
-          <div className="h-[260px] min-h-[220px]">
-            <TestTabs
-              cases={visibleCases}
-              activeIndex={activeCaseIndex}
-              onSelect={setActiveCaseIndex}
-              result={result}
-              busy={isRunning || isSubmitting}
-            />
-          </div>
-        </div>
+      <div className="flex h-[calc(100vh-var(--h-navbar))] flex-col overflow-hidden">
+        <ResizablePanelGroup
+          className="flex-1 overflow-hidden"
+          defaultLayout={horizontalLayout.defaultLayout}
+          onLayoutChanged={horizontalLayout.onLayoutChanged}
+          orientation="horizontal"
+        >
+          <Panel defaultSize={38} maxSize={55} minSize={24}>
+            <div className="h-full min-h-0 overflow-hidden pr-0">
+              <ProblemDescription loading={problemStatus === "loading"} problem={selectedProblem} />
+            </div>
+          </Panel>
+
+          <ResizeHandle orientation="vertical" />
+
+          <Panel defaultSize={62} minSize={35}>
+            <ResizablePanelGroup
+              className="h-full"
+              defaultLayout={verticalLayout.defaultLayout}
+              onLayoutChanged={verticalLayout.onLayoutChanged}
+              orientation="vertical"
+            >
+              <Panel defaultSize={66} minSize={38}>
+                <CodeEditorPanel
+                  code={code}
+                  isRunning={isRunning}
+                  isSubmitting={isSubmitting}
+                  language={language}
+                  onChange={setCode}
+                  onLanguageChange={setLanguage}
+                  onRun={() => runCode().catch(() => {})}
+                  onSubmit={() => submitCode(token).catch(() => {})}
+                />
+              </Panel>
+
+              <ResizeHandle orientation="horizontal" />
+
+              <Panel defaultSize={34} maxSize={58} minSize={18}>
+                <TestTabs
+                  activeIndex={activeCaseIndex}
+                  busy={isRunning || isSubmitting}
+                  cases={visibleCases}
+                  result={result}
+                  onSelect={setActiveCaseIndex}
+                />
+              </Panel>
+            </ResizablePanelGroup>
+          </Panel>
+        </ResizablePanelGroup>
       </div>
       <AuthPromptModal open={showAuthModal} problemId={problemKey} onClose={dismissAuthModal} />
     </>
   );
 }
-

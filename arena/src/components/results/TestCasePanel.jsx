@@ -1,14 +1,8 @@
 export default function TestCasePanel({ cases = [], activeIndex, onSelect }) {
   if (!cases.length) {
     return (
-      <div className="flex h-full min-h-0 min-w-0 flex-col">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-arena-border px-[22px] py-[18px]">
-          <h3 className="m-0 text-xl font-semibold">Visible Test Cases</h3>
-          <span className="text-sm text-arena-muted">0 cases</span>
-        </div>
-        <div className="flex flex-1 items-center justify-center px-6 text-center text-arena-muted">
-          Select a problem to inspect the sample cases.
-        </div>
+      <div className="flex h-full min-h-0 min-w-0 items-center justify-center px-4 text-center text-[12px] text-[var(--text-secondary)]">
+        Select a problem to inspect the visible test cases.
       </div>
     );
   }
@@ -17,19 +11,15 @@ export default function TestCasePanel({ cases = [], activeIndex, onSelect }) {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-arena-border px-[22px] py-[18px]">
-        <h3 className="m-0 text-xl font-semibold">Visible Test Cases</h3>
-        <span className="text-sm text-arena-muted">{cases.length} cases</span>
-      </div>
-      <div className="flex shrink-0 gap-2 overflow-x-auto px-5 pt-4">
+      <div className="flex shrink-0 gap-1 overflow-x-auto p-[10px] pb-0">
         {cases.map((testCase, index) => (
           <button
             key={`${testCase.input}-${index}`}
             className={[
-              "whitespace-nowrap rounded-full border px-3 py-2 text-sm transition",
+              "h-[var(--h-badge)] shrink-0 rounded-[var(--radius-xs)] border px-2 text-[11px] font-medium transition",
               activeIndex === index
-                ? "border-arena-borderStrong bg-[rgba(108,146,255,0.12)] text-arena-text"
-                : "border-arena-border bg-white/5 text-arena-muted hover:border-arena-borderStrong hover:text-arena-text",
+                ? "border-[color:var(--accent-border)] bg-[var(--accent-subtle)] text-[var(--text-primary)]"
+                : "border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]",
             ].join(" ")}
             type="button"
             onClick={() => onSelect(index)}
@@ -38,16 +28,17 @@ export default function TestCasePanel({ cases = [], activeIndex, onSelect }) {
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 space-y-[14px] overflow-auto px-[22px] pb-[22px] pt-[18px]">
-        <section className="rounded-[18px] border border-arena-border bg-white/5 p-4">
-          <div className="mb-2.5 text-xs uppercase tracking-[0.08em] text-arena-muted">Input</div>
-          <pre className="m-0 whitespace-pre-wrap break-words font-mono text-sm">
+
+      <div className="min-h-0 flex-1 space-y-2 overflow-auto p-[10px]">
+        <section className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Input</div>
+          <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
             {activeCase.input || "No input"}
           </pre>
         </section>
-        <section className="rounded-[18px] border border-arena-border bg-white/5 p-4">
-          <div className="mb-2.5 text-xs uppercase tracking-[0.08em] text-arena-muted">Expected output</div>
-          <pre className="m-0 whitespace-pre-wrap break-words font-mono text-sm">
+        <section className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Expected Output</div>
+          <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
             {activeCase.expected_output || "No expected output"}
           </pre>
         </section>

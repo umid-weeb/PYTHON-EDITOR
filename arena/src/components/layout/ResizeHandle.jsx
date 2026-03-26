@@ -6,16 +6,14 @@ export default function ResizeHandle({ orientation = "vertical" }) {
   return (
     <Separator
       className={[
-        "group relative flex shrink-0 items-center justify-center rounded-full transition-colors duration-150",
-        isVertical
-          ? "w-4 cursor-col-resize focus:outline-none"
-          : "h-4 cursor-row-resize focus:outline-none",
+        "group relative flex shrink-0 items-center justify-center transition-colors",
+        isVertical ? "w-1 cursor-col-resize" : "h-1 cursor-row-resize",
       ].join(" ")}
     >
       <div
         className={[
-          "rounded-full bg-arena-border transition-colors duration-150 group-hover:bg-arena-borderStrong group-focus:bg-arena-borderStrong",
-          isVertical ? "h-full w-px" : "h-px w-full",
+          "bg-[var(--border)] transition-colors duration-150 group-hover:bg-[var(--accent)] group-focus:bg-[var(--accent)]",
+          isVertical ? "h-full w-full" : "h-full w-full",
         ].join(" ")}
       />
     </Separator>

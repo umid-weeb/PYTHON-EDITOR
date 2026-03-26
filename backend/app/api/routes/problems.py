@@ -6,6 +6,8 @@ from time import perf_counter
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.schemas import ProblemDetail, ProblemListResponse
+from app.models.user import User
+from app.api.routes.auth import get_optional_user
 from app.services.problem_service import (
     ProblemNotFoundError,
     ProblemService,
@@ -25,6 +27,7 @@ async def list_problems(
     tags: str = "",
     difficulty: str = "",
     refresh: bool = False,
+    current_user: User | None = Depends(get_optional_user),
     service: ProblemService = Depends(get_problem_service),
 ) -> ProblemListResponse:
     started_at = perf_counter()
@@ -42,6 +45,7 @@ async def list_problems(
         query=q,
         tags=tag_items,
         difficulty=difficulty,
+        user_id=current_user.id if current_user else None,
         force_refresh=refresh,
     )
 
@@ -80,6 +84,7 @@ async def search_problems(
     per_page: int = 200,
     tags: str = "",
     difficulty: str = "",
+    current_user: User | None = Depends(get_optional_user),
     service: ProblemService = Depends(get_problem_service),
 ) -> ProblemListResponse:
     """Enhanced search endpoint for problems with better query handling"""
@@ -93,6 +98,7 @@ async def search_problems(
         query=q.strip(),
         tags=tag_items,
         difficulty=difficulty,
+        user_id=current_user.id if current_user else None,
         force_refresh=False,
     )
     

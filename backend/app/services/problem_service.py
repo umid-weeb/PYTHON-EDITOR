@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.database import SessionLocal
 from app.models.problem import Problem
 from app.models.schemas import ProblemDetail, ProblemSummary
+from app.models.submission_stats import SubmissionRecord, UserProgress
 from app.services.problem_cache import ProblemCache
 
 
@@ -67,6 +68,7 @@ class ProblemService:
         query: str = "",
         tags: list[str] | None = None,
         difficulty: str | None = None,
+        user_id: int | None = None,
         force_refresh: bool = False,
     ) -> dict[str, Any]:
         all_items = await self.list_problems(force_refresh=force_refresh)
@@ -97,7 +99,19 @@ class ProblemService:
             if matches_query and matches_tags and matches_difficulty:
                 filtered.append(item)
 
-        total = len(filtered)
+        acceptance_rates, solved_ids, attempted_ids = self._load_problem_metrics(user_id=user_id)
+        enriched = [
+            item.model_copy(
+                update={
+                    "acceptance_rate": acceptance_rates.get(item.id),
+                    "is_solved": item.id in solved_ids,
+                    "is_attempted": item.id in attempted_ids,
+                }
+            )
+            for item in filtered
+        ]
+
+        total = len(enriched)
         safe_per_page = max(1, min(per_page, 500))
         total_pages = max(1, (total + safe_per_page - 1) // safe_per_page)
         safe_page = min(max(1, page), total_pages)
@@ -107,7 +121,7 @@ class ProblemService:
         available_tags = sorted({tag for item in all_items for tag in item.tags if tag})
 
         return {
-            "items": filtered[start:end],
+            "items": enriched[start:end],
             "total": total,
             "page": safe_page,
             "per_page": safe_per_page,
@@ -116,6 +130,50 @@ class ProblemService:
             "selected_tags": normalized_tags,
             "available_tags": available_tags,
         }
+
+    def _load_problem_metrics(self, user_id: int | None = None) -> tuple[dict[str, int | None], set[str], set[str]]:
+        acceptance_rates: dict[str, int | None] = {}
+        solved_ids: set[str] = set()
+        attempted_ids: set[str] = set()
+
+        with SessionLocal() as db:
+            submission_rows = (
+                db.query(SubmissionRecord.problem_id, SubmissionRecord.status, SubmissionRecord.verdict)
+                .filter(SubmissionRecord.problem_id.isnot(None))
+                .all()
+            )
+            aggregates: dict[str, tuple[int, int]] = {}
+            for problem_id, status, verdict in submission_rows:
+                key = str(problem_id)
+                total, accepted = aggregates.get(key, (0, 0))
+                total += 1
+                normalized_status = str(status or "").strip().lower()
+                normalized_verdict = str(verdict or "").strip().lower()
+                if normalized_status == "accepted" or normalized_verdict == "accepted":
+                    accepted += 1
+                aggregates[key] = (total, accepted)
+
+            acceptance_rates = {
+                problem_id: int(round((accepted / total) * 100)) if total else None
+                for problem_id, (total, accepted) in aggregates.items()
+            }
+
+            if user_id is not None:
+                solved_ids = {
+                    str(problem_id)
+                    for (problem_id,) in db.query(UserProgress.problem_id).filter(UserProgress.user_id == user_id).all()
+                }
+                attempted_ids = {
+                    str(problem_id)
+                    for (problem_id,) in (
+                        db.query(SubmissionRecord.problem_id)
+                        .filter(SubmissionRecord.user_id == user_id, SubmissionRecord.problem_id.isnot(None))
+                        .distinct()
+                        .all()
+                    )
+                }
+
+        return acceptance_rates, solved_ids, attempted_ids
 
     async def get_problem(self, problem_key: str, force_refresh: bool = False) -> ProblemDetail:
         bundle = await self.get_problem_bundle(problem_key, force_refresh=force_refresh)

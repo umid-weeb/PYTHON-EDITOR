@@ -8,6 +8,17 @@
       name="description"
       content="Pyzone Arena is a modern competitive coding workspace for solving, testing, and submitting programming problems."
     />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("pyzone-theme");
+          var system = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", saved || system);
+        } catch (error) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </head>
   <body>

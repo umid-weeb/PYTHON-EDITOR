@@ -13,7 +13,7 @@ from app.models.user import User
 from app.models.problem import Problem, TestCase
 from app.models.engagement import StreakHistory, DailyChallenge
 from app.models.rating import UserRating, RatingHistory
-from app.models.submission_stats import UserSubmission, SubmissionRecord, UserStats
+from app.models.submission_stats import UserSubmission, UserProgress, SubmissionRecord, UserStats
 from app.models.contest import Contest, ContestProblem, ContestEntry, ContestRegistration, ContestSubmission, ContestStanding
 
 __all__ = [
@@ -30,6 +30,7 @@ __all__ = [
     "StreakHistory",
     "DailyChallenge",
     "UserSubmission",
+    "UserProgress",
     "SubmissionRecord",
     "UserStats",
     "UserRating",

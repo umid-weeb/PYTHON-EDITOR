@@ -9,9 +9,9 @@ type VisibleTestcase = {
 };
 
 type Result = {
-  tone: string;
-  chip: string;
-  summary: string;
+  tone?: string;
+  chip?: string;
+  summary?: string;
   details?: any[];
 };
 
@@ -23,42 +23,42 @@ type Props = {
   busy: boolean;
 };
 
+type Tab = "cases" | "result" | "console";
+
 export default function TestTabs({ cases, activeIndex, onSelect, result, busy }: Props) {
-  // Simple tab state: keep everything in one component for now.
-  const tabs: Array<"cases" | "result" | "console"> = ["cases", "result", "console"];
-  const [active, setActive] = useState<"cases" | "result" | "console">("cases");
+  const [active, setActive] = useState<Tab>("cases");
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-gray-900 text-gray-200">
-      <div className="flex shrink-0 border-b border-gray-800 px-4">
-        {tabs.map((tab) => (
+    <div className="flex h-full min-h-0 flex-col border-t border-[color:var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
+      <div className="flex h-[var(--h-tab-bar)] shrink-0 items-center border-b border-[color:var(--border)] px-1">
+        {[
+          { key: "cases", label: "Test Cases" },
+          { key: "result", label: "Result" },
+          { key: "console", label: "Console" },
+        ].map((tab) => (
           <button
-            key={tab}
-            type="button"
-            onClick={() => setActive(tab)}
+            key={tab.key}
             className={[
-              "relative -mb-px mr-4 border-b-2 px-1 py-2 text-xs font-semibold uppercase tracking-[0.12em]",
-              active === tab
-                ? "border-indigo-400 text-gray-100"
-                : "border-transparent text-gray-400 hover:text-gray-200",
+              "inline-flex h-full items-center border-b-2 px-3 text-[12px] transition",
+              active === tab.key
+                ? "border-[color:var(--accent)] text-[var(--text-primary)]"
+                : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]",
             ].join(" ")}
+            type="button"
+            onClick={() => setActive(tab.key as Tab)}
           >
-            {tab === "cases" ? "Test Cases" : tab === "result" ? "Result" : "Console"}
+            {tab.label}
           </button>
         ))}
       </div>
+
       <div className="min-h-0 flex-1 overflow-hidden">
-        {active === "cases" ? (
-          <TestCasePanel cases={cases} activeIndex={activeIndex} onSelect={onSelect} />
-        ) : null}
-        {active === "result" ? <ResultPanel result={result} busy={busy} /> : null}
+        {active === "cases" ? <TestCasePanel activeIndex={activeIndex} cases={cases} onSelect={onSelect} /> : null}
+        {active === "result" ? <ResultPanel busy={busy} result={result} /> : null}
         {active === "console" ? (
-          <div className="flex h-full flex-col px-4 py-3 text-sm text-gray-300">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
-              Console
-            </div>
-            <div className="rounded-lg border border-gray-800 bg-gray-950 p-3 text-xs text-gray-300">
-              {result.summary || "No output yet."}
+          <div className="flex h-full flex-col overflow-auto p-[10px]">
+            <div className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] text-[var(--text-secondary)]">
+              {result?.summary || "No console output yet."}
             </div>
           </div>
         ) : null}
@@ -66,4 +66,3 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy }:
     </div>
   );
 }
-
