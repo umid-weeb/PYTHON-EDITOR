@@ -19,6 +19,7 @@ class ProblemSummary(BaseModel):
     is_attempted: bool = False
     time_limit_seconds: float | None = None
     memory_limit_mb: int | None = None
+    language_code: str = "en"  # Add language code to summary
 
 
 class VisibleTestcase(BaseModel):

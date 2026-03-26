@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from time import perf_counter
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.models.schemas import ProblemDetail, ProblemListResponse
 from app.models.user import User
@@ -119,6 +119,7 @@ async def search_problems(
 @router.get("/problems/{problem_slug}", response_model=ProblemDetail)
 async def get_problem(
     problem_slug: str,
+    lang: str = Query("uz", description="Language code (uz for Uzbek, en for English)"),
     refresh: bool = False,
     service: ProblemService = Depends(get_problem_service),
 ) -> ProblemDetail:
@@ -126,15 +127,32 @@ async def get_problem(
     cache_hit = False
     if not refresh:
         try:
-            cache_hit = service.cache.load_problem(problem_slug) is not None
+            cache_key = f"{problem_slug}_{lang}"
+            cache_hit = service.cache.load_problem(cache_key) is not None
         except Exception:
             cache_hit = False
 
     try:
-        problem = await service.get_problem(problem_slug, force_refresh=refresh)
+        # Use multilingual version if language is specified
+        if lang in ["uz", "en"]:
+            with service.cache._db_session() as db:
+                from app.models.problem import Problem
+                problem_obj = db.query(Problem).filter(Problem.slug == problem_slug).first()
+                if problem_obj is None:
+                    raise ProblemNotFoundError(problem_slug)
+                
+                bundle = service._build_problem_bundle_multilingual(problem_obj, lang)
+                public_payload = dict(bundle)
+                public_payload.pop("hidden_testcases", None)
+                problem = ProblemDetail.model_validate(public_payload)
+        else:
+            # Fallback to original method for backward compatibility
+            problem = await service.get_problem(problem_slug, force_refresh=refresh)
+        
         logger.info(
-            "problems.detail problem=%s source=%s refresh=%s cache=%s visible=%s hidden=%s latency_ms=%.2f",
+            "problems.detail problem=%s lang=%s source=%s refresh=%s cache=%s visible=%s hidden=%s latency_ms=%.2f",
             problem_slug,
+            lang,
             service.source_label,
             refresh,
             "hit" if cache_hit else "miss",
@@ -145,8 +163,9 @@ async def get_problem(
         return problem
     except ProblemNotFoundError as error:
         logger.warning(
-            "problems.detail.not_found problem=%s source=%s refresh=%s cache=%s",
+            "problems.detail.not_found problem=%s lang=%s source=%s refresh=%s cache=%s",
             problem_slug,
+            lang,
             service.source_label,
             refresh,
             "hit" if cache_hit else "miss",

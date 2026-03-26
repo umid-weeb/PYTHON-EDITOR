@@ -20,6 +20,7 @@ class Problem(Base):
     starter_code = Column(Text, nullable=False)
     function_name = Column(String(64), nullable=False, default="solve")
     tags_json = Column(Text, nullable=False, default="[]")
+    leetcode_id = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     test_cases = relationship(
@@ -28,6 +29,14 @@ class Problem(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="TestCase.sort_order.asc()",
+    )
+    
+    # Relationship to translations
+    translations = relationship(
+        "ProblemTranslation",
+        back_populates="problem",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 

@@ -21,6 +21,7 @@ export default {
           success: "#57dfb4",
           warning: "#ffcc66",
           danger: "#ff7b8f",
+          
         },
       },
       fontFamily: {

@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 from app.core.config import get_settings
 from app.database import SessionLocal
 from app.models.problem import Problem
+from app.models.problem_translation import ProblemTranslation
 from app.models.schemas import ProblemDetail, ProblemSummary
 from app.models.submission_stats import SubmissionRecord, UserProgress
 from app.services.problem_cache import ProblemCache
@@ -284,7 +285,112 @@ class ProblemService:
             pass
         return [item.strip() for item in str(raw_value).split(",") if item.strip()]
 
+    def _get_problem_translation(self, problem: Problem, language_code: str = "uz") -> dict[str, Any]:
+        """Get problem content in specified language with fallback to English."""
+        with SessionLocal() as db:
+            # Try to get the requested language first
+            translation = db.query(ProblemTranslation).filter(
+                ProblemTranslation.problem_id == problem.id,
+                ProblemTranslation.language_code == language_code
+            ).first()
+            
+            # If not found, fallback to English
+            if not translation:
+                translation = db.query(ProblemTranslation).filter(
+                    ProblemTranslation.problem_id == problem.id,
+                    ProblemTranslation.language_code == "en"
+                ).first()
+            
+            # If still not found, use original problem content (backward compatibility)
+            if not translation:
+                return {
+                    "title": problem.title,
+                    "description": problem.description,
+                    "input_format": problem.input_format,
+                    "output_format": problem.output_format,
+                    "constraints": problem.constraints_text,
+                    "starter_code": problem.starter_code,
+                    "language_code": "en"
+                }
+            
+            return {
+                "title": translation.title,
+                "description": translation.description,
+                "input_format": translation.input_format,
+                "output_format": translation.output_format,
+                "constraints": translation.constraints,
+                "starter_code": translation.starter_code,
+                "language_code": translation.language_code
+            }
+
+    def _build_summary_multilingual(self, problem: Problem, language_code: str = "uz") -> ProblemSummary:
+        """Build problem summary with multilingual support."""
+        order_map = build_problem_order_map()
+        translation = self._get_problem_translation(problem, language_code)
+        constraints = self._split_constraints(translation["constraints"])
+        tags = self._load_tags(problem.tags_json)
+        preview = constraints[0] if constraints else (translation["input_format"] or None)
+
+        return ProblemSummary(
+            id=problem.id,
+            slug=problem.slug,
+            title=translation["title"],
+            order_index=order_map.get(problem.slug),
+            difficulty=problem.difficulty.lower(),
+            tags=tags,
+            preview=preview,
+            acceptance_rate=None,
+            is_solved=False,
+            time_limit_seconds=2.0,
+            memory_limit_mb=256,
+            language_code=translation["language_code"]
+        )
+
+    def _build_problem_bundle_multilingual(self, problem: Problem, language_code: str = "uz") -> dict[str, Any]:
+        """Build problem bundle with multilingual support."""
+        order_map = build_problem_order_map()
+        translation = self._get_problem_translation(problem, language_code)
+        visible_testcases = []
+        hidden_testcases = []
+
+        for index, test_case in enumerate(problem.test_cases, start=1):
+            payload = {
+                "name": f"Test {index}",
+                "input": test_case.input.strip(),
+                "expected_output": test_case.expected_output.strip(),
+                "hidden": bool(test_case.is_hidden),
+            }
+            if test_case.is_hidden:
+                hidden_testcases.append(payload)
+            else:
+                visible_testcases.append(payload)
+
+        constraints = self._split_constraints(translation["constraints"])
+        tags = self._load_tags(problem.tags_json)
+
+        return {
+            "id": problem.id,
+            "slug": problem.slug,
+            "title": translation["title"],
+            "order_index": order_map.get(problem.slug),
+            "difficulty": problem.difficulty.lower(),
+            "description": translation["description"],
+            "starter_code": translation["starter_code"],
+            "function_name": problem.function_name or "solve",
+            "input_format": translation["input_format"],
+            "output_format": translation["output_format"],
+            "constraints": constraints,
+            "tags": tags,
+            "time_limit_seconds": 2.0,
+            "memory_limit_mb": 256,
+            "visible_testcases": visible_testcases,
+            "hidden_testcases": hidden_testcases,
+            "hidden_testcase_count": len(hidden_testcases),
+            "language_code": translation["language_code"]
+        }
+
 
 @lru_cache(maxsize=1)
 def get_problem_service() -> ProblemService:
     return ProblemService()
+
