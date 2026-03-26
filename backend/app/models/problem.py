@@ -31,9 +31,15 @@ class Problem(Base):
         order_by="TestCase.sort_order.asc()",
     )
     
-    # Relationship to translations
-    translations = relationship(
-        "ProblemTranslation",
+    # Relationships for submission system
+    submissions = relationship(
+        "Submission",
+        back_populates="problem",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    solved_problems = relationship(
+        "SolvedProblem",
         back_populates="problem",
         cascade="all, delete-orphan",
         passive_deletes=True,

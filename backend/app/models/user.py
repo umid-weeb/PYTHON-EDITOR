@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, Date, DateTime, Integer, String, Text, func
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -27,3 +28,24 @@ class User(Base):
     streak_freeze = Column(Integer, nullable=False, default=0, server_default="0")
     last_active = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships for submission system
+    submissions = relationship(
+        "Submission",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    solved_problems = relationship(
+        "SolvedProblem",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    stats = relationship(
+        "UserStats",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
