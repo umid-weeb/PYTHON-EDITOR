@@ -27,8 +27,8 @@ export function ArenaProvider({ children }) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [result, setResult] = useState({
     tone: "info",
-    chip: "Info",
-    summary: "Loading problems...",
+    chip: "Ma'lumot",
+    summary: "Masalalar yuklanmoqda...",
     details: [],
   });
   const [isRunning, setIsRunning] = useState(false);
@@ -53,8 +53,8 @@ export function ArenaProvider({ children }) {
       setProblemsStatus("error");
       setResult({
         tone: "danger",
-        chip: "Error",
-        summary: "Backend connection error",
+        chip: "Xato",
+        summary: "Backend bilan ulanishda xato",
         details: [],
       });
       throw error;
@@ -73,8 +73,8 @@ export function ArenaProvider({ children }) {
       setActiveCaseIndex(0);
       setResult({
         tone: "info",
-        chip: "Ready",
-        summary: "Ready. Write code and run visible test cases or submit your solution.",
+        chip: "Tayyor",
+        summary: "Tayyor. Kod yozing va ko'rinadigan testlarni ishga tushiring yoki yechimni yuboring.",
         details: [],
       });
       return cached;
@@ -89,8 +89,8 @@ export function ArenaProvider({ children }) {
       setActiveCaseIndex(0);
       setResult({
         tone: "info",
-        chip: "Ready",
-        summary: "Ready. Write code and run visible test cases or submit your solution.",
+        chip: "Tayyor",
+        summary: "Tayyor. Kod yozing va ko'rinadigan testlarni ishga tushiring yoki yechimni yuboring.",
         details: [],
       });
       setProblemStatus("ready");
@@ -99,8 +99,8 @@ export function ArenaProvider({ children }) {
       setProblemStatus("error");
       setResult({
         tone: "danger",
-        chip: "Error",
-        summary: "Failed to load the selected problem",
+        chip: "Xato",
+        summary: "Tanlangan masalani yuklab bo'lmadi",
         details: [],
       });
       throw error;
@@ -126,8 +126,8 @@ export function ArenaProvider({ children }) {
     if (!submissionProblemKey) {
       setResult({
         tone: "warning",
-        chip: "Info",
-        summary: "Select a problem first.",
+        chip: "Ma'lumot",
+        summary: "Avval masalani tanlang.",
         details: [],
       });
       return null;
@@ -137,8 +137,8 @@ export function ArenaProvider({ children }) {
     setIsRunning(true);
     setResult({
       tone: "info",
-      chip: "Running",
-      summary: "Running visible test cases...",
+      chip: "Ishlayapti",
+      summary: "Ko'rinadigan testlar ishga tushirilmoqda...",
       details: [],
     });
 
@@ -153,8 +153,8 @@ export function ArenaProvider({ children }) {
     } catch (error) {
       setResult({
         tone: "danger",
-        chip: "Error",
-        summary: error.message || "Execution failed",
+        chip: "Xato",
+        summary: error.message || "Bajarish muvaffaqiyatsiz tugadi",
         details: [],
       });
       throw error;
@@ -170,8 +170,8 @@ export function ArenaProvider({ children }) {
       if (!submissionProblemKey) {
         setResult({
           tone: "warning",
-          chip: "Info",
-          summary: "Select a problem first.",
+          chip: "Ma'lumot",
+          summary: "Avval masalani tanlang.",
           details: [],
         });
         return null;
@@ -187,8 +187,8 @@ export function ArenaProvider({ children }) {
       setIsSubmitting(true);
       setResult({
         tone: "info",
-        chip: "Submitting",
-        summary: "Submitting your solution...",
+        chip: "Yuborilmoqda",
+        summary: "Yechimingiz yuborilmoqda...",
         details: [],
       });
 
@@ -204,8 +204,8 @@ export function ArenaProvider({ children }) {
       } catch (error) {
         setResult({
           tone: "danger",
-          chip: "Error",
-          summary: error.message || "Execution failed",
+          chip: "Xato",
+          summary: error.message || "Bajarish muvaffaqiyatsiz tugadi",
           details: [],
         });
         throw error;

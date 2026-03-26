@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models.problem import Problem
 from app.models.user import User
 from app.services.engagement_service import engagement_service
+from app.services.problem_catalog import build_problem_order_map
 
 
 router = APIRouter(tags=["engagement"])
@@ -62,6 +63,7 @@ def assess_onboarding(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
+    order_map = build_problem_order_map()
     score = _calculate_assessment_score(payload.answers)
     if score < 30:
         level = "beginner"
@@ -99,6 +101,7 @@ def assess_onboarding(
                 "id": problem.id,
                 "slug": problem.slug,
                 "title": problem.title,
+                "order_index": order_map.get(problem.slug),
                 "difficulty": problem.difficulty,
             }
             for problem in recommended
@@ -116,6 +119,7 @@ def get_my_streak(
 
 @router.get("/daily-challenge")
 def get_daily_challenge(db: Session = Depends(get_db)) -> dict:
+    order_map = build_problem_order_map()
     challenge = engagement_service.get_or_create_today_challenge(db)
     if challenge is None or challenge.problem is None:
         raise HTTPException(status_code=404, detail="Daily challenge is not available")
@@ -129,6 +133,7 @@ def get_daily_challenge(db: Session = Depends(get_db)) -> dict:
             "id": problem.id,
             "slug": problem.slug,
             "title": problem.title,
+            "order_index": order_map.get(problem.slug),
             "difficulty": problem.difficulty,
         },
     }

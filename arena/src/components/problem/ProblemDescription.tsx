@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import { formatProblemTitle, localizeDifficultyLabel } from "../../lib/problemPresentation.js";
 
 type VisibleTestcase = {
   name?: string;
@@ -9,6 +10,7 @@ type VisibleTestcase = {
 type Problem = {
   title?: string;
   id?: string;
+  order_index?: number;
   difficulty?: string;
   description?: string;
   constraints?: string[];
@@ -43,7 +45,7 @@ export default function ProblemDescription({ problem, loading, embedded = false 
   if (!problem) {
     return (
       <div className="flex h-full items-center justify-center px-6 text-center text-[12px] text-[var(--text-secondary)]">
-        Select a problem to see the description.
+        Tavsifni ko'rish uchun masalani tanlang.
       </div>
     );
   }
@@ -65,10 +67,10 @@ export default function ProblemDescription({ problem, loading, embedded = false 
               difficultyStyles(problem.difficulty),
             ].join(" ")}
           >
-            {String(problem.difficulty || "Unknown")}
+            {localizeDifficultyLabel(problem.difficulty)}
           </span>
           <h1 className="text-[18px] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
-            {problem.title || problem.id || "Untitled problem"}
+            {formatProblemTitle(problem)}
           </h1>
         </div>
       </div>
@@ -97,13 +99,13 @@ export default function ProblemDescription({ problem, loading, embedded = false 
                 ),
               }}
             >
-              {problem.description || "No description available."}
+              {problem.description || "Tavsif hozircha mavjud emas."}
             </ReactMarkdown>
           </div>
 
           {problem.constraints && problem.constraints.length > 0 ? (
             <section className="rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Constraints</div>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Cheklovlar</div>
               <ul className="space-y-1 pl-4 text-[13px] text-[var(--text-secondary)]">
                 {problem.constraints.map((constraint, index) => (
                   <li key={index}>{constraint}</li>
@@ -114,22 +116,22 @@ export default function ProblemDescription({ problem, loading, embedded = false 
 
           {examples.length > 0 ? (
             <section className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Examples</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Misollar</div>
               {examples.map((example, index) => (
                 <div
                   key={index}
                   className="rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3"
                 >
-                  <div className="mb-2 text-[12px] font-semibold text-[var(--text-primary)]">Example {index + 1}</div>
+                  <div className="mb-2 text-[12px] font-semibold text-[var(--text-primary)]">Misol {index + 1}</div>
                   <div className="grid gap-2 md:grid-cols-2">
                     <div>
-                      <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Input</div>
+                      <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Kirish</div>
                       <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
                         {example.input || "--"}
                       </pre>
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Output</div>
+                      <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Chiqish</div>
                       <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
                         {example.expected_output || "--"}
                       </pre>

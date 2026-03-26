@@ -32,9 +32,9 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy }:
     <div className="flex h-full min-h-0 min-w-0 flex-col border-t border-[color:var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
       <div className="flex h-[var(--h-tab-bar)] shrink-0 items-center border-b border-[color:var(--border)] px-1">
         {[
-          { key: "cases", label: "Test Cases" },
-          { key: "result", label: "Result" },
-          { key: "console", label: "Console" },
+          { key: "cases", label: "Testlar" },
+          { key: "result", label: "Natija" },
+          { key: "console", label: "Konsol" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -58,7 +58,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy }:
         {active === "console" ? (
           <div className="flex h-full flex-col overflow-auto p-[10px]">
             <div className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] text-[var(--text-secondary)]">
-              {result?.summary || "No console output yet."}
+              {result?.summary || "Hozircha konsol chiqishi yo'q."}
             </div>
           </div>
         ) : null}

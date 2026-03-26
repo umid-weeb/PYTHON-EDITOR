@@ -34,6 +34,7 @@ def test_list_problems_supports_pagination_and_query() -> None:
     assert payload["selected_tags"] == ["array"]
     assert payload["easy_only"] is False
     assert len(payload["items"]) == 10
+    assert payload["items"][0]["order_index"] == 1
     assert payload["items"][0]["slug"].startswith("divisible-sum-")
 
 
@@ -57,13 +58,14 @@ def test_get_problem_returns_detail_without_hidden_tests() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["slug"] == "divisible-sum-01"
-    assert payload["title"] == "Beacon Divisible Sum"
+    assert payload["title"] == "2 ga bo'linadigan sonlar yig'indisi"
+    assert payload["order_index"] == 1
     assert payload["difficulty"] == "easy"
     assert payload["function_name"] == "solve"
     assert payload["hidden_testcase_count"] == 3
     assert "hidden_testcases" not in payload
     assert len(payload["visible_testcases"]) == 3
-    assert "divisible by 2" in payload["description"].lower()
+    assert "2 ga bo'linadigan" in payload["description"].lower()
 
 
 def test_health_endpoints_report_ok() -> None:

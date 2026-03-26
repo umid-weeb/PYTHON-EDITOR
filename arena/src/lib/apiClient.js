@@ -141,7 +141,7 @@ export const arenaApi = {
       }
       return payload;
     }
-    throw new Error("Submission polling timed out");
+    throw new Error("Yuborish holatini kutish vaqti tugadi");
   },
   getDailyChallenge() {
     return request("/api/daily-challenge");

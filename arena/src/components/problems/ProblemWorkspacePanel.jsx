@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { formatMemory, formatRuntime } from "../../lib/formatters.js";
+import { formatMemory, formatRuntime, localizeVerdictLabel } from "../../lib/formatters.js";
+import { formatProblemTitle, localizeDifficultyLabel } from "../../lib/problemPresentation.js";
 import { getMySubmissions, hydrateSubmissionRows } from "../../services/profileService";
 import ProblemDescription from "../problem/ProblemDescription.tsx";
 
 const DIFFICULTY_FILTERS = [
-  { id: "all", label: "All" },
-  { id: "easy", label: "Easy" },
-  { id: "medium", label: "Medium" },
-  { id: "hard", label: "Hard" },
+  { id: "all", label: "Barchasi" },
+  { id: "easy", label: "Oson" },
+  { id: "medium", label: "O'rtacha" },
+  { id: "hard", label: "Qiyin" },
 ];
 
 const TABS = [
-  { id: "description", label: "Description" },
-  { id: "submissions", label: "Submissions" },
+  { id: "description", label: "Tavsif" },
+  { id: "submissions", label: "Yuborishlar" },
 ];
 
 function getProblemKey(problem) {
@@ -60,15 +61,15 @@ function SubmissionPanel({ username, rows, status }) {
   if (!username) {
     return (
       <EmptyStateCard
-        eyebrow="Submissions"
-        title="Login to see your real submission history"
-        copy="Bu tab current problem uchun aynan sizning runtime, memory va verdict tarixingizni ko‘rsatadi. Login qilgach shu joy avtomatik real data bilan to‘ladi."
+        eyebrow="Yuborishlar"
+        title="Haqiqiy yuborish tarixini ko'rish uchun tizimga kiring"
+        copy="Bu bo'lim aynan shu masala bo'yicha sizning vaqt, xotira va natija tarixingizni ko'rsatadi. Tizimga kirganingizdan keyin bu yer avtomatik to'ladi."
         action={
           <Link
             className="inline-flex h-[var(--h-btn-md)] items-center border border-[color:var(--border)] px-3 text-[12px] font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)]"
             to="/login"
           >
-            Open login
+            Kirish oynasi
           </Link>
         }
       />
@@ -78,7 +79,7 @@ function SubmissionPanel({ username, rows, status }) {
   if (status === "loading") {
     return (
       <div className="flex h-full items-center justify-center text-[13px] text-[var(--text-secondary)]">
-        Loading problem submissions...
+        Masala yuborishlari yuklanmoqda...
       </div>
     );
   }
@@ -86,9 +87,9 @@ function SubmissionPanel({ username, rows, status }) {
   if (status === "error") {
     return (
       <EmptyStateCard
-        eyebrow="Submissions"
-        title="Could not load problem submissions"
-        copy="Submission tarixi hozircha olinmadi. API ni qayta tekshirib ko'ring yoki sahifani yangilang."
+        eyebrow="Yuborishlar"
+        title="Masala yuborishlarini yuklab bo'lmadi"
+        copy="Yuborish tarixi hozircha olinmadi. API ni qayta tekshirib ko'ring yoki sahifani yangilang."
       />
     );
   }
@@ -96,9 +97,9 @@ function SubmissionPanel({ username, rows, status }) {
   if (rows.length === 0) {
     return (
       <EmptyStateCard
-        eyebrow="Submissions"
-        title="No submissions for this problem yet"
-        copy="Bu masala uchun hali submission yozilmagan. Run yoki Submit qilganingizdan keyin shu yerda real history chiqadi."
+        eyebrow="Yuborishlar"
+        title="Bu masala uchun hali yuborish yo'q"
+        copy="Bu masala uchun hali yuborish qilinmagan. Sinash yoki Yuborish tugmasidan foydalangach, tarix shu yerda ko'rinadi."
       />
     );
   }
@@ -107,15 +108,15 @@ function SubmissionPanel({ username, rows, status }) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="grid shrink-0 gap-3 border-b border-[color:var(--border)] p-4 md:grid-cols-3">
         <div className="border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Total submissions</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Jami yuborishlar</div>
           <div className="mt-2 text-[20px] font-semibold text-[var(--text-primary)]">{rows.length}</div>
         </div>
         <div className="border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Accepted</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Qabul qilingan</div>
           <div className="mt-2 text-[20px] font-semibold text-[var(--success)]">{acceptedCount}</div>
         </div>
         <div className="border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Fastest accepted</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Eng tez qabul</div>
           <div className="mt-2 text-[20px] font-semibold text-[var(--text-primary)]">
             {fastestAccepted ? formatRuntime(fastestAccepted.runtime_ms) : "--"}
           </div>
@@ -135,24 +136,24 @@ function SubmissionPanel({ username, rows, status }) {
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold text-[var(--text-primary)]">{submission.problem_title || submission.problem_id}</div>
                     <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
-                      <span>{submission.language || "unknown"}</span>
+                      <span>{submission.language || "noma'lum"}</span>
                       <span>{submission.created_at ? new Date(submission.created_at).toLocaleString() : "--"}</span>
                     </div>
                   </div>
                   <span className={["inline-flex h-[22px] items-center px-2 text-[11px] font-semibold uppercase tracking-[0.05em]", statusTone(verdict)].join(" ")}>
-                    {verdict}
+                    {localizeVerdictLabel(verdict)}
                   </span>
                 </div>
 
                 <div className="mt-3 grid gap-2 text-[12px] text-[var(--text-secondary)] sm:grid-cols-3">
                   <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
-                    Runtime: <span className="font-medium text-[var(--text-primary)]">{formatRuntime(submission.runtime_ms)}</span>
+                    Vaqt: <span className="font-medium text-[var(--text-primary)]">{formatRuntime(submission.runtime_ms)}</span>
                   </div>
                   <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
-                    Memory: <span className="font-medium text-[var(--text-primary)]">{formatMemory(submission.memory_kb)}</span>
+                    Xotira: <span className="font-medium text-[var(--text-primary)]">{formatMemory(submission.memory_kb)}</span>
                   </div>
                   <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
-                    Difficulty: <span className="font-medium text-[var(--text-primary)]">{submission.difficulty || "--"}</span>
+                    Qiyinlik: <span className="font-medium text-[var(--text-primary)]">{localizeDifficultyLabel(submission.difficulty)}</span>
                   </div>
                 </div>
               </div>
@@ -192,8 +193,8 @@ export default function ProblemWorkspacePanel({
     () => new Set([problem?.id, problem?.slug, selectedProblemId].filter(Boolean)),
     [problem?.id, problem?.slug, selectedProblemId]
   );
-  const currentTitle = problem?.title || "Select a problem";
-  const currentDifficulty = String(problem?.difficulty || "").toUpperCase();
+  const currentTitle = formatProblemTitle(problem);
+  const currentDifficulty = localizeDifficultyLabel(problem?.difficulty);
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex >= 0 && currentIndex < problems.length - 1;
 
@@ -273,8 +274,8 @@ export default function ProblemWorkspacePanel({
           type="button"
           onClick={() => setBrowserOpen(true)}
         >
-          <span>List</span>
-          <span>Problems</span>
+          <span>Masalalar</span>
+          <span>ro'yxati</span>
         </button>
 
         <button
@@ -283,12 +284,12 @@ export default function ProblemWorkspacePanel({
           type="button"
           onClick={handleDailyOpen}
         >
-          <span>Daily Question</span>
+          <span>Kunlik masala</span>
         </button>
 
         <div className="ml-1 flex items-center gap-1">
           <button
-            aria-label="Previous problem"
+            aria-label="Oldingi masala"
             className="inline-flex h-[30px] w-[30px] items-center justify-center border border-[color:var(--border)] bg-transparent text-[15px] text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canGoPrev}
             type="button"
@@ -297,7 +298,7 @@ export default function ProblemWorkspacePanel({
             {"<"}
           </button>
           <button
-            aria-label="Next problem"
+            aria-label="Keyingi masala"
             className="inline-flex h-[30px] w-[30px] items-center justify-center border border-[color:var(--border)] bg-transparent text-[15px] text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canGoNext}
             type="button"
@@ -323,7 +324,7 @@ export default function ProblemWorkspacePanel({
               ) : null}
             </span>
           ) : (
-            "Open a problem to start solving."
+            "Yechishni boshlash uchun masalani oching."
           )}
         </div>
       </div>
@@ -365,8 +366,8 @@ export default function ProblemWorkspacePanel({
           <div className="relative z-10 flex h-full w-[min(390px,94%)] max-w-full flex-col border-r border-[color:var(--border)] bg-[color:var(--bg-surface)] shadow-[var(--shadow-lg)]">
             <div className="flex h-[46px] shrink-0 items-center justify-between border-b border-[color:var(--border)] px-4">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Workspace Browser</div>
-                <div className="text-[15px] font-semibold text-[var(--text-primary)]">Problems</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Ish maydoni</div>
+                <div className="text-[15px] font-semibold text-[var(--text-primary)]">Masalalar</div>
               </div>
               <button
                 aria-label="Close browser"
@@ -385,9 +386,9 @@ export default function ProblemWorkspacePanel({
                 type="button"
                 onClick={handleDailyOpen}
               >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">Daily</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">Kunlik</span>
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">
-                  {dailyChallenge?.problem?.title || "Daily challenge unavailable"}
+                  {dailyChallenge?.problem ? formatProblemTitle(dailyChallenge.problem) : "Kunlik masala hozircha yo'q"}
                 </span>
                 {dailyChallenge?.problem?.difficulty ? (
                   <span
@@ -396,14 +397,14 @@ export default function ProblemWorkspacePanel({
                       difficultyBadgeClass(dailyChallenge.problem.difficulty),
                     ].join(" ")}
                   >
-                    {String(dailyChallenge.problem.difficulty)}
+                    {localizeDifficultyLabel(dailyChallenge.problem.difficulty)}
                   </span>
                 ) : null}
               </button>
 
               <input
                 className="h-[var(--h-input)] w-full border border-[color:var(--border)] bg-[var(--bg-input)] px-3 text-[12px] text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
-                placeholder="Search problems..."
+                placeholder="Masalalarni qidiring..."
                 type="search"
                 value={search}
                 onChange={(event) => onSearchChange(event.target.value)}
@@ -431,7 +432,7 @@ export default function ProblemWorkspacePanel({
               </div>
 
               <div className="text-[12px] text-[var(--text-secondary)]">
-                Showing <span className="font-semibold text-[var(--text-primary)]">{problems.length}</span> problem{problems.length === 1 ? "" : "s"}
+                <span className="font-semibold text-[var(--text-primary)]">{problems.length}</span> ta masala
               </div>
             </div>
 
@@ -456,7 +457,7 @@ export default function ProblemWorkspacePanel({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{item.title || item.id}</div>
+                            <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{formatProblemTitle(item)}</div>
                             <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">{item.slug || item.id}</div>
                           </div>
                           <span
@@ -465,7 +466,7 @@ export default function ProblemWorkspacePanel({
                               difficultyBadgeClass(item.difficulty),
                             ].join(" ")}
                           >
-                            {String(item.difficulty || "easy")}
+                            {localizeDifficultyLabel(item.difficulty)}
                           </span>
                         </div>
                       </button>
@@ -473,19 +474,19 @@ export default function ProblemWorkspacePanel({
                   })
                 ) : (
                   <div className="border border-dashed border-[color:var(--border)] p-4 text-[12px] text-[var(--text-secondary)]">
-                    No problems match the current filters.
+                    Joriy filtrlarga mos masala topilmadi.
                   </div>
                 )}
               </div>
             </div>
 
             <div className="flex h-[44px] shrink-0 items-center justify-between border-t border-[color:var(--border)] px-4 text-[12px] text-[var(--text-secondary)]">
-              <span>Need wider filtering?</span>
+              <span>Kengroq qidiruv kerakmi?</span>
               <Link
                 className="font-medium text-[var(--text-primary)] transition hover:text-[var(--accent-hover)]"
                 to="/problems"
               >
-                Open full problems page
+                To'liq masalalar sahifasi
               </Link>
             </div>
           </div>

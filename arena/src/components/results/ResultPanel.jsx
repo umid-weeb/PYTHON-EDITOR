@@ -20,15 +20,15 @@ export default function ResultPanel({ result, busy = false }) {
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-[10px]">
         <div className="flex items-center gap-3">
           <span className={["text-[14px] font-semibold", statusTone(result?.tone)].join(" ")}>
-            {result?.chip || "Result"}
+            {result?.chip || "Natija"}
           </span>
-          <span className="text-[12px] text-[var(--text-muted)]">{result?.summary || "Run or submit to see the verdict."}</span>
+          <span className="text-[12px] text-[var(--text-muted)]">{result?.summary || "Natijani ko'rish uchun kodni ishga tushiring yoki yuboring."}</span>
           {busy ? <Spinner /> : null}
         </div>
 
         {busy && !hasDetails ? (
           <div className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
-            Waiting for the judge to finish execution...
+            Tekshiruvchi bajarishni yakunlamoqda...
           </div>
         ) : null}
 
@@ -52,7 +52,7 @@ export default function ResultPanel({ result, busy = false }) {
           </div>
         ) : !busy ? (
           <div className="text-[12px] text-[var(--text-secondary)]">
-            Run or submit a solution to inspect each test result.
+            Har bir test natijasini ko'rish uchun yechimni ishga tushiring yoki yuboring.
           </div>
         ) : null}
       </div>

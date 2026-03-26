@@ -26,13 +26,13 @@ def test_ensure_problem_catalog_seeded_backfills_partial_catalog(tmp_path) -> No
         db.add(
             Problem(
                 id=seed.id,
-                title=seed.title,
+                title="Eski sarlavha",
                 slug=seed.slug,
                 difficulty=seed.difficulty,
-                description=seed.description,
-                input_format=seed.input_format,
-                output_format=seed.output_format,
-                constraints_text=seed.constraints_text,
+                description="Eski tavsif",
+                input_format="Eski input",
+                output_format="Eski output",
+                constraints_text="Eski cheklov",
                 starter_code=seed.starter_code,
                 function_name=seed.function_name,
                 tags_json="[]",
@@ -41,7 +41,11 @@ def test_ensure_problem_catalog_seeded_backfills_partial_catalog(tmp_path) -> No
         db.commit()
 
         summary = ensure_problem_catalog_seeded(db)
+        updated_seed = db.query(Problem).filter(Problem.slug == seed.slug).first()
 
         assert summary.total_count == 120
         assert summary.inserted_count == 119
         assert db.query(Problem).count() == 120
+        assert updated_seed is not None
+        assert updated_seed.title == seed.title
+        assert updated_seed.description == seed.description

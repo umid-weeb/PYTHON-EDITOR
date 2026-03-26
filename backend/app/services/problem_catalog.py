@@ -5,6 +5,7 @@ import logging
 import random
 import string
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Callable
 from uuid import NAMESPACE_URL, uuid5
 
@@ -16,18 +17,6 @@ from app.models.problem import Problem, TestCase
 VISIBLE_CASE_COUNT = 3
 HIDDEN_CASE_COUNT = 3
 logger = logging.getLogger(__name__)
-THEMES = [
-    "Beacon",
-    "Orbit",
-    "Quartz",
-    "Nimbus",
-    "Atlas",
-    "Aurora",
-    "Cipher",
-    "Delta",
-    "Ember",
-    "Flux",
-]
 
 
 @dataclass(frozen=True)
@@ -65,7 +54,7 @@ class SeedSummary:
 @dataclass(frozen=True)
 class TemplateDefinition:
     slug_prefix: str
-    title_suffix: str
+    build_title: Callable[[int], str]
     difficulty: str
     tags: list[str]
     build_description: Callable[[int], str]
@@ -79,13 +68,12 @@ class TemplateDefinition:
 def build_problem_catalog() -> list[ProblemSeed]:
     catalog: list[ProblemSeed] = []
     for template in _templates():
-        for variation_index, theme in enumerate(THEMES):
+        for variation_index in range(10):
             slug = f"{template.slug_prefix}-{variation_index + 1:02d}"
-            title = f"{theme} {template.title_suffix}"
             catalog.append(
                 ProblemSeed(
                     id=str(uuid5(NAMESPACE_URL, f"https://pyzone.uz/problems/{slug}")),
-                    title=title,
+                    title=template.build_title(variation_index),
                     slug=slug,
                     difficulty=template.difficulty,
                     description=template.build_description(variation_index),
@@ -106,13 +94,10 @@ def ensure_problem_catalog_seeded(db: Session) -> SeedSummary:
     existing_count = db.query(Problem).count()
 
     if existing_count >= total_count:
-        logger.info("%s problems ready.", total_count)
-        return SeedSummary(
-            total_count=total_count,
-            inserted_count=0,
-            skipped_count=total_count,
-            forced=False,
-        )
+        logger.info("Syncing problem catalog text and metadata...")
+        summary = seed_problem_catalog(db, force=False)
+        logger.info("%s problems ready.", summary.total_count)
+        return summary
 
     logger.info("Seeding problems...")
     summary = seed_problem_catalog(db, force=False)
@@ -128,12 +113,22 @@ def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
         db.query(Problem).delete()
         db.commit()
 
-    existing_slugs = {slug for (slug,) in db.query(Problem.slug).all()}
+    existing_problems = {problem.slug: problem for problem in db.query(Problem).all()}
     inserted_count = 0
     skipped_count = 0
 
     for problem_seed in catalog:
-        if problem_seed.slug in existing_slugs:
+        existing_problem = existing_problems.get(problem_seed.slug)
+        if existing_problem is not None:
+            existing_problem.title = problem_seed.title
+            existing_problem.difficulty = problem_seed.difficulty
+            existing_problem.description = problem_seed.description
+            existing_problem.input_format = problem_seed.input_format
+            existing_problem.output_format = problem_seed.output_format
+            existing_problem.constraints_text = problem_seed.constraints_text
+            existing_problem.starter_code = problem_seed.starter_code
+            existing_problem.function_name = problem_seed.function_name
+            existing_problem.tags_json = json.dumps(problem_seed.tags, ensure_ascii=False)
             skipped_count += 1
             continue
 
@@ -175,6 +170,14 @@ def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
     )
 
 
+@lru_cache(maxsize=1)
+def build_problem_order_map() -> dict[str, int]:
+    return {
+        problem_seed.slug: index
+        for index, problem_seed in enumerate(build_problem_catalog(), start=1)
+    }
+
+
 def _serialize_value(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -195,11 +198,11 @@ def _problem_description(
     examples: list[str],
     notes: list[str],
 ) -> str:
-    lines = [f"## {title}", "", summary, "", "### What to do", ""]
+    lines = [f"## {title}", "", summary, "", "### Vazifa", ""]
     lines.extend(f"- {step}" for step in steps)
-    lines.extend(["", "### Examples", ""])
+    lines.extend(["", "### Misollar", ""])
     lines.extend(examples)
-    lines.extend(["", "### Notes", ""])
+    lines.extend(["", "### Eslatmalar", ""])
     lines.extend(f"- {note}" for note in notes)
     return "\n".join(lines)
 
@@ -377,9 +380,9 @@ def _lower_bound_args(rng: random.Random, case_index: int) -> tuple[list[int], i
 
 def _edit_distance_args(rng: random.Random, case_index: int) -> tuple[str, str]:
     if case_index == 0:
-        return "kitten", "sitting"
+        return "uy", "suy"
     if case_index == 1:
-        return "arena", "arena"
+        return "olma", "olma"
 
     left_size = rng.randint(4, 8)
     right_size = rng.randint(4, 8)
@@ -391,34 +394,34 @@ def _edit_distance_args(rng: random.Random, case_index: int) -> tuple[str, str]:
 
 
 def _templates() -> list[TemplateDefinition]:
-    char_sets = ["aeiou", "arena", "python", "logic", "queue", "stack", "delta", "orbit", "cipher", "flux"]
+    char_sets = ["aeiou", "salom", "kitob", "mantiq", "navbat", "stek", "daryo", "osmon", "raqam", "oqim"]
 
     return [
         TemplateDefinition(
             slug_prefix="divisible-sum",
-            title_suffix="Divisible Sum",
+            build_title=lambda index: f"{index + 2} ga bo'linadigan sonlar yig'indisi",
             difficulty="easy",
             tags=["array", "math"],
             build_description=lambda index: _problem_description(
-                title="Divisible Sum",
-                summary=f"You are given an integer array. Return the sum of all values divisible by {index + 2}.",
+                title=f"{index + 2} ga bo'linadigan sonlar yig'indisi",
+                summary=f"Sizga butun sonlardan iborat massiv beriladi. {index + 2} ga bo'linadigan barcha qiymatlar yig'indisini qaytaring.",
                 steps=[
-                    "Inspect every number in the array.",
-                    f"Keep the values divisible by {index + 2}.",
-                    "Return their total sum as a single integer.",
+                    "Massivdagi har bir sonni tekshiring.",
+                    f"{index + 2} ga bo'linadigan qiymatlarni ajrating.",
+                    "Ularning umumiy yig'indisini bitta butun son sifatida qaytaring.",
                 ],
                 examples=[
-                    f"- If nums = [3, 6, 7, 9] and the divisor is {index + 2}, only valid values should contribute to the answer.",
-                    "- Empty matches should return 0.",
+                    f"- Agar nums = [3, 6, 7, 9] bo'lsa, {index + 2} ga bo'linadigan sonlargina javobga qo'shiladi.",
+                    "- Mos qiymat topilmasa, javob 0 bo'ladi.",
                 ],
-                notes=["Negative numbers may also be divisible.", "The array can contain duplicates."],
+                notes=["Manfiy sonlar ham bo'linishi mumkin.", "Massivda takroriy qiymatlar bo'lishi mumkin."],
             ),
-            build_input_format=lambda index: "nums: list[int]",
-            build_output_format=lambda index: "Return one integer representing the filtered sum.",
+            build_input_format=lambda index: "nums: butun sonlardan iborat ro'yxat",
+            build_output_format=lambda index: "Shartga mos sonlar yig'indisini qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(nums) <= 200",
+                "1 <= nums dagi elementlar soni <= 200",
                 "-1000 <= nums[i] <= 1000",
-                f"The divisor for this problem is fixed to {index + 2}.",
+                f"Bu variantdagi bo'luvchi {index + 2}.",
             ],
             build_starter_code=lambda index: _starter("nums"),
             build_test_cases=lambda index: _mk_cases(
@@ -429,28 +432,28 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="pattern-char-count",
-            title_suffix="Pattern Character Count",
+            build_title=lambda index: f'"{char_sets[index]}" to\'plamidagi belgilar soni',
             difficulty="easy",
             tags=["string", "hashmap"],
             build_description=lambda index: _problem_description(
-                title="Pattern Character Count",
-                summary=f'Count how many characters from the set "{char_sets[index]}" appear in the given text.',
+                title=f'"{char_sets[index]}" to\'plamidagi belgilar soni',
+                summary=f'Berilgan matnda "{char_sets[index]}" to\'plamiga kiradigan belgilar necha marta uchrashini toping.',
                 steps=[
-                    "Treat uppercase and lowercase letters as the same.",
-                    "Count each matching character occurrence.",
-                    "Return the final count.",
+                    "Katta va kichik harflarni bir xil deb oling.",
+                    "Mos keladigan har bir belgi uchrashuvini sanang.",
+                    "Yakuniy sonni qaytaring.",
                 ],
                 examples=[
-                    '- In the text "Arena", the set "ae" would count three characters.',
-                    "- Spaces and punctuation do not count unless they are part of the target set.",
+                    '- "Salom" matnida "ao" to\'plami uchun 2 ta mos belgi bor.',
+                    "- Belgilar to'plamiga kirmaydigan belgilarga e'tibor berilmaydi.",
                 ],
-                notes=["The target set is fixed for this problem.", "The input text may contain spaces."],
+                notes=["Belgilar to'plami bu masala uchun oldindan berilgan.", "Matnda bo'shliqlar bo'lishi mumkin."],
             ),
-            build_input_format=lambda index: "text: str",
-            build_output_format=lambda index: "Return one integer.",
+            build_input_format=lambda index: "text: matn",
+            build_output_format=lambda index: "Mos kelgan belgilar sonini qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(text) <= 300",
-                f'The target character set for this problem is "{char_sets[index]}".',
+                "1 <= text uzunligi <= 300",
+                f'Bu variantdagi belgilar to\'plami "{char_sets[index]}".',
             ],
             build_starter_code=lambda index: _starter("text"),
             build_test_cases=lambda index: _mk_cases(
@@ -461,29 +464,29 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="distinct-sort",
-            title_suffix="Distinct Sort",
+            build_title=lambda index: f'Takrorlarsiz saralash ({"o'sish" if index % 2 == 0 else "kamayish"} tartibida)',
             difficulty="easy",
             tags=["sorting", "array"],
             build_description=lambda index: _problem_description(
-                title="Distinct Sort",
-                summary="Remove duplicate integers from the array and return the remaining values in the required order.",
+                title=f'Takrorlarsiz saralash ({"o'sish" if index % 2 == 0 else "kamayish"} tartibida)',
+                summary="Massivdagi takroriy butun sonlarni olib tashlang va qolgan qiymatlarni berilgan tartibda qaytaring.",
                 steps=[
-                    "Keep only one copy of each integer.",
-                    "Sort the distinct values.",
-                    f'Return them in {"descending" if index % 2 else "ascending"} order.',
+                    "Har bir butun sondan faqat bittasini qoldiring.",
+                    "Noyob qiymatlarni saralang.",
+                    f'Ularni {"o'sish" if index % 2 == 0 else "kamayish"} tartibida qaytaring.',
                 ],
                 examples=[
-                    "- [4, 1, 4, 2] becomes [1, 2, 4] in ascending mode.",
-                    "- [4, 1, 4, 2] becomes [4, 2, 1] in descending mode.",
+                    "- [4, 1, 4, 2] o'sish tartibida [1, 2, 4] bo'ladi.",
+                    "- [4, 1, 4, 2] kamayish tartibida [4, 2, 1] bo'ladi.",
                 ],
-                notes=["The sort order is fixed for the whole problem statement.", "You must return a list."],
+                notes=["Saralash tartibi butun masala uchun oldindan berilgan.", "Natija ro'yxat ko'rinishida qaytishi kerak."],
             ),
-            build_input_format=lambda index: "nums: list[int]",
-            build_output_format=lambda index: "Return a list[int] with unique sorted values.",
+            build_input_format=lambda index: "nums: butun sonlardan iborat ro'yxat",
+            build_output_format=lambda index: "Noyob va saralangan ro'yxatni qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(nums) <= 150",
+                "1 <= nums dagi elementlar soni <= 150",
                 "-500 <= nums[i] <= 500",
-                f'This variation uses {"descending" if index % 2 else "ascending"} order.',
+                f'Bu variantda {"o'sish" if index % 2 == 0 else "kamayish"} tartibi ishlatiladi.',
             ],
             build_starter_code=lambda index: _starter("nums"),
             build_test_cases=lambda index: _mk_cases(
@@ -494,28 +497,28 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="balanced-brackets-lite",
-            title_suffix="Balanced Brackets Lite",
+            build_title=lambda index: "Qavslar muvozanati",
             difficulty="easy",
             tags=["stack", "string"],
             build_description=lambda index: _problem_description(
-                title="Balanced Brackets Lite",
-                summary="Return true if every opening bracket is closed in the correct order.",
+                title="Qavslar muvozanati",
+                summary="Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.",
                 steps=[
-                    "Handle (), [] and {} characters.",
-                    "Ignore any non-bracket characters.",
-                    "Return a boolean answer.",
+                    "(), [] va {} qavslarini ko'rib chiqing.",
+                    "Qavs bo'lmagan belgilarni e'tiborga olmang.",
+                    "Rost yoki yolg'on javob qaytaring.",
                 ],
                 examples=[
-                    '- "()[]{}" is valid.',
-                    '- "([)]" is not valid because the order is wrong.',
+                    '- "()[]{}" to\'g\'ri ketma-ketlik hisoblanadi.',
+                    '- "([)]" noto\'g\'ri, chunki yopilish tartibi xato.',
                 ],
-                notes=["Use a stack-like approach.", "An empty effective bracket sequence is valid."],
+                notes=["Stek usuli bu yerda juda qulay.", "Bo'sh samarali ketma-ketlik ham to'g'ri hisoblanadi."],
             ),
-            build_input_format=lambda index: "text: str",
-            build_output_format=lambda index: "Return true or false.",
+            build_input_format=lambda index: "text: satr",
+            build_output_format=lambda index: "Rost yoki yolg'on qiymat qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(text) <= 200",
-                "Only bracket characters affect the verdict.",
+                "1 <= text uzunligi <= 200",
+                "Natijaga faqat qavs belgilarigina ta'sir qiladi.",
             ],
             build_starter_code=lambda index: _starter("text"),
             build_test_cases=lambda index: _mk_cases(
@@ -534,40 +537,40 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="clean-palindrome-check",
-            title_suffix="Clean Palindrome Check",
+            build_title=lambda index: f'Palindromni tekshirish ({"faqat harflar" if index % 2 else "harflar va raqamlar"})',
             difficulty="easy",
             tags=["two-pointers", "string"],
             build_description=lambda index: _problem_description(
-                title="Clean Palindrome Check",
+                title=f'Palindromni tekshirish ({"faqat harflar" if index % 2 else "harflar va raqamlar"})',
                 summary=(
-                    "Normalize the text and decide whether it reads the same forward and backward. "
-                    f'This variation keeps {"letters only" if index % 2 else "letters and digits"}.'
+                    "Matnni tozalang va u chapdan o'ngga ham, o'ngdan chapga ham bir xil o'qilishini tekshiring. "
+                    f'Bu variantda {"faqat harflar" if index % 2 else "harflar va raqamlar"} saqlanadi.'
                 ),
                 steps=[
-                    "Ignore spaces and punctuation.",
-                    f'Keep {"letters only" if index % 2 else "letters and digits"} while normalizing.',
-                    "Compare the cleaned string with its reverse.",
+                    "Bo'shliqlar va tinish belgilarini e'tiborga olmang.",
+                    f'Tozalashda {"faqat harflarni" if index % 2 else "harflar va raqamlarni"} qoldiring.',
+                    "Tozalangan satrni uning teskarisi bilan solishtiring.",
                 ],
                 examples=[
-                    '- "Never odd or even" is a palindrome in normalized form.',
-                    '- "Arena" is not a palindrome.',
+                    '- "alla" palindrom hisoblanadi.',
+                    '- "salom" palindrom emas.',
                 ],
-                notes=["Case does not matter.", "Return a boolean answer."],
+                notes=["Katta-kichik harf farqi muhim emas.", "Rost yoki yolg'on qiymat qaytaring."],
             ),
-            build_input_format=lambda index: "text: str",
-            build_output_format=lambda index: "Return true or false.",
+            build_input_format=lambda index: "text: satr",
+            build_output_format=lambda index: "Rost yoki yolg'on qiymat qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(text) <= 250",
-                f'This variation keeps {"letters only" if index % 2 else "letters and digits"}.',
+                "1 <= text uzunligi <= 250",
+                f'Bu variantda {"faqat harflar" if index % 2 else "harflar va raqamlar"} saqlanadi.',
             ],
             build_starter_code=lambda index: _starter("text"),
             build_test_cases=lambda index: _mk_cases(
                 lambda text: _clean_palindrome_solver(text, bool(index % 2)),
                 lambda rng, case_index: (
                     (
-                        "Never odd or even"
+                        "alla"
                         if case_index == 0
-                        else "A man, a plan, a canal: Panama 202"
+                        else "Qiziq 202"
                         if case_index == 1
                         else _random_text(rng, 12, 30, string.ascii_letters + string.digits + " ,.:;!?")
                     ),
@@ -577,27 +580,27 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="pair-sum-indices",
-            title_suffix="Pair Sum Indices",
+            build_title=lambda index: "Ikki son yig'indisi",
             difficulty="medium",
             tags=["two-pointers", "hashmap"],
             build_description=lambda index: _problem_description(
-                title="Pair Sum Indices",
-                summary="Return the first pair of indices whose values add up to the target.",
+                title="Ikki son yig'indisi",
+                summary="Qiymatlari target ga teng bo'ladigan yig'indini hosil qiluvchi birinchi indekslar juftligini qaytaring.",
                 steps=[
-                    "Scan the array from left to right.",
-                    "Return the earliest valid pair as [i, j].",
-                    "If no pair exists, return [-1, -1].",
+                    "Massivni chapdan o'ngga qarab ko'rib chiqing.",
+                    "Birinchi topilgan to'g'ri juftlikni [i, j] ko'rinishida qaytaring.",
+                    "Agar bunday juftlik bo'lmasa, [-1, -1] qaytaring.",
                 ],
                 examples=[
-                    "- nums = [2, 7, 11, 15], target = 9 returns [0, 1].",
-                    "- nums = [1, 2, 3], target = 8 returns [-1, -1].",
+                    "- nums = [2, 7, 11, 15], target = 9 bo'lsa, javob [0, 1] bo'ladi.",
+                    "- nums = [1, 2, 3], target = 8 bo'lsa, javob [-1, -1] bo'ladi.",
                 ],
-                notes=["Exactly one answer is not guaranteed.", "Prefer the first pair discovered from left to right."],
+                notes=["Har doim yagona javob bo'lishi shart emas.", "Chapdan o'ngga yurishda birinchi topilgan juftlik afzal."],
             ),
-            build_input_format=lambda index: "nums: list[int]\ntarget: int",
-            build_output_format=lambda index: "Return a list[int] of length two.",
+            build_input_format=lambda index: "nums: butun sonlar ro'yxati\ntarget: butun son",
+            build_output_format=lambda index: "Uzunligi 2 bo'lgan indekslar ro'yxatini qaytaring.",
             build_constraints=lambda index: [
-                "2 <= len(nums) <= 250",
+                "2 <= nums dagi elementlar soni <= 250",
                 "-10^4 <= nums[i], target <= 10^4",
             ],
             build_starter_code=lambda index: _starter("nums, target"),
@@ -609,27 +612,27 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="lower-bound-search",
-            title_suffix="Lower Bound Search",
+            build_title=lambda index: "Birinchi mos indeks",
             difficulty="medium",
             tags=["binary-search", "array"],
             build_description=lambda index: _problem_description(
-                title="Lower Bound Search",
-                summary="Given a sorted array, return the index of the first value greater than or equal to the target.",
+                title="Birinchi mos indeks",
+                summary="Saralangan massivda target dan katta yoki unga teng bo'lgan birinchi qiymat indeksini qaytaring.",
                 steps=[
-                    "Use the sorted order of the input.",
-                    "Return len(nums) when every value is smaller than the target.",
-                    "The array can contain duplicates.",
+                    "Massiv saralanganidan foydalaning.",
+                    "Agar barcha qiymatlar target dan kichik bo'lsa, nums uzunligini qaytaring.",
+                    "Massivda takroriy qiymatlar bo'lishi mumkin.",
                 ],
                 examples=[
-                    "- nums = [1, 3, 3, 5], target = 3 returns 1.",
-                    "- nums = [1, 3, 3, 5], target = 4 returns 3.",
+                    "- nums = [1, 3, 3, 5], target = 3 bo'lsa, javob 1 bo'ladi.",
+                    "- nums = [1, 3, 3, 5], target = 4 bo'lsa, javob 3 bo'ladi.",
                 ],
-                notes=["This is the classic lower-bound position.", "Binary search is recommended."],
+                notes=["Bu klassik quyi chegara masalasi.", "Ikkilik qidiruv tavsiya etiladi."],
             ),
-            build_input_format=lambda index: "nums: list[int] sorted in non-decreasing order\ntarget: int",
-            build_output_format=lambda index: "Return one integer index.",
+            build_input_format=lambda index: "nums: o'sish tartibida saralangan butun sonlar ro'yxati\ntarget: butun son",
+            build_output_format=lambda index: "Bitta indeksni qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(nums) <= 300",
+                "1 <= nums dagi elementlar soni <= 300",
                 "-10^4 <= nums[i], target <= 10^4",
             ],
             build_starter_code=lambda index: _starter("nums, target"),
@@ -641,27 +644,27 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="frequency-leader",
-            title_suffix="Frequency Leader",
+            build_title=lambda index: "Eng ko'p uchraydigan son",
             difficulty="medium",
             tags=["hashmap", "sorting"],
             build_description=lambda index: _problem_description(
-                title="Frequency Leader",
-                summary="Return the value that appears most often. Break ties by choosing the smallest value.",
+                title="Eng ko'p uchraydigan son",
+                summary="Eng ko'p marta uchraydigan qiymatni qaytaring. Tenglik bo'lsa, eng kichigini tanlang.",
                 steps=[
-                    "Count each integer occurrence.",
-                    "Find the highest frequency.",
-                    "If multiple values share the best frequency, return the smallest one.",
+                    "Har bir butun son necha marta uchrashini sanang.",
+                    "Eng katta takrorlanish sonini toping.",
+                    "Bir nechta qiymat teng bo'lsa, eng kichigini qaytaring.",
                 ],
                 examples=[
-                    "- [4, 4, 2, 2, 2, 7] returns 2.",
-                    "- [5, 5, 1, 1] returns 1 because of the tie-break rule.",
+                    "- [4, 4, 2, 2, 2, 7] uchun javob 2 bo'ladi.",
+                    "- [5, 5, 1, 1] uchun tenglik qoidasi sabab javob 1 bo'ladi.",
                 ],
-                notes=["The array always contains at least one number.", "A hashmap-based count works well."],
+                notes=["Massivda kamida bitta son bo'ladi.", "Xesh-jadval asosidagi sanash juda qulay."],
             ),
-            build_input_format=lambda index: "nums: list[int]",
-            build_output_format=lambda index: "Return one integer.",
+            build_input_format=lambda index: "nums: butun sonlar ro'yxati",
+            build_output_format=lambda index: "Bitta butun sonni qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(nums) <= 250",
+                "1 <= nums dagi elementlar soni <= 250",
                 "-1000 <= nums[i] <= 1000",
             ],
             build_starter_code=lambda index: _starter("nums"),
@@ -673,28 +676,28 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="climbing-ways",
-            title_suffix="Climbing Ways",
+            build_title=lambda index: f"Zinaga chiqish usullari ({2 + (index % 2)} qadamgacha)",
             difficulty="medium",
             tags=["dynamic-programming", "recursion"],
             build_description=lambda index: _problem_description(
-                title="Climbing Ways",
-                summary=f"Count how many distinct ways there are to reach exactly n steps when each move can advance 1 to {2 + (index % 2)} steps.",
+                title=f"Zinaga chiqish usullari ({2 + (index % 2)} qadamgacha)",
+                summary=f"Har bir yurishda 1 tadan {2 + (index % 2)} tagacha qadam tashlash mumkin bo'lsa, n pog'onaga nechta turli usul bilan chiqish mumkinligini toping.",
                 steps=[
-                    "You start from step 0.",
-                    f"Each move may jump between 1 and {2 + (index % 2)} steps.",
-                    "Return the total number of valid ways to land exactly on step n.",
+                    "Boshlanish nuqtasi 0-pog'ona deb olinadi.",
+                    f"Har yurishda 1 tadan {2 + (index % 2)} tagacha qadam tashlash mumkin.",
+                    "Aynan n pog'onaga tushadigan barcha usullar sonini qaytaring.",
                 ],
                 examples=[
-                    "- If n = 4 and jumps are 1..2, the answer is 5.",
-                    "- Larger n values require dynamic programming to avoid repeated work.",
+                    "- n = 4 va yurish 1..2 bo'lsa, javob 5 bo'ladi.",
+                    "- Katta n qiymatlarida dinamik dasturlash juda foydali.",
                 ],
-                notes=["Order matters.", "Return an integer count."],
+                notes=["Qadamlar ketma-ketligi muhim.", "Butun son ko'rinishidagi javob qaytaring."],
             ),
-            build_input_format=lambda index: "n: int",
-            build_output_format=lambda index: "Return one integer.",
+            build_input_format=lambda index: "n: pog'onalar soni",
+            build_output_format=lambda index: "Bitta butun sonni qaytaring.",
             build_constraints=lambda index: [
                 "1 <= n <= 25",
-                f"This variation allows jumps from 1 to {2 + (index % 2)} steps.",
+                f"Bu variantda bir yurishda 1 tadan {2 + (index % 2)} tagacha qadam tashlash mumkin.",
             ],
             build_starter_code=lambda index: _starter("n"),
             build_test_cases=lambda index: _mk_cases(
@@ -705,28 +708,28 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="longest-unique-window",
-            title_suffix="Longest Unique Window",
+            build_title=lambda index: "Takrorlanmas eng uzun qism",
             difficulty="medium",
             tags=["string", "sliding-window"],
             build_description=lambda index: _problem_description(
-                title="Longest Unique Window",
-                summary="Return the length of the longest substring that contains no repeated characters.",
+                title="Takrorlanmas eng uzun qism",
+                summary="Takroriy belgilar qatnashmaydigan eng uzun qism uzunligini qaytaring.",
                 steps=[
-                    "Scan the text from left to right.",
-                    "A valid window cannot contain duplicate characters.",
-                    "Return the best window length.",
+                    "Matnni chapdan o'ngga qarab ko'rib chiqing.",
+                    "To'g'ri qism ichida bir xil belgi takrorlanmasligi kerak.",
+                    "Eng yaxshi uzunlikni qaytaring.",
                 ],
                 examples=[
-                    '- "abcabcbb" returns 3.',
-                    '- "bbbbb" returns 1.',
+                    '- "abca" uchun javob 3 bo\'ladi.',
+                    '- "aaaa" uchun javob 1 bo\'ladi.',
                 ],
-                notes=["Spaces count as characters.", "An empty string would return 0, although this dataset uses non-empty strings."],
+                notes=["Bo'sh joy ham belgi hisoblanadi.", "Bo'sh satr uchun javob 0 bo'lar edi, lekin bu to'plamda bo'sh satr berilmaydi."],
             ),
-            build_input_format=lambda index: "text: str",
-            build_output_format=lambda index: "Return one integer length.",
+            build_input_format=lambda index: "text: satr",
+            build_output_format=lambda index: "Uzunlikni butun son sifatida qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(text) <= 200",
-                "Characters may repeat many times.",
+                "1 <= text uzunligi <= 200",
+                "Belgilar ko'p marta takrorlanishi mumkin.",
             ],
             build_starter_code=lambda index: _starter("text"),
             build_test_cases=lambda index: _mk_cases(
@@ -745,28 +748,28 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="edit-distance-grid",
-            title_suffix="Edit Distance Grid",
+            build_title=lambda index: "Tahrirlash masofasi",
             difficulty="hard",
             tags=["dynamic-programming", "string"],
             build_description=lambda index: _problem_description(
-                title="Edit Distance Grid",
-                summary="Return the minimum number of insertions, deletions and replacements needed to turn the first string into the second string.",
+                title="Tahrirlash masofasi",
+                summary="Birinchi satrni ikkinchi satrga aylantirish uchun kerak bo'ladigan eng kam qo'shish, o'chirish va almashtirishlar sonini toping.",
                 steps=[
-                    "You may insert one character.",
-                    "You may delete one character.",
-                    "You may replace one character with another.",
+                    "Bitta belgini qo'shish mumkin.",
+                    "Bitta belgini o'chirish mumkin.",
+                    "Bitta belgini boshqa belgi bilan almashtirish mumkin.",
                 ],
                 examples=[
-                    '- "kitten" -> "sitting" needs 3 edits.',
-                    "- Identical strings need 0 edits.",
+                    '- "uy" -> "suy" uchun 1 ta qo\'shish kifoya.',
+                    "- Bir xil satrlar uchun javob 0 bo'ladi.",
                 ],
-                notes=["Dynamic programming is the intended approach.", "Return the minimum edit count."],
+                notes=["Asosiy yondashuv dinamik dasturlashdir.", "Eng kichik tahrirlar sonini qaytaring."],
             ),
-            build_input_format=lambda index: "left_text: str\nright_text: str",
-            build_output_format=lambda index: "Return one integer.",
+            build_input_format=lambda index: "left_text: birinchi satr\nright_text: ikkinchi satr",
+            build_output_format=lambda index: "Bitta butun sonni qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(left_text), len(right_text) <= 40",
-                "Inputs contain lowercase English letters.",
+                "1 <= left_text va right_text uzunligi <= 40",
+                "Kirish satrlari kichik lotin harflaridan iborat bo'ladi.",
             ],
             build_starter_code=lambda index: _starter("left_text, right_text"),
             build_test_cases=lambda index: _mk_cases(
@@ -777,27 +780,27 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="trapped-rain-collector",
-            title_suffix="Trapped Rain Collector",
+            build_title=lambda index: "Yig'ilgan yomg'ir suvi",
             difficulty="hard",
             tags=["array", "two-pointers", "stack"],
             build_description=lambda index: _problem_description(
-                title="Trapped Rain Collector",
-                summary="Given elevation heights, return how much water can be trapped after raining.",
+                title="Yig'ilgan yomg'ir suvi",
+                summary="Balandliklar massivi berilganda, yomg'irdan keyin qancha suv yig'ilishini toping.",
                 steps=[
-                    "Each value represents a column height.",
-                    "Water can be trapped between taller boundaries.",
-                    "Return the total trapped water volume.",
+                    "Har bir qiymat ustun balandligini bildiradi.",
+                    "Suv balandroq chegaralar orasida yig'ilishi mumkin.",
+                    "Yig'ilgan suvning umumiy hajmini qaytaring.",
                 ],
                 examples=[
-                    "- [0,1,0,2,1,0,1,3,2,1,2,1] returns 6.",
-                    "- A strictly increasing skyline traps 0 water.",
+                    "- [0,1,0,2,1,0,1,3,2,1,2,1] uchun javob 6 bo'ladi.",
+                    "- To'liq o'sib boruvchi balandliklar suv ushlamaydi.",
                 ],
-                notes=["A two-pointer solution runs in linear time.", "Return one integer."],
+                notes=["Ikki ko'rsatkichli yechim chiziqli vaqtda ishlaydi.", "Bitta butun sonni qaytaring."],
             ),
-            build_input_format=lambda index: "heights: list[int]",
-            build_output_format=lambda index: "Return one integer.",
+            build_input_format=lambda index: "heights: balandliklar ro'yxati",
+            build_output_format=lambda index: "Bitta butun sonni qaytaring.",
             build_constraints=lambda index: [
-                "1 <= len(heights) <= 120",
+                "1 <= heights dagi elementlar soni <= 120",
                 "0 <= heights[i] <= 20",
             ],
             build_starter_code=lambda index: _starter("heights"),

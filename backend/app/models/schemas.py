@@ -10,6 +10,7 @@ class ProblemSummary(BaseModel):
     id: str
     slug: str
     title: str
+    order_index: int | None = None
     difficulty: str
     tags: list[str] = Field(default_factory=list)
     preview: str | None = None

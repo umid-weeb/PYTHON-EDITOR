@@ -1,7 +1,7 @@
 export function formatJoinedDate(value) {
-  if (!value) return "Unknown";
+  if (!value) return "Noma'lum";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown";
+  if (Number.isNaN(date.getTime())) return "Noma'lum";
   return date.toLocaleDateString();
 }
 
@@ -17,15 +17,33 @@ export function formatMemory(memoryKb) {
   return `${Math.round(memoryKb)} KB`;
 }
 
+export function localizeVerdictLabel(verdict) {
+  const normalized = String(verdict || "").trim().toLowerCase();
+  if (!normalized) return "Natija";
+  if (normalized.includes("accepted")) return "Qabul qilindi";
+  if (normalized.includes("wrong answer")) return "Noto'g'ri javob";
+  if (normalized.includes("runtime error")) return "Bajarilish xatosi";
+  if (normalized.includes("time limit")) return "Vaqt limiti oshdi";
+  if (normalized.includes("memory limit")) return "Xotira limiti oshdi";
+  if (normalized.includes("compilation")) return "Kompilyatsiya xatosi";
+  if (normalized.includes("queued")) return "Navbatda";
+  if (normalized.includes("running")) return "Ishlayapti";
+  if (normalized.includes("pending")) return "Kutilmoqda";
+  if (normalized.includes("submitting")) return "Yuborilmoqda";
+  if (normalized.includes("error")) return "Xato";
+  return verdict;
+}
+
 export function formatCaseResults(cases = []) {
   if (!cases.length) return [];
   return cases.map((entry, index) => {
-    const verdict = entry.verdict || (entry.passed ? "Accepted" : "Wrong Answer");
+    const rawVerdict = entry.verdict || (entry.passed ? "Accepted" : "Wrong Answer");
+    const verdict = localizeVerdictLabel(rawVerdict);
     const actual = entry.actual_output;
     const verdictText = actual && entry.passed ? `${verdict}: Natija: ${String(actual).slice(0, 120)}` : verdict;
     return {
       id: `${index + 1}`,
-      label: `Case ${index + 1}`,
+      label: `Test ${index + 1}`,
       verdict: entry.error ? `${verdict}: ${entry.error}` : verdictText,
       runtime: formatRuntime(entry.runtime_ms),
       memory: formatMemory(entry.memory_kb),
@@ -80,15 +98,15 @@ export function buildResultState(payload, mode = "run") {
   if (!payload) {
     return {
       tone: "info",
-      chip: "Info",
-      summary: "No result yet.",
+      chip: "Ma'lumot",
+      summary: "Hozircha natija yo'q.",
       details: [],
     };
   }
 
   const status = payload.verdict || payload.status || (payload.ok ? "Accepted" : "Result");
   const details = payload.output
-    ? [{ id: "output", label: "Console Output", verdict: payload.output, runtime: "", memory: "" }]
+    ? [{ id: "output", label: "Konsol chiqishi", verdict: payload.output, runtime: "", memory: "" }]
     : formatCaseResults(payload.case_results);
 
   const summaryParts = [];
@@ -100,7 +118,7 @@ export function buildResultState(payload, mode = "run") {
 
   return {
     tone: resolveResultTone(status),
-    chip: status,
+    chip: localizeVerdictLabel(status),
     summary:
       payload.error_text && String(status).toLowerCase() !== "accepted"
         ? translateErrorToUzbek(status, payload.error_text)

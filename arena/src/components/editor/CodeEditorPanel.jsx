@@ -40,7 +40,7 @@ export default function CodeEditorPanel({
           type="button"
           onClick={onRun}
         >
-          {isRunning ? "Running..." : "Run"}
+          {isRunning ? "Ishlayapti..." : "Sinash"}
         </button>
         <button
           className="inline-flex h-[var(--h-btn-md)] items-center rounded-[var(--radius-xs)] bg-[var(--accent)] px-4 text-[12px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
@@ -48,7 +48,7 @@ export default function CodeEditorPanel({
           type="button"
           onClick={onSubmit}
         >
-          {isSubmitting ? "Submitting..." : "Submit"}
+          {isSubmitting ? "Yuborilmoqda..." : "Yuborish"}
         </button>
       </div>
 

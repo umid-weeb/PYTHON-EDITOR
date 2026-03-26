@@ -2,7 +2,7 @@ export default function TestCasePanel({ cases = [], activeIndex, onSelect }) {
   if (!cases.length) {
     return (
       <div className="flex h-full min-h-0 min-w-0 items-center justify-center px-4 text-center text-[12px] text-[var(--text-secondary)]">
-        Select a problem to inspect the visible test cases.
+        Ko'rinadigan testlarni ko'rish uchun masalani tanlang.
       </div>
     );
   }
@@ -24,22 +24,22 @@ export default function TestCasePanel({ cases = [], activeIndex, onSelect }) {
             type="button"
             onClick={() => onSelect(index)}
           >
-            Case {index + 1}
+            Test {index + 1}
           </button>
         ))}
       </div>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-auto p-[10px]">
         <section className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Input</div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Kirish</div>
           <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
-            {activeCase.input || "No input"}
+            {activeCase.input || "Kirish ma'lumoti yo'q"}
           </pre>
         </section>
         <section className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Expected Output</div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Kutilgan chiqish</div>
           <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
-            {activeCase.expected_output || "No expected output"}
+            {activeCase.expected_output || "Kutilgan chiqish yo'q"}
           </pre>
         </section>
       </div>

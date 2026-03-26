@@ -1,33 +1,36 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { API_BASE_URL, arenaApi, userApi } from "../lib/apiClient.js";
+import { formatProblemTitle, localizeDifficultyLabel, localizeTagLabel } from "../lib/problemPresentation.js";
 import { readStoredToken } from "../lib/storage.js";
 
 const TOPIC_CATEGORIES = [
-  "Arrays & Hashing",
-  "Two Pointers",
-  "Sliding Window",
-  "Stack",
-  "Binary Search",
-  "Linked List",
+  "array",
+  "hashmap",
+  "two-pointers",
+  "sliding-window",
+  "stack",
+  "binary-search",
+  "linked-list",
   "Trees",
   "Tries",
-  "Heap / Priority Queue",
+  "heap / priority queue",
   "Backtracking",
   "Graphs",
-  "Dynamic Programming",
+  "dynamic-programming",
   "Greedy",
   "Intervals",
-  "Math & Geometry",
-  "Bit Manipulation",
-  "Recursion",
-  "Sorting",
+  "math",
+  "bit-manipulation",
+  "recursion",
+  "sorting",
 ];
 
 type Problem = {
   id: string;
   slug: string;
   title: string;
+  order_index?: number;
   difficulty: string;
   acceptance_rate?: number;
   tags?: string[];
@@ -51,6 +54,7 @@ type DailyChallengePayload = {
     id: string;
     slug: string;
     title: string;
+    order_index?: number;
     difficulty: string;
   };
 };
@@ -73,7 +77,7 @@ function DifficultyBadge({ difficulty }: { difficulty: string }) {
 
   return (
     <span className={["inline-flex h-[var(--h-badge)] items-center rounded-[var(--radius-xs)] px-2 text-[11px] font-semibold uppercase tracking-[0.04em]", styles].join(" ")}>
-      {difficulty || "Unknown"}
+      {localizeDifficultyLabel(difficulty)}
     </span>
   );
 }
@@ -163,10 +167,10 @@ function DailyStreakBar({
           type="button"
           onClick={onOpenDaily}
         >
-          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">Daily</span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{dailyChallenge.problem.title}</span>
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">Kunlik</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{formatProblemTitle(dailyChallenge.problem)}</span>
           <DifficultyBadge difficulty={dailyChallenge.problem.difficulty} />
-          <span className="shrink-0 text-[11px] font-semibold text-[var(--text-secondary)]">Solve</span>
+          <span className="shrink-0 text-[11px] font-semibold text-[var(--text-secondary)]">Yechish</span>
         </button>
       ) : null}
 
@@ -175,10 +179,10 @@ function DailyStreakBar({
           <span className="text-[18px] leading-none">{streak.streak > 0 ? "🔥" : "○"}</span>
           <div className="min-w-0">
             <div className="text-[14px] font-bold text-[var(--text-primary)]">
-              {streak.streak} day{streak.streak === 1 ? "" : "s"}
+              {streak.streak} kun
             </div>
             <div className="truncate text-[11px] text-[var(--text-secondary)]">
-              Best: {streak.longest_streak} · Freeze: {streak.streak_freeze} · {streak.today_solved ? "Solved today" : "Solve today"}
+              Eng uzuni: {streak.longest_streak} · Muzlatish: {streak.streak_freeze} · {streak.today_solved ? "Bugun yechildi" : "Bugun yeching"}
             </div>
           </div>
         </div>
@@ -322,7 +326,7 @@ export default function ProblemsPage() {
           <form onSubmit={handleSearchSubmit}>
             <input
               className="h-[var(--h-input)] w-full rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-input)] px-3 text-[12px] text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
-              placeholder="Search problems..."
+              placeholder="Masalalarni qidiring..."
               type="text"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
@@ -330,22 +334,27 @@ export default function ProblemsPage() {
           </form>
 
           <div className="flex flex-wrap gap-2">
-            {["", "Easy", "Medium", "Hard"].map((difficulty) => (
+            {[
+              { value: "", label: "Barchasi" },
+              { value: "easy", label: "Oson" },
+              { value: "medium", label: "O'rtacha" },
+              { value: "hard", label: "Qiyin" },
+            ].map((difficulty) => (
               <TagChip
-                key={difficulty || "all"}
-                active={difficultyFilter === difficulty}
-                label={difficulty || "All"}
-                onClick={() => updateFilter("difficulty", difficulty)}
+                key={difficulty.value || "all"}
+                active={difficultyFilter === difficulty.value}
+                label={difficulty.label}
+                onClick={() => updateFilter("difficulty", difficulty.value)}
               />
             ))}
           </div>
 
           <div className="flex flex-wrap gap-2">
             {[
-              { value: "", label: "All" },
-              { value: "solved", label: "Solved" },
-              { value: "attempted", label: "Attempted" },
-              { value: "unsolved", label: "Todo" },
+              { value: "", label: "Barchasi" },
+              { value: "solved", label: "Yechilgan" },
+              { value: "attempted", label: "Urinilgan" },
+              { value: "unsolved", label: "Boshlanmagan" },
             ].map((option) => (
               <TagChip
                 key={option.value || "all"}
@@ -358,7 +367,7 @@ export default function ProblemsPage() {
 
           <div className="flex max-h-[180px] flex-wrap gap-2 overflow-y-auto lg:max-h-none">
             {displayTags.map((tag) => (
-              <TagChip key={tag} active={selectedTags.includes(tag)} label={tag} onClick={() => toggleTag(tag)} />
+              <TagChip key={tag} active={selectedTags.includes(tag)} label={localizeTagLabel(tag)} onClick={() => toggleTag(tag)} />
             ))}
           </div>
 
@@ -368,7 +377,7 @@ export default function ProblemsPage() {
               type="button"
               onClick={clearFilters}
             >
-              Clear filters
+              Filtrlarni tozalash
             </button>
           ) : null}
         </div>
@@ -383,11 +392,11 @@ export default function ProblemsPage() {
 
         <div className="flex h-[44px] shrink-0 items-center justify-between gap-3 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/88 px-4">
           <div className="min-w-0 truncate text-[12px] text-[var(--text-secondary)]">
-            Showing <span className="font-semibold text-[var(--text-primary)]">{filteredProblems.length}</span> of{" "}
-            <span className="font-semibold text-[var(--text-primary)]">{total}</span> problems
+            <span className="font-semibold text-[var(--text-primary)]">{filteredProblems.length}</span> /{" "}
+            <span className="font-semibold text-[var(--text-primary)]">{total}</span> ta masala ko'rsatilmoqda
           </div>
           <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
-            <label htmlFor="perPage">Per page</label>
+            <label htmlFor="perPage">Sahifada</label>
             <select
               id="perPage"
               className="h-[var(--h-input)] rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-input)] px-2 text-[12px] text-[var(--text-primary)] outline-none"
@@ -412,7 +421,7 @@ export default function ProblemsPage() {
             </colgroup>
             <thead className="sticky top-0 z-10 bg-[var(--bg-base)]">
               <tr className="h-[var(--h-table-head)] border-b border-[color:var(--border)]">
-                {["", "Title", "Difficulty", "Acceptance", "Tags"].map((header, index) => (
+                {["", "Masala", "Qiyinlik", "Qabul", "Teglar"].map((header, index) => (
                   <th
                     key={header || index}
                     className={[
@@ -429,13 +438,13 @@ export default function ProblemsPage() {
               {loading ? (
                 <tr>
                   <td className="px-4 py-10 text-center text-[12px] text-[var(--text-secondary)]" colSpan={5}>
-                    Loading problems...
+                    Masalalar yuklanmoqda...
                   </td>
                 </tr>
               ) : filteredProblems.length === 0 ? (
                 <tr>
                   <td className="px-4 py-10 text-center text-[12px] text-[var(--text-secondary)]" colSpan={5}>
-                    {searchQuery ? `No results for "${searchQuery}".` : "No problems found."}
+                    {searchQuery ? `"${searchQuery}" bo'yicha natija topilmadi.` : "Masalalar topilmadi."}
                   </td>
                 </tr>
               ) : (
@@ -450,7 +459,7 @@ export default function ProblemsPage() {
                     </td>
                     <td className="pr-3">
                       <div className="truncate text-[13px] text-[var(--text-primary)]">
-                        <HighlightedText query={searchQuery} text={problem.title} />
+                        <HighlightedText query={searchQuery} text={formatProblemTitle(problem)} />
                       </div>
                     </td>
                     <td className="pr-3">
@@ -471,7 +480,7 @@ export default function ProblemsPage() {
                     <td className="pr-4">
                       <div className="flex items-center gap-1 overflow-hidden">
                         {(problem.tags || []).slice(0, 2).map((tag) => (
-                          <TagChip key={tag} label={tag} />
+                          <TagChip key={tag} label={localizeTagLabel(tag)} />
                         ))}
                         {(problem.tags || []).length > 2 ? (
                           <span className="shrink-0 text-[11px] text-[var(--text-muted)]">+{(problem.tags || []).length - 2}</span>
@@ -488,7 +497,7 @@ export default function ProblemsPage() {
         {totalPages > 1 ? (
           <div className="flex h-[44px] shrink-0 items-center justify-between border-t border-[color:var(--border)] px-4 text-[12px] text-[var(--text-secondary)]">
             <span>
-              Page {currentPage} of {totalPages}
+              {currentPage}-sahifa / {totalPages}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -497,7 +506,7 @@ export default function ProblemsPage() {
                 type="button"
                 onClick={() => updateFilter("page", String(Math.max(1, currentPage - 1)))}
               >
-                Previous
+                Oldingi
               </button>
               <button
                 className="inline-flex h-[var(--h-btn-sm)] items-center rounded-[var(--radius-xs)] border border-[color:var(--border)] px-3 transition hover:bg-[var(--bg-overlay)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -505,7 +514,7 @@ export default function ProblemsPage() {
                 type="button"
                 onClick={() => updateFilter("page", String(Math.min(totalPages, currentPage + 1)))}
               >
-                Next
+                Keyingi
               </button>
             </div>
           </div>

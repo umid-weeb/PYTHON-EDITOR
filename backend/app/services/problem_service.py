@@ -14,6 +14,7 @@ from app.models.problem import Problem
 from app.models.schemas import ProblemDetail, ProblemSummary
 from app.models.submission_stats import SubmissionRecord, UserProgress
 from app.services.problem_cache import ProblemCache
+from app.services.problem_catalog import build_problem_order_map
 
 
 class ProblemNotFoundError(Exception):
@@ -46,15 +47,17 @@ class ProblemService:
     async def list_problems(self, force_refresh: bool = False) -> list[ProblemSummary]:
         if not force_refresh:
             cached = self.cache.load_index()
-            if cached is not None and all(isinstance(item, dict) and item.get("slug") for item in cached):
+            if cached is not None and all(
+                isinstance(item, dict) and item.get("slug") and item.get("order_index") is not None
+                for item in cached
+            ):
                 return [ProblemSummary.model_validate(item) for item in cached]
 
+        order_map = build_problem_order_map()
         with SessionLocal() as db:
-            problems = (
-                db.query(Problem)
-                .order_by(Problem.title.asc())
-                .all()
-            )
+            problems = db.query(Problem).all()
+
+        problems.sort(key=lambda problem: (order_map.get(problem.slug, 10**9), str(problem.slug)))
 
         items = [self._build_summary(problem) for problem in problems]
         self.cache.save_index([item.model_dump() for item in items])
@@ -80,6 +83,7 @@ class ProblemService:
         for item in all_items:
             haystack = " ".join(
                 [
+                    str(item.order_index or ""),
                     item.id,
                     item.slug,
                     item.title,
@@ -184,7 +188,7 @@ class ProblemService:
     async def get_problem_bundle(self, problem_key: str, force_refresh: bool = False) -> dict[str, Any]:
         if not force_refresh:
             cached = self.cache.load_problem(problem_key)
-            if cached is not None and cached.get("slug"):
+            if cached is not None and cached.get("slug") and cached.get("order_index") is not None:
                 return cached
 
         with SessionLocal() as db:
@@ -205,6 +209,7 @@ class ProblemService:
         return bundle
 
     def _build_summary(self, problem: Problem) -> ProblemSummary:
+        order_map = build_problem_order_map()
         constraints = self._split_constraints(problem.constraints_text)
         tags = self._load_tags(problem.tags_json)
         preview = constraints[0] if constraints else (problem.input_format or None)
@@ -213,6 +218,7 @@ class ProblemService:
             id=problem.id,
             slug=problem.slug,
             title=problem.title,
+            order_index=order_map.get(problem.slug),
             difficulty=problem.difficulty.lower(),
             tags=tags,
             preview=preview,
@@ -223,12 +229,13 @@ class ProblemService:
         )
 
     def _build_problem_bundle(self, problem: Problem) -> dict[str, Any]:
+        order_map = build_problem_order_map()
         visible_testcases = []
         hidden_testcases = []
 
         for index, test_case in enumerate(problem.test_cases, start=1):
             payload = {
-                "name": f"Case {index}",
+                "name": f"Test {index}",
                 "input": test_case.input.strip(),
                 "expected_output": test_case.expected_output.strip(),
                 "hidden": bool(test_case.is_hidden),
@@ -245,6 +252,7 @@ class ProblemService:
             "id": problem.id,
             "slug": problem.slug,
             "title": problem.title,
+            "order_index": order_map.get(problem.slug),
             "difficulty": problem.difficulty.lower(),
             "description": problem.description,
             "starter_code": problem.starter_code,
