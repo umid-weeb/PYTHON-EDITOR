@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
-import { contestService, type ContestLeaderboardRow } from "../../services/contestService";
+import { contestService, type ContestDetail, type ContestLeaderboardRow } from "../../services/contestService";
 
 export default function ContestLeaderboardPage() {
   const { id = "" } = useParams();
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [rows, setRows] = useState<ContestLeaderboardRow[]>([]);
+  const [contest, setContest] = useState<ContestDetail | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setStatus("loading");
       try {
-        const data = await contestService.leaderboard(id);
+        const [contestPayload, leaderboard] = await Promise.all([contestService.get(id), contestService.leaderboard(id)]);
         if (!cancelled) {
-          setRows(data || []);
+          setContest(contestPayload);
+          setRows(leaderboard || []);
           setStatus("ready");
         }
       } catch {
@@ -29,15 +31,21 @@ export default function ContestLeaderboardPage() {
   }, [id]);
 
   return (
-    <DashboardShell eyebrow="Contest" title="Leaderboard" subtitle={`Contest: ${id}`}>
+    <DashboardShell
+      eyebrow="Contest"
+      title="Leaderboard"
+      subtitle={contest ? `${contest.title} | ${contest.status} | ${contest.problems.length} problems` : `Contest: ${id}`}
+    >
       {status === "loading" ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Loading leaderboard…</div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Loading leaderboard...</div>
       ) : null}
+
       {status === "error" ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">
           Failed to load contest leaderboard.
         </div>
       ) : null}
+
       {status === "ready" ? (
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0b1220] shadow-2xl">
           <div className="overflow-x-auto">
@@ -51,18 +59,19 @@ export default function ContestLeaderboardPage() {
                 </tr>
               </thead>
               <tbody className="text-sm text-arena-text">
-                {rows.map((r, idx) => (
-                  <tr key={`${r.username}-${idx}`} className="border-t border-white/5">
-                    <td className="px-4 py-3 text-arena-muted">{idx + 1}</td>
-                    <td className="px-4 py-3 font-medium">{r.username}</td>
-                    <td className="px-4 py-3 text-arena-muted">{r.solved}</td>
-                    <td className="px-4 py-3 text-arena-muted">{r.penalty_minutes}</td>
+                {rows.map((row, index) => (
+                  <tr key={`${row.username}-${index}`} className="border-t border-white/5">
+                    <td className="px-4 py-3 text-arena-muted">{index + 1}</td>
+                    <td className="px-4 py-3 font-medium">{row.username}</td>
+                    <td className="px-4 py-3 text-arena-muted">{row.solved}</td>
+                    <td className="px-4 py-3 text-arena-muted">{row.penalty_minutes}</td>
                   </tr>
                 ))}
+
                 {rows.length === 0 ? (
                   <tr>
                     <td className="px-4 py-6 text-arena-muted" colSpan={4}>
-                      No entries yet.
+                      Leaderboard will appear after the first scored submission.
                     </td>
                   </tr>
                 ) : null}
@@ -74,4 +83,3 @@ export default function ContestLeaderboardPage() {
     </DashboardShell>
   );
 }
-

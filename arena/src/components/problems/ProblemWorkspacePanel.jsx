@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { formatMemory, formatRuntime } from "../../lib/formatters.js";
+import { getMySubmissions, hydrateSubmissionRows } from "../../services/profileService";
 import ProblemDescription from "../problem/ProblemDescription.tsx";
 
 const DIFFICULTY_FILTERS = [
@@ -11,8 +13,6 @@ const DIFFICULTY_FILTERS = [
 
 const TABS = [
   { id: "description", label: "Description" },
-  { id: "editorial", label: "Editorial" },
-  { id: "solutions", label: "Solutions" },
   { id: "submissions", label: "Submissions" },
 ];
 
@@ -25,6 +25,16 @@ function difficultyBadgeClass(difficulty) {
   if (normalized === "easy") return "bg-[var(--easy-bg)] text-[var(--easy)]";
   if (normalized === "medium") return "bg-[var(--medium-bg)] text-[var(--medium)]";
   if (normalized === "hard") return "bg-[var(--hard-bg)] text-[var(--hard)]";
+  return "bg-[var(--bg-subtle)] text-[var(--text-secondary)]";
+}
+
+function statusTone(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized.includes("accepted")) return "bg-[var(--success-bg)] text-[var(--success)]";
+  if (normalized.includes("wrong") || normalized.includes("error")) return "bg-[var(--error-bg)] text-[var(--error)]";
+  if (normalized.includes("running") || normalized.includes("queued") || normalized.includes("pending")) {
+    return "bg-[var(--warning-bg)] text-[var(--warning)]";
+  }
   return "bg-[var(--bg-subtle)] text-[var(--text-secondary)]";
 }
 
@@ -41,6 +51,119 @@ function EmptyStateCard({ eyebrow, title, copy, action }) {
   );
 }
 
+function SubmissionPanel({ username, rows, status }) {
+  const acceptedCount = rows.filter((row) => String(row.status || row.verdict || "").toLowerCase().includes("accepted")).length;
+  const fastestAccepted = rows
+    .filter((row) => String(row.status || row.verdict || "").toLowerCase().includes("accepted") && row.runtime_ms != null)
+    .sort((left, right) => Number(left.runtime_ms || 0) - Number(right.runtime_ms || 0))[0];
+
+  if (!username) {
+    return (
+      <EmptyStateCard
+        eyebrow="Submissions"
+        title="Login to see your real submission history"
+        copy="Bu tab current problem uchun aynan sizning runtime, memory va verdict tarixingizni ko‘rsatadi. Login qilgach shu joy avtomatik real data bilan to‘ladi."
+        action={
+          <Link
+            className="inline-flex h-[var(--h-btn-md)] items-center border border-[color:var(--border)] px-3 text-[12px] font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)]"
+            to="/login"
+          >
+            Open login
+          </Link>
+        }
+      />
+    );
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="flex h-full items-center justify-center text-[13px] text-[var(--text-secondary)]">
+        Loading problem submissions...
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <EmptyStateCard
+        eyebrow="Submissions"
+        title="Could not load problem submissions"
+        copy="Submission tarixi hozircha olinmadi. API ni qayta tekshirib ko'ring yoki sahifani yangilang."
+      />
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <EmptyStateCard
+        eyebrow="Submissions"
+        title="No submissions for this problem yet"
+        copy="Bu masala uchun hali submission yozilmagan. Run yoki Submit qilganingizdan keyin shu yerda real history chiqadi."
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="grid shrink-0 gap-3 border-b border-[color:var(--border)] p-4 md:grid-cols-3">
+        <div className="border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Total submissions</div>
+          <div className="mt-2 text-[20px] font-semibold text-[var(--text-primary)]">{rows.length}</div>
+        </div>
+        <div className="border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Accepted</div>
+          <div className="mt-2 text-[20px] font-semibold text-[var(--success)]">{acceptedCount}</div>
+        </div>
+        <div className="border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Fastest accepted</div>
+          <div className="mt-2 text-[20px] font-semibold text-[var(--text-primary)]">
+            {fastestAccepted ? formatRuntime(fastestAccepted.runtime_ms) : "--"}
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-2">
+          {rows.map((submission, index) => {
+            const verdict = String(submission.status || submission.verdict || "pending");
+            return (
+              <div
+                key={`${submission.submission_id || submission.created_at || submission.problem_id}-${index}`}
+                className="border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold text-[var(--text-primary)]">{submission.problem_title || submission.problem_id}</div>
+                    <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
+                      <span>{submission.language || "unknown"}</span>
+                      <span>{submission.created_at ? new Date(submission.created_at).toLocaleString() : "--"}</span>
+                    </div>
+                  </div>
+                  <span className={["inline-flex h-[22px] items-center px-2 text-[11px] font-semibold uppercase tracking-[0.05em]", statusTone(verdict)].join(" ")}>
+                    {verdict}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-2 text-[12px] text-[var(--text-secondary)] sm:grid-cols-3">
+                  <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+                    Runtime: <span className="font-medium text-[var(--text-primary)]">{formatRuntime(submission.runtime_ms)}</span>
+                  </div>
+                  <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+                    Memory: <span className="font-medium text-[var(--text-primary)]">{formatMemory(submission.memory_kb)}</span>
+                  </div>
+                  <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
+                    Difficulty: <span className="font-medium text-[var(--text-primary)]">{submission.difficulty || "--"}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProblemWorkspacePanel({
   problem,
   loading,
@@ -48,7 +171,6 @@ export default function ProblemWorkspacePanel({
   selectedProblemId,
   search,
   difficulty,
-  result,
   user,
   dailyChallenge,
   onSearchChange,
@@ -58,17 +180,22 @@ export default function ProblemWorkspacePanel({
 }) {
   const [browserOpen, setBrowserOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("description");
+  const [submissionStatus, setSubmissionStatus] = useState("idle");
+  const [submissionRows, setSubmissionRows] = useState([]);
 
   const currentProblemKey = problem?.slug || problem?.id || selectedProblemId || "";
   const currentIndex = useMemo(
     () => problems.findIndex((item) => getProblemKey(item) === currentProblemKey),
     [currentProblemKey, problems]
   );
-
-  const canGoPrev = currentIndex > 0;
-  const canGoNext = currentIndex >= 0 && currentIndex < problems.length - 1;
+  const currentProblemIds = useMemo(
+    () => new Set([problem?.id, problem?.slug, selectedProblemId].filter(Boolean)),
+    [problem?.id, problem?.slug, selectedProblemId]
+  );
   const currentTitle = problem?.title || "Select a problem";
   const currentDifficulty = String(problem?.difficulty || "").toUpperCase();
+  const canGoPrev = currentIndex > 0;
+  const canGoNext = currentIndex >= 0 && currentIndex < problems.length - 1;
 
   useEffect(() => {
     setActiveTab("description");
@@ -86,6 +213,38 @@ export default function ProblemWorkspacePanel({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [browserOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProblemSubmissions() {
+      if (!user?.username || !currentProblemIds.size) {
+        setSubmissionRows([]);
+        setSubmissionStatus("idle");
+        return;
+      }
+
+      setSubmissionStatus("loading");
+      try {
+        const rows = await getMySubmissions().then(hydrateSubmissionRows);
+        const filtered = rows.filter((row) => currentProblemIds.has(row.problem_id) || currentProblemIds.has(row.problem_slug));
+        if (!cancelled) {
+          setSubmissionRows(filtered);
+          setSubmissionStatus("ready");
+        }
+      } catch {
+        if (!cancelled) {
+          setSubmissionRows([]);
+          setSubmissionStatus("error");
+        }
+      }
+    }
+
+    loadProblemSubmissions().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProblemIds, user?.username]);
 
   async function handleProblemSelect(problemId) {
     if (!problemId) return;
@@ -114,7 +273,7 @@ export default function ProblemWorkspacePanel({
           type="button"
           onClick={() => setBrowserOpen(true)}
         >
-          <span aria-hidden="true">☰</span>
+          <span>List</span>
           <span>Problems</span>
         </button>
 
@@ -124,7 +283,6 @@ export default function ProblemWorkspacePanel({
           type="button"
           onClick={handleDailyOpen}
         >
-          <span aria-hidden="true">⚡</span>
           <span>Daily Question</span>
         </button>
 
@@ -136,7 +294,7 @@ export default function ProblemWorkspacePanel({
             type="button"
             onClick={() => handleShift(-1)}
           >
-            ‹
+            {"<"}
           </button>
           <button
             aria-label="Next problem"
@@ -145,7 +303,7 @@ export default function ProblemWorkspacePanel({
             type="button"
             onClick={() => handleShift(1)}
           >
-            ›
+            {">"}
           </button>
         </div>
 
@@ -190,50 +348,8 @@ export default function ProblemWorkspacePanel({
 
       <div className="min-h-0 flex-1 overflow-hidden">
         {activeTab === "description" ? <ProblemDescription embedded loading={loading} problem={problem} /> : null}
-
-        {activeTab === "editorial" ? (
-          <EmptyStateCard
-            eyebrow="Editorial"
-            title="Official walkthrough is the next layer"
-            copy="Bu joyga masalaning official editoriali, optimal approach, complexity breakdown va edge case tahlili chiqadi. Hozircha description ustidan ishlash va coding flow tayyor."
-            action={
-              <button
-                className="inline-flex h-[var(--h-btn-md)] items-center border border-[color:var(--border)] px-3 text-[12px] font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)]"
-                type="button"
-                onClick={() => setActiveTab("description")}
-              >
-                Back to description
-              </button>
-            }
-          />
-        ) : null}
-
-        {activeTab === "solutions" ? (
-          <EmptyStateCard
-            eyebrow="Solutions"
-            title="AI-reviewed and community solutions can live here"
-            copy="Keyingi bosqichda bu tabga eng yaxshi Python, JavaScript va C++ yechimlari, complexity taqqoslash va code review bloklarini qo‘shishimiz mumkin."
-          />
-        ) : null}
-
         {activeTab === "submissions" ? (
-          <EmptyStateCard
-            eyebrow="Submissions"
-            title="Run history and accepted attempts"
-            copy={result?.summary || "Bu bo‘limda current problem bo‘yicha submit tarixini, verdict, runtime va memory ko‘rsatish mumkin."}
-            action={
-              user?.username ? (
-                <Link
-                  className="inline-flex h-[var(--h-btn-md)] items-center border border-[color:var(--border)] px-3 text-[12px] font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)]"
-                  to={`/profile/${encodeURIComponent(user.username)}/submissions`}
-                >
-                  Open my submissions
-                </Link>
-              ) : (
-                <div className="text-[12px] text-[var(--text-muted)]">Login qilgandan keyin submissions tarixi shu yer bilan bog‘lanadi.</div>
-              )
-            }
-          />
+          <SubmissionPanel rows={submissionRows} status={submissionStatus} username={user?.username || ""} />
         ) : null}
       </div>
 
@@ -258,7 +374,7 @@ export default function ProblemWorkspacePanel({
                 type="button"
                 onClick={() => setBrowserOpen(false)}
               >
-                ×
+                x
               </button>
             </div>
 
@@ -357,7 +473,7 @@ export default function ProblemWorkspacePanel({
                   })
                 ) : (
                   <div className="border border-dashed border-[color:var(--border)] p-4 text-[12px] text-[var(--text-secondary)]">
-                    Current filters bo‘yicha problem topilmadi.
+                    No problems match the current filters.
                   </div>
                 )}
               </div>

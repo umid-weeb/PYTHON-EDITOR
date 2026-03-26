@@ -1,4 +1,4 @@
-import { userApi } from "../lib/apiClient.js";
+import { arenaApi, userApi } from "../lib/apiClient.js";
 
 export type PublicProfile = {
   id: number;
@@ -24,7 +24,9 @@ export type PublicProfile = {
 };
 
 export type SubmissionRow = {
+  submission_id?: string | null;
   problem_id: string;
+  problem_slug?: string | null;
   problem_title?: string | null;
   difficulty?: string | null;
   language?: string | null;
@@ -63,5 +65,56 @@ export async function getUserStatsById(userId: number): Promise<{
 
 export async function getUserSubmissionsById(userId: number): Promise<SubmissionRow[]> {
   return userApi.getUserSubmissionsById(userId);
+}
+
+function normalizeLiveStatus(payload: {
+  status?: string | null;
+  verdict?: string | null;
+}) {
+  const verdict = String(payload.verdict || "").trim();
+  const status = String(payload.status || "").trim().toLowerCase();
+  if (verdict.toLowerCase() === "accepted") return "accepted";
+  if (verdict) return verdict;
+  if (status === "completed") return "completed";
+  return status || null;
+}
+
+function needsLiveRefresh(submission: SubmissionRow) {
+  const status = String(submission.status || submission.verdict || "").trim().toLowerCase();
+  return Boolean(
+    submission.submission_id &&
+      (!status || status === "pending" || status === "queued" || status === "running" || status === "completed")
+  );
+}
+
+export async function hydrateSubmissionRows(rows: SubmissionRow[]): Promise<SubmissionRow[]> {
+  const pending = rows.filter(needsLiveRefresh).slice(0, 50);
+  if (pending.length === 0) return rows;
+
+  const updates = await Promise.all(
+    pending.map(async (row) => {
+      try {
+        const live = await arenaApi.getSubmission(String(row.submission_id));
+        return [
+          String(row.submission_id),
+          {
+            status: normalizeLiveStatus(live),
+            verdict: live?.verdict || row.verdict || null,
+            runtime_ms: live?.runtime_ms ?? row.runtime_ms ?? null,
+            memory_kb: live?.memory_kb ?? row.memory_kb ?? null,
+          },
+        ] as const;
+      } catch {
+        return [String(row.submission_id), null] as const;
+      }
+    })
+  );
+
+  const updateMap = new Map(updates);
+  return rows.map((row) => {
+    const key = String(row.submission_id || "");
+    const next = updateMap.get(key);
+    return next ? { ...row, ...next } : row;
+  });
 }
 

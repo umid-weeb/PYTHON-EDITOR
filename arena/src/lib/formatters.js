@@ -22,10 +22,7 @@ export function formatCaseResults(cases = []) {
   return cases.map((entry, index) => {
     const verdict = entry.verdict || (entry.passed ? "Accepted" : "Wrong Answer");
     const actual = entry.actual_output;
-    const verdictText =
-      actual && entry.passed
-        ? `${verdict}: Natija → ${String(actual).slice(0, 120)}`
-        : verdict;
+    const verdictText = actual && entry.passed ? `${verdict}: Natija: ${String(actual).slice(0, 120)}` : verdict;
     return {
       id: `${index + 1}`,
       label: `Case ${index + 1}`,
@@ -41,13 +38,13 @@ function translateErrorToUzbek(status, errorText = "") {
   const normalizedError = String(errorText || "").toLowerCase();
 
   if (normalizedStatus.includes("time limit")) {
-    return "Kod juda uzoq ishladi. Cheksiz sikl bo‘lishi mumkin.";
+    return "Kod juda uzoq ishladi. Cheksiz sikl bo'lishi mumkin.";
   }
   if (normalizedStatus.includes("memory limit")) {
     return "Xato: xotira limiti oshib ketdi.";
   }
   if (normalizedError.includes("zerodivisionerror")) {
-    return "Xato: nolga bo‘lish mumkin emas.";
+    return "Xato: nolga bo'lish mumkin emas.";
   }
   if (normalizedError.includes("syntaxerror") || normalizedStatus.includes("compilation")) {
     return "Sintaksis xatosi: kod tuzilmasini tekshiring.";
@@ -59,7 +56,7 @@ function translateErrorToUzbek(status, errorText = "") {
     return "Xato: kalit mavjud emas.";
   }
   if (normalizedError.includes("typeerror")) {
-    return "Xato: noto‘g‘ri turdagi qiymat ishlatilgan.";
+    return "Xato: noto'g'ri turdagi qiymat ishlatilgan.";
   }
   if (normalizedStatus.includes("runtime error")) {
     return "Xato: dastur bajarilishida kutilmagan xato yuz berdi.";
@@ -107,8 +104,7 @@ export function buildResultState(payload, mode = "run") {
     summary:
       payload.error_text && String(status).toLowerCase() !== "accepted"
         ? translateErrorToUzbek(status, payload.error_text)
-        : summaryParts.join(" | ") ||
-          (mode === "submit" ? "Yuborish yakunlandi." : "Bajarish yakunlandi."),
+        : summaryParts.join(" | ") || (mode === "submit" ? "Yuborish yakunlandi." : "Bajarish yakunlandi."),
     details,
   };
 }

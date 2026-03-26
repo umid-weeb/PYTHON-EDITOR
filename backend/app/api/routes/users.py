@@ -41,6 +41,46 @@ account_router = APIRouter(tags=["account"])
 LOGGER = logging.getLogger("pyzone.arena.users")
 
 
+def _serialize_submission_feed_rows(db: Session, rows: list[tuple]) -> list[dict]:
+    changed = False
+    items: list[dict] = []
+
+    for row in rows:
+        record: SubmissionRecord = row[0]
+        problem_title = row.problem_title
+        difficulty = row.difficulty
+        problem_slug = getattr(row, "problem_slug", None)
+
+        if record.external_submission_id and (
+            not record.verdict or str(record.status or "").strip().lower() in {"pending", "queued", "running", "completed"}
+        ):
+            changed = user_stats_service.repair_submission_record_from_judge_store(db, record) or changed
+
+        normalized_status = str(record.status or record.verdict or "").strip()
+        normalized_verdict = str(record.verdict or "").strip()
+
+        items.append(
+            {
+                "submission_id": record.external_submission_id,
+                "problem_id": record.problem_id,
+                "problem_slug": problem_slug,
+                "problem_title": problem_title,
+                "language": record.language,
+                "difficulty": difficulty,
+                "verdict": normalized_verdict or None,
+                "runtime_ms": int(record.runtime) if record.runtime is not None else None,
+                "memory_kb": record.memory_kb,
+                "created_at": record.created_at.isoformat() if record.created_at else None,
+                "status": normalized_status or None,
+            }
+        )
+
+    if changed:
+        db.commit()
+
+    return items
+
+
 class UserSearchItem(BaseModel):
     id: int
     username: str
@@ -257,15 +297,10 @@ def user_submissions(current_user: User = Depends(get_current_user), db: Session
     user_stats_service.ensure_user_stats_fresh(db, current_user.id)
     rows = (
         db.query(
-            SubmissionRecord.problem_id,
-            SubmissionRecord.language,
-            SubmissionRecord.verdict,
-            SubmissionRecord.runtime,
-            SubmissionRecord.memory_kb,
-            SubmissionRecord.created_at,
-            SubmissionRecord.status,
+            SubmissionRecord,
             Problem.title.label("problem_title"),
             Problem.difficulty.label("difficulty"),
+            Problem.slug.label("problem_slug"),
         )
         .outerjoin(Problem, Problem.id == SubmissionRecord.problem_id)
         .filter(SubmissionRecord.user_id == current_user.id)
@@ -273,21 +308,7 @@ def user_submissions(current_user: User = Depends(get_current_user), db: Session
         .limit(200)
         .all()
     )
-
-    return [
-        {
-            "problem_id": row.problem_id,
-            "problem_title": row.problem_title,
-            "language": row.language,
-            "difficulty": row.difficulty,
-            "verdict": row.verdict,
-            "runtime_ms": int(row.runtime) if row.runtime is not None else None,
-            "memory_kb": row.memory_kb,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "status": row.status or row.verdict,
-        }
-        for row in rows
-    ]
+    return _serialize_submission_feed_rows(db, rows)
 
 
 @router.get("/leaderboard")
@@ -365,15 +386,10 @@ def get_user_submissions_by_id(user_id: int, db: Session = Depends(get_db)) -> l
     user_stats_service.ensure_user_stats_fresh(db, user_id)
     rows = (
         db.query(
-            SubmissionRecord.problem_id,
-            SubmissionRecord.language,
-            SubmissionRecord.verdict,
-            SubmissionRecord.runtime,
-            SubmissionRecord.memory_kb,
-            SubmissionRecord.created_at,
-            SubmissionRecord.status,
+            SubmissionRecord,
             Problem.title.label("problem_title"),
             Problem.difficulty.label("difficulty"),
+            Problem.slug.label("problem_slug"),
         )
         .outerjoin(Problem, Problem.id == SubmissionRecord.problem_id)
         .filter(SubmissionRecord.user_id == user_id)
@@ -381,18 +397,4 @@ def get_user_submissions_by_id(user_id: int, db: Session = Depends(get_db)) -> l
         .limit(200)
         .all()
     )
-
-    return [
-        {
-            "problem_id": row.problem_id,
-            "problem_title": row.problem_title,
-            "language": row.language,
-            "difficulty": row.difficulty,
-            "verdict": row.verdict,
-            "runtime_ms": int(row.runtime) if row.runtime is not None else None,
-            "memory_kb": row.memory_kb,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "status": row.status or row.verdict,
-        }
-        for row in rows
-    ]
+    return _serialize_submission_feed_rows(db, rows)

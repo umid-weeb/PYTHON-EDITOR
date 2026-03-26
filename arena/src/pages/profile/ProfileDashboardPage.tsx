@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
 import Avatar from "../../components/profile/Avatar";
-import RatingBadge from "../../components/profile/RatingBadge";
 import CircularProgress from "../../components/profile/CircularProgress";
 import ActivityHeatmap from "../../components/profile/ActivityHeatmap";
 import BadgeDisplay from "../../components/profile/BadgeDisplay";
@@ -18,6 +17,7 @@ import {
   getMyActivity,
   getMySubmissions,
   getPublicProfile,
+  hydrateSubmissionRows,
   getUserSubmissionsById,
   type PublicProfile,
   type SubmissionRow,
@@ -45,6 +45,36 @@ function deriveActivityFromSubmissions(submissions: SubmissionRow[]): ActivityRo
   return Array.from(counts.entries())
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, count]) => ({ date, count }));
+}
+
+function deriveSolvedStats(submissions: SubmissionRow[]) {
+  const accepted = new Map<string, string>();
+
+  submissions.forEach((submission) => {
+    const status = String(submission.status || submission.verdict || "").toLowerCase();
+    if (!status.includes("accepted")) return;
+    if (!submission.problem_id) return;
+    if (!accepted.has(submission.problem_id)) {
+      accepted.set(submission.problem_id, String(submission.difficulty || "").toLowerCase());
+    }
+  });
+
+  let easy = 0;
+  let medium = 0;
+  let hard = 0;
+
+  accepted.forEach((difficulty) => {
+    if (difficulty === "easy") easy += 1;
+    else if (difficulty === "medium") medium += 1;
+    else if (difficulty === "hard") hard += 1;
+  });
+
+  return {
+    total: accepted.size,
+    easy,
+    medium,
+    hard,
+  };
 }
 
 function buildFullYearHeatmap(activity: ActivityRow[]) {
@@ -181,11 +211,12 @@ export default function ProfileDashboardPage() {
             ? getMySubmissions().catch(() => [])
             : getUserSubmissionsById(publicProfile.id).catch(() => []),
         ]);
+        const hydratedSubmissions = await hydrateSubmissionRows(submissionRows || []);
 
         if (!cancelled) {
           setProfile(publicProfile);
           setActivity(activityRows || []);
-          setSubmissions(submissionRows || []);
+          setSubmissions(hydratedSubmissions);
           setStatus("ready");
         }
       } catch {
@@ -202,6 +233,7 @@ export default function ProfileDashboardPage() {
   }, [isOwnProfile, username]);
 
   const derivedActivity = useMemo(() => deriveActivityFromSubmissions(submissions), [submissions]);
+  const derivedSolved = useMemo(() => deriveSolvedStats(submissions), [submissions]);
   const visibleActivity = activity.length ? activity : derivedActivity;
   const activityDays = useMemo(() => buildActivityHeatmap(visibleActivity), [visibleActivity]);
   const fullYearActivity = useMemo(() => buildFullYearHeatmap(visibleActivity), [visibleActivity]);
@@ -211,18 +243,28 @@ export default function ProfileDashboardPage() {
   const currentStreak = Number(profile?.streak ?? derivedCurrentStreak ?? 0);
   const bestStreak = Number(profile?.longest_streak ?? derivedBestStreak ?? 0);
 
+  const solvedTotals = useMemo(
+    () => ({
+      total: Math.max(Number(profile?.solved_total ?? 0), derivedSolved.total),
+      easy: Math.max(Number(profile?.solved_easy ?? 0), derivedSolved.easy),
+      medium: Math.max(Number(profile?.solved_medium ?? 0), derivedSolved.medium),
+      hard: Math.max(Number(profile?.solved_hard ?? 0), derivedSolved.hard),
+    }),
+    [derivedSolved.easy, derivedSolved.hard, derivedSolved.medium, derivedSolved.total, profile],
+  );
+
   const problemTotals = useMemo(
     () => ({
-      easy: { solved: Number(profile?.solved_easy ?? 0), total: 150 },
-      medium: { solved: Number(profile?.solved_medium ?? 0), total: 300 },
-      hard: { solved: Number(profile?.solved_hard ?? 0), total: 150 },
+      easy: { solved: solvedTotals.easy, total: 150 },
+      medium: { solved: solvedTotals.medium, total: 300 },
+      hard: { solved: solvedTotals.hard, total: 150 },
     }),
-    [profile],
+    [solvedTotals.easy, solvedTotals.hard, solvedTotals.medium],
   );
 
   const totalSubmissions = useMemo(
-    () => fullYearActivity.reduce((sum, day) => sum + day.count, 0),
-    [fullYearActivity],
+    () => Math.max(submissions.length, fullYearActivity.reduce((sum, day) => sum + day.count, 0)),
+    [fullYearActivity, submissions.length],
   );
 
   const activeDays = useMemo(
@@ -248,7 +290,22 @@ export default function ProfileDashboardPage() {
   );
 
   const visibleSubmissions = feedTab === "recent-ac" ? acceptedSubmissions : submissions;
-  const badgeSummary = useMemo(() => buildBadgeSummary(profile, bestStreak), [profile, bestStreak]);
+  const badgeSummary = useMemo(
+    () =>
+      buildBadgeSummary(
+        profile
+          ? {
+              ...profile,
+              solved_total: solvedTotals.total,
+              solved_easy: solvedTotals.easy,
+              solved_medium: solvedTotals.medium,
+              solved_hard: solvedTotals.hard,
+            }
+          : null,
+        bestStreak,
+      ),
+    [bestStreak, profile, solvedTotals.easy, solvedTotals.hard, solvedTotals.medium, solvedTotals.total],
+  );
 
   return (
     <DashboardShell
@@ -315,7 +372,7 @@ export default function ProfileDashboardPage() {
                     Community Stats
                   </div>
                   <div className="mt-2">
-                    <InfoRow label="Solved" value={Number(profile.solved_total || 0)} />
+                    <InfoRow label="Solved" value={solvedTotals.total} />
                     <InfoRow label="Submissions" value={totalSubmissions} />
                     <InfoRow label="Acceptance" value={acceptance != null ? `${acceptance}%` : "--"} />
                     <InfoRow label="Current streak" value={`${currentStreak} days`} />
@@ -421,12 +478,12 @@ export default function ProfileDashboardPage() {
 
           <section className="rounded-3xl border border-white/10 bg-[#121826] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
             <BadgeDisplay
-              solvedCount={Number(profile.solved_total || 0)}
+              solvedCount={solvedTotals.total}
               currentStreak={currentStreak}
               bestStreak={bestStreak}
-              easySolved={Number(profile.solved_easy || 0)}
-              mediumSolved={Number(profile.solved_medium || 0)}
-              hardSolved={Number(profile.solved_hard || 0)}
+              easySolved={solvedTotals.easy}
+              mediumSolved={solvedTotals.medium}
+              hardSolved={solvedTotals.hard}
             />
           </section>
 

@@ -24,6 +24,7 @@ export type ContestDetail = {
   description: string | null;
   starts_at: string | null;
   ends_at: string | null;
+  status: ContestStatus;
   problems: ContestProblemItem[];
 };
 

@@ -41,7 +41,7 @@ export default function ProfileSettingsPage() {
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
-    setStatus((s) => ({ ...s, profile: "Saving…" }));
+    setStatus((s) => ({ ...s, profile: "Saving..." }));
     try {
       await userApi.updateProfile({
         username: profileForm.username.trim(),
@@ -58,7 +58,7 @@ export default function ProfileSettingsPage() {
 
   async function savePassword(event: React.FormEvent) {
     event.preventDefault();
-    setStatus((s) => ({ ...s, password: "Updating…" }));
+    setStatus((s) => ({ ...s, password: "Updating..." }));
     try {
       await userApi.updatePassword({
         current_password: passwordForm.current,
@@ -75,7 +75,7 @@ export default function ProfileSettingsPage() {
   async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setStatus((s) => ({ ...s, avatar: "Uploading…" }));
+    setStatus((s) => ({ ...s, avatar: "Uploading..." }));
     try {
       await userApi.uploadAvatar(file);
       await refreshUser();

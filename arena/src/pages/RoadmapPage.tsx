@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import DashboardShell from "../components/layout/DashboardShell.jsx";
 import { API_BASE_URL } from "../lib/apiClient.js";
 import { readStoredToken } from "../lib/storage.js";
+import { getMySubmissions, hydrateSubmissionRows } from "../services/profileService";
 
 // NeetCode-style topic categories with icons
 const TOPICS = [
@@ -269,6 +270,7 @@ export default function RoadmapPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [topicStats, setTopicStats] = useState<Map<string, TopicStats>>(new Map());
+  const [totalStats, setTotalStats] = useState({ total: 0, solved: 0 });
 
   // Fetch problems to calculate stats per topic
   const fetchStats = useCallback(async () => {
@@ -278,18 +280,28 @@ export default function RoadmapPage() {
       const headers: Record<string, string> = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`${API_BASE_URL}/api/problems?per_page=500`, { headers });
-      const data = await res.json();
-      const problems = data.items || data || [];
+      const [problemRes, submissionRows] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/problems?per_page=500`, { headers }).then((res) => res.json()),
+        token ? getMySubmissions().then(hydrateSubmissionRows).catch(() => []) : Promise.resolve([]),
+      ]);
+      const problems = problemRes.items || problemRes || [];
+      const solvedProblemIds = new Set(
+        submissionRows
+          .filter((submission) => String(submission.status || submission.verdict || "").toLowerCase().includes("accepted"))
+          .map((submission) => String(submission.problem_id || "").trim())
+          .filter(Boolean)
+      );
 
-      // Calculate stats per tag
       const statsMap = new Map<string, TopicStats>();
-      
       TOPICS.forEach((topic) => {
         const tagProblems = problems.filter((p: { tags?: string[] }) =>
           p.tags?.some((t: string) => t.toLowerCase().includes(topic.tag.toLowerCase()))
         );
-        const solved = tagProblems.filter((p: { is_solved?: boolean }) => p.is_solved).length;
+        const solved = tagProblems.filter((p: { id?: string; slug?: string; is_solved?: boolean }) => {
+          const problemId = String(p.id || "").trim();
+          const problemSlug = String(p.slug || "").trim();
+          return Boolean(p.is_solved || solvedProblemIds.has(problemId) || solvedProblemIds.has(problemSlug));
+        }).length;
         statsMap.set(topic.tag, {
           tag: topic.tag,
           total: tagProblems.length,
@@ -298,6 +310,18 @@ export default function RoadmapPage() {
       });
 
       setTopicStats(statsMap);
+      const uniqueProblems = new Map<string, { solved: boolean }>();
+      problems.forEach((problem: { id?: string; slug?: string; is_solved?: boolean }) => {
+        const key = String(problem.id || problem.slug || "").trim();
+        if (!key) return;
+        uniqueProblems.set(key, {
+          solved: Boolean(problem.is_solved || solvedProblemIds.has(String(problem.id || "").trim()) || solvedProblemIds.has(String(problem.slug || "").trim())),
+        });
+      });
+      setTotalStats({
+        total: uniqueProblems.size,
+        solved: Array.from(uniqueProblems.values()).filter((item) => item.solved).length,
+      });
     } catch (err) {
       console.error("Failed to fetch roadmap stats:", err);
     } finally {
@@ -310,19 +334,7 @@ export default function RoadmapPage() {
   }, [fetchStats]);
 
   // Overall stats
-  const overallStats = useMemo(() => {
-    let totalProblems = 0;
-    let totalSolved = 0;
-    topicStats.forEach((stats) => {
-      totalProblems += stats.total;
-      totalSolved += stats.solved;
-    });
-    // Deduplicate (problems can have multiple tags)
-    return {
-      total: Math.round(totalProblems / 2), // Approximate deduplication
-      solved: Math.round(totalSolved / 2),
-    };
-  }, [topicStats]);
+  const overallStats = useMemo(() => totalStats, [totalStats]);
 
   const overallPercentage = overallStats.total > 0 
     ? Math.round((overallStats.solved / overallStats.total) * 100) 
