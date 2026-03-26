@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.submission_stats import UserStats
 from app.models.user import User
+from app.services.user_stats_service import user_stats_service
 
 
 router = APIRouter(tags=["auth"])
@@ -150,23 +151,13 @@ def create_access_token(user: User) -> str:
 
 
 def calculate_user_stats(db: Session, user_id: int) -> dict:
-    stats_row = db.query(UserStats).filter(UserStats.user_id == user_id).first()
-    if stats_row:
-        solved_total = int(stats_row.solved_count or 0)
-        solved_easy = int(stats_row.easy_solved or 0)
-        solved_medium = int(stats_row.medium_solved or 0)
-        solved_hard = int(stats_row.hard_solved or 0)
-    else:
-        solved_total = 0
-        solved_easy = 0
-        solved_medium = 0
-        solved_hard = 0
+    snapshot = user_stats_service.ensure_user_stats_fresh(db, user_id)
 
     return {
-        "solved_total": solved_total,
-        "solved_easy": solved_easy,
-        "solved_medium": solved_medium,
-        "solved_hard": solved_hard,
+        "solved_total": int(snapshot.solved_count or 0),
+        "solved_easy": int(snapshot.easy_solved or 0),
+        "solved_medium": int(snapshot.medium_solved or 0),
+        "solved_hard": int(snapshot.hard_solved or 0),
     }
 
 

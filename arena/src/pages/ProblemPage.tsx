@@ -89,7 +89,7 @@ export default function ProblemPage() {
           onLayoutChanged={horizontalLayout.onLayoutChanged}
           orientation="horizontal"
         >
-          <Panel defaultSize={38} maxSize={55} minSize={24}>
+          <Panel defaultSize={30} maxSize={42} minSize={18}>
             <div className="h-full min-h-0 overflow-hidden pr-0">
               <ProblemDescription loading={problemStatus === "loading"} problem={selectedProblem} />
             </div>
@@ -97,14 +97,14 @@ export default function ProblemPage() {
 
           <ResizeHandle orientation="vertical" />
 
-          <Panel defaultSize={62} minSize={35}>
+          <Panel defaultSize={70} minSize={52}>
             <ResizablePanelGroup
               className="h-full"
               defaultLayout={verticalLayout.defaultLayout}
               onLayoutChanged={verticalLayout.onLayoutChanged}
               orientation="vertical"
             >
-              <Panel defaultSize={66} minSize={38}>
+              <Panel defaultSize={78} minSize={62}>
                 <CodeEditorPanel
                   code={code}
                   isRunning={isRunning}
@@ -119,7 +119,7 @@ export default function ProblemPage() {
 
               <ResizeHandle orientation="horizontal" />
 
-              <Panel defaultSize={34} maxSize={58} minSize={18}>
+              <Panel defaultSize={22} maxSize={30} minSize={14}>
                 <TestTabs
                   activeIndex={activeCaseIndex}
                   busy={isRunning || isSubmitting}

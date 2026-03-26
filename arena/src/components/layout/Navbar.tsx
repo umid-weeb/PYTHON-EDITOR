@@ -16,7 +16,7 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   const username = user?.username || "";
-  const showBackToProblems = location.pathname.startsWith("/problems/") && location.pathname !== "/problems";
+  const showBackToEditor = location.pathname.startsWith("/problems/") && location.pathname !== "/problems";
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + "/");
 
@@ -65,13 +65,14 @@ export default function Navbar() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
-          {showBackToProblems ? (
+          {showBackToEditor ? (
             <button
-              className="hidden h-[var(--h-btn-md)] items-center rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 text-[12px] font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] md:inline-flex"
+              className="inline-flex h-[var(--h-btn-md)] items-center gap-2 rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 text-[12px] font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
               type="button"
-              onClick={() => navigate("/problems")}
+              onClick={() => navigate("/")}
             >
-              Back to Problems
+              <span aria-hidden="true" className="text-[14px] leading-none">←</span>
+              <span>Back to Editor</span>
             </button>
           ) : null}
           <ThemeToggle />

@@ -33,6 +33,7 @@ from app.api.routes.auth import (
     security,
 )
 from app.api.routes.auth import get_current_user
+from app.services.user_stats_service import user_stats_service
 
 
 router = APIRouter(tags=["users"])
@@ -253,6 +254,7 @@ def user_activity(current_user: User = Depends(get_current_user), db: Session = 
 
 @account_router.get("/user/submissions")
 def user_submissions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list:
+    user_stats_service.ensure_user_stats_fresh(db, current_user.id)
     rows = (
         db.query(
             SubmissionRecord.problem_id,
@@ -340,15 +342,15 @@ def get_user_stats_by_id(user_id: int, db: Session = Depends(get_db)) -> dict:
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    stats = db.query(UserStats).filter(UserStats.user_id == user_id).first()
+    snapshot = user_stats_service.ensure_user_stats_fresh(db, user_id)
     return {
         "user_id": user.id,
         "username": user.username,
-        "solved_count": int(getattr(stats, "solved_count", 0) or 0),
-        "easy_solved": int(getattr(stats, "easy_solved", 0) or 0),
-        "medium_solved": int(getattr(stats, "medium_solved", 0) or 0),
-        "hard_solved": int(getattr(stats, "hard_solved", 0) or 0),
-        "rating": int(getattr(stats, "rating", 1200) or 1200),
+        "solved_count": int(snapshot.solved_count or 0),
+        "easy_solved": int(snapshot.easy_solved or 0),
+        "medium_solved": int(snapshot.medium_solved or 0),
+        "hard_solved": int(snapshot.hard_solved or 0),
+        "rating": int(snapshot.rating or 1200),
         "streak": int(getattr(user, "streak", 0) or 0),
         "longest_streak": int(getattr(user, "longest_streak", 0) or 0),
     }
@@ -360,6 +362,7 @@ def get_user_submissions_by_id(user_id: int, db: Session = Depends(get_db)) -> l
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    user_stats_service.ensure_user_stats_fresh(db, user_id)
     rows = (
         db.query(
             SubmissionRecord.problem_id,

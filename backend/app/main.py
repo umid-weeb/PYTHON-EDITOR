@@ -35,8 +35,9 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     SubmissionRepository(settings.submissions_db_path)
+    Base.metadata.create_all(bind=engine)
     run_startup_migrations(engine)
-    # Ensure SQLAlchemy models are created (Supabase/Postgres or fallback SQLite)
+    # Run once more after bootstrap alters/creates auxiliary tables.
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         ensure_problem_catalog_seeded(db)

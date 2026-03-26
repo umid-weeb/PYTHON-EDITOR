@@ -149,61 +149,105 @@ class SubmissionService:
             )
             if submission.get("mode") == "submit":
                 with SessionLocal() as db:
-                    tracked_submission = user_stats_service.finalize_submission(
-                        db,
-                        external_submission_id=submission_id,
-                        verdict=result.get("verdict"),
-                        runtime_ms=result.get("runtime_ms"),
-                        memory_kb=result.get("memory_kb"),
-                        error_text=result.get("error_text"),
-                    )
-                    record = user_stats_service.sync_submission_history(db, tracked_submission) if tracked_submission else None
-                    if record:
-                        contest_row = (
-                            db.query(ContestSubmission)
-                            .filter(ContestSubmission.submission_id == submission_id)
-                            .first()
-                        )
-                        if contest_row:
-                            contest_row.verdict = record.verdict
-                            contest_row.runtime_ms = record.runtime_ms
-                            contest_row.memory_kb = record.memory_kb
-                        rating_service.on_submission_result(
+                    tracked_submission = None
+                    record = None
+                    stats_user_id = None
+                    accepted_submission = False
+                    accepted_problem_id = None
+                    accepted_runtime = None
+                    accepted_memory = None
+                    accepted_solved_at = None
+
+                    try:
+                        tracked_submission = user_stats_service.finalize_submission(
                             db,
-                            user_id=record.user_id,
-                            problem_id=record.problem_id,
-                            submission_id=record.submission_id,
-                            verdict=record.verdict,
+                            external_submission_id=submission_id,
+                            verdict=result.get("verdict"),
+                            runtime_ms=result.get("runtime_ms"),
+                            memory_kb=result.get("memory_kb"),
+                            error_text=result.get("error_text"),
                         )
-                        if (record.verdict or "").strip().lower() == "accepted":
+                        record = user_stats_service.sync_submission_history(db, tracked_submission) if tracked_submission else None
+
+                        if record:
+                            contest_row = (
+                                db.query(ContestSubmission)
+                                .filter(ContestSubmission.submission_id == submission_id)
+                                .first()
+                            )
+                            if contest_row:
+                                contest_row.verdict = record.verdict
+                                contest_row.runtime_ms = record.runtime_ms
+                                contest_row.memory_kb = record.memory_kb
+
+                            stats_user_id = record.user_id
+                            accepted_submission = (record.verdict or "").strip().lower() == "accepted"
+                            accepted_problem_id = record.problem_id
+                            accepted_runtime = record.runtime_ms
+                            accepted_memory = record.memory_kb
+                            accepted_solved_at = tracked_submission.created_at if tracked_submission else None
+                        elif tracked_submission and tracked_submission.user_id is not None:
+                            stats_user_id = int(tracked_submission.user_id)
+                            accepted_submission = (tracked_submission.verdict or "").strip().lower() == "accepted"
+                            accepted_problem_id = str(tracked_submission.problem_id) if tracked_submission.problem_id else None
+                            accepted_runtime = int(round(tracked_submission.runtime)) if tracked_submission.runtime is not None else None
+                            accepted_memory = tracked_submission.memory_kb
+                            accepted_solved_at = tracked_submission.created_at
+
+                        if accepted_submission and stats_user_id and accepted_problem_id:
                             user_stats_service.record_accepted_progress(
+                                db,
+                                user_id=stats_user_id,
+                                problem_id=accepted_problem_id,
+                                runtime_ms=accepted_runtime,
+                                memory_kb=accepted_memory,
+                                solved_at=accepted_solved_at,
+                            )
+                        elif stats_user_id:
+                            user = db.query(User).filter(User.id == stats_user_id).first()
+                            if user is not None:
+                                engagement_service.touch_last_active(db, user)
+
+                        if stats_user_id:
+                            user_stats_service.rebuild(db, stats_user_id)
+
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+                        raise
+
+                    if stats_user_id and record:
+                        try:
+                            rating_service.on_submission_result(
                                 db,
                                 user_id=record.user_id,
                                 problem_id=record.problem_id,
-                                runtime_ms=record.runtime_ms,
-                                memory_kb=record.memory_kb,
-                                solved_at=tracked_submission.created_at if tracked_submission else None,
+                                submission_id=record.submission_id,
+                                verdict=record.verdict,
                             )
-                            engagement_service.update_streak_for_accept(db, record.user_id)
-                        else:
-                            user = db.query(User).filter(User.id == record.user_id).first() if record.user_id else None
-                            if user is not None:
-                                engagement_service.touch_last_active(db, user)
-                        user_stats_service.rebuild(db, record.user_id)
-                    elif tracked_submission and tracked_submission.user_id is not None:
-                        if (tracked_submission.verdict or "").strip().lower() == "accepted":
-                            if tracked_submission.problem_id:
-                                user_stats_service.record_accepted_progress(
-                                    db,
-                                    user_id=int(tracked_submission.user_id),
-                                    problem_id=str(tracked_submission.problem_id),
-                                    runtime_ms=int(round(tracked_submission.runtime)) if tracked_submission.runtime is not None else None,
-                                    memory_kb=tracked_submission.memory_kb,
-                                    solved_at=tracked_submission.created_at,
-                                )
-                            engagement_service.update_streak_for_accept(db, int(tracked_submission.user_id))
-                        user_stats_service.rebuild(db, int(tracked_submission.user_id))
-                    db.commit()
+                            if accepted_submission:
+                                engagement_service.update_streak_for_accept(db, stats_user_id)
+                            db.commit()
+                        except Exception as side_effect_error:
+                            db.rollback()
+                            self.logger.exception(
+                                "submission.side_effect_failed id=%s user_id=%s error=%s",
+                                submission_id,
+                                stats_user_id,
+                                side_effect_error,
+                            )
+                    elif stats_user_id and accepted_submission:
+                        try:
+                            engagement_service.update_streak_for_accept(db, stats_user_id)
+                            db.commit()
+                        except Exception as side_effect_error:
+                            db.rollback()
+                            self.logger.exception(
+                                "submission.streak_failed id=%s user_id=%s error=%s",
+                                submission_id,
+                                stats_user_id,
+                                side_effect_error,
+                            )
         except Exception as error:
             self.repository.mark_failed(submission_id, str(error))
             self.logger.exception("submission.failed id=%s error=%s", submission_id, error)

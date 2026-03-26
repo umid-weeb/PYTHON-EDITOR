@@ -30,37 +30,37 @@ export default function ArenaLayout({
           onLayoutChanged={rootLayout.onLayoutChanged}
           orientation="horizontal"
         >
-          <Panel defaultSize={21} maxSize={30} minSize={16}>
+          <Panel defaultSize={16} maxSize={24} minSize={12}>
             <Surface>{sidebar}</Surface>
           </Panel>
           <ResizeHandle orientation="vertical" />
-          <Panel defaultSize={31} minSize={22}>
+          <Panel defaultSize={28} maxSize={36} minSize={18}>
             <Surface>{viewer}</Surface>
           </Panel>
           <ResizeHandle orientation="vertical" />
-          <Panel defaultSize={48} minSize={30}>
+          <Panel defaultSize={56} minSize={40}>
             <ResizablePanelGroup
               className="h-full min-h-0"
               defaultLayout={rightLayout.defaultLayout}
               onLayoutChanged={rightLayout.onLayoutChanged}
               orientation="vertical"
             >
-              <Panel defaultSize={63} minSize={38}>
+              <Panel defaultSize={74} minSize={58}>
                 <Surface>{editor}</Surface>
               </Panel>
               <ResizeHandle orientation="horizontal" />
-              <Panel defaultSize={37} minSize={22}>
+              <Panel defaultSize={26} maxSize={34} minSize={16}>
                 <ResizablePanelGroup
                   className="h-full min-h-0"
                   defaultLayout={bottomLayout.defaultLayout}
                   onLayoutChanged={bottomLayout.onLayoutChanged}
                   orientation="horizontal"
                 >
-                  <Panel defaultSize={48} minSize={24}>
+                  <Panel defaultSize={44} minSize={26}>
                     <Surface>{testCases}</Surface>
                   </Panel>
                   <ResizeHandle orientation="vertical" />
-                  <Panel defaultSize={52} minSize={24}>
+                  <Panel defaultSize={56} minSize={26}>
                     <Surface>{result}</Surface>
                   </Panel>
                 </ResizablePanelGroup>

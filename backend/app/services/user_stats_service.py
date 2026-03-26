@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.problem import Problem
 from app.models.rating import RatingHistory, UserRating
 from app.models.submission_stats import SubmissionRecord, UserProgress, UserStats, UserSubmission
 from app.models.user import User
+from app.repositories.submissions import SubmissionRepository
 
 
 @dataclass(frozen=True)
@@ -23,6 +26,11 @@ class UserStatsSnapshot:
 
 
 class UserStatsService:
+    @lru_cache(maxsize=1)
+    def _submission_repository(self) -> SubmissionRepository:
+        settings = get_settings()
+        return SubmissionRepository(settings.submissions_db_path)
+
     @staticmethod
     def _is_accepted(verdict: str | None, status: str | None = None) -> bool:
         normalized_verdict = (verdict or "").strip().lower()
@@ -241,6 +249,66 @@ class UserStatsService:
         user_ids = [row[0] for row in db.query(User.id).all()]
         for user_id in user_ids:
             self.rebuild(db, int(user_id))
+
+    def repair_submission_record_from_judge_store(self, db: Session, submission: SubmissionRecord) -> bool:
+        if not submission.external_submission_id:
+            return False
+
+        payload = self._submission_repository().get(submission.external_submission_id)
+        if payload is None:
+            return False
+
+        raw_status = str(payload.get("status") or "").strip().lower()
+        if raw_status in {"", "queued", "running"}:
+            return False
+
+        verdict = (payload.get("verdict") or "").strip() or None
+        status = (
+            "accepted"
+            if (verdict or "").lower() == "accepted"
+            else raw_status or (verdict or "").lower().replace(" ", "_") or "runtime_error"
+        )
+        runtime_ms = payload.get("runtime_ms")
+        memory_kb = payload.get("memory_kb")
+        error_text = payload.get("error_text")
+
+        changed = False
+        if submission.verdict != verdict:
+            submission.verdict = verdict
+            changed = True
+        if submission.status != status:
+            submission.status = status
+            changed = True
+        normalized_runtime = float(runtime_ms) if runtime_ms is not None else None
+        if submission.runtime != normalized_runtime:
+            submission.runtime = normalized_runtime
+            changed = True
+        if submission.memory_kb != memory_kb:
+            submission.memory_kb = memory_kb
+            changed = True
+        if submission.error_text != error_text:
+            submission.error_text = error_text
+            changed = True
+
+        if changed:
+            db.flush()
+        return changed
+
+    def ensure_user_stats_fresh(self, db: Session, user_id: int) -> UserStatsSnapshot:
+        records = (
+            db.query(SubmissionRecord)
+            .filter(SubmissionRecord.user_id == user_id)
+            .order_by(SubmissionRecord.created_at.asc(), SubmissionRecord.id.asc())
+            .all()
+        )
+        for record in records:
+            self.repair_submission_record_from_judge_store(db, record)
+
+        self.backfill_submission_history(db, user_id)
+        self.rebuild_progress_from_submissions(db, user_id)
+        snapshot = self.rebuild(db, user_id)
+        db.commit()
+        return snapshot
 
     def record_submission(
         self,
