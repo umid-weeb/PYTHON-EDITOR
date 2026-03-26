@@ -50,7 +50,7 @@ export default function ProblemDescription({ problem, loading }: Props) {
   const examples = (problem.visible_testcases || []).slice(0, 3);
 
   return (
-    <div className="flex h-full min-h-0 flex-col border border-[color:var(--border)] bg-[var(--bg-surface)]">
+    <div className="flex h-full min-h-0 min-w-0 flex-col border border-[color:var(--border)] bg-[var(--bg-surface)]">
       <div className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/95 px-4 py-3 backdrop-blur">
         <div className="mb-2 flex items-center gap-3">
           <span

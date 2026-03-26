@@ -38,8 +38,8 @@ export default function ProblemPage() {
   } = useArena();
 
   const problemKey = useMemo(() => slug || selectedProblem?.slug || selectedProblemId, [selectedProblem?.slug, selectedProblemId, slug]);
-  const horizontalLayout = useDefaultLayout({ id: "pyzone-problem-horizontal" });
-  const verticalLayout = useDefaultLayout({ id: "pyzone-problem-vertical" });
+  const horizontalLayout = useDefaultLayout({ id: "pyzone-problem-horizontal-v4" });
+  const verticalLayout = useDefaultLayout({ id: "pyzone-problem-vertical-v4" });
 
   useEffect(() => {
     let mounted = true;
@@ -82,29 +82,29 @@ export default function ProblemPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-var(--h-navbar))] flex-col overflow-hidden">
+      <div className="flex h-[calc(100vh-var(--h-navbar))] min-w-0 flex-col overflow-hidden">
         <ResizablePanelGroup
-          className="flex-1 overflow-hidden"
+          className="flex-1 min-w-0 overflow-hidden"
           defaultLayout={horizontalLayout.defaultLayout}
           onLayoutChanged={horizontalLayout.onLayoutChanged}
           orientation="horizontal"
         >
-          <Panel defaultSize={30} maxSize={42} minSize={18}>
-            <div className="h-full min-h-0 overflow-hidden pr-0">
+          <Panel defaultSize={48} maxSize={68} minSize={26}>
+            <div className="h-full min-h-0 min-w-0 overflow-hidden pr-0">
               <ProblemDescription loading={problemStatus === "loading"} problem={selectedProblem} />
             </div>
           </Panel>
 
           <ResizeHandle orientation="vertical" />
 
-          <Panel defaultSize={70} minSize={52}>
+          <Panel defaultSize={52} maxSize={74} minSize={26}>
             <ResizablePanelGroup
-              className="h-full"
+              className="h-full min-h-0 min-w-0"
               defaultLayout={verticalLayout.defaultLayout}
               onLayoutChanged={verticalLayout.onLayoutChanged}
               orientation="vertical"
             >
-              <Panel defaultSize={78} minSize={62}>
+              <Panel defaultSize={52} maxSize={82} minSize={26}>
                 <CodeEditorPanel
                   code={code}
                   isRunning={isRunning}
@@ -119,7 +119,7 @@ export default function ProblemPage() {
 
               <ResizeHandle orientation="horizontal" />
 
-              <Panel defaultSize={22} maxSize={30} minSize={14}>
+              <Panel defaultSize={48} maxSize={74} minSize={18}>
                 <TestTabs
                   activeIndex={activeCaseIndex}
                   busy={isRunning || isSubmitting}

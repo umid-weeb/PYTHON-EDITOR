@@ -29,7 +29,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy }:
   const [active, setActive] = useState<Tab>("cases");
 
   return (
-    <div className="flex h-full min-h-0 flex-col border-t border-[color:var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
+    <div className="flex h-full min-h-0 min-w-0 flex-col border-t border-[color:var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
       <div className="flex h-[var(--h-tab-bar)] shrink-0 items-center border-b border-[color:var(--border)] px-1">
         {[
           { key: "cases", label: "Test Cases" },
