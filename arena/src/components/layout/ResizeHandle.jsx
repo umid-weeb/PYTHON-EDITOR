@@ -6,22 +6,19 @@ export default function ResizeHandle({ orientation = "vertical" }) {
   return (
     <Separator
       className={[
-        "group relative z-[1] flex shrink-0 items-center justify-center transition-colors",
-        isVertical ? "w-3 cursor-col-resize" : "h-3 cursor-row-resize",
+        "group relative z-[10] flex shrink-0 items-center justify-center transition-colors bg-[var(--bg-surface)] hover:bg-[var(--accent-subtle)]/30",
+        isVertical ? "w-2 cursor-col-resize active:transition-none" : "h-2 cursor-row-resize active:transition-none",
       ].join(" ")}
     >
       <div
         className={[
-          "rounded-[var(--radius-pill)] bg-[var(--border-strong)] transition-colors duration-150 group-hover:bg-[var(--accent)] group-focus:bg-[var(--accent)]",
-          isVertical ? "h-full w-[2px]" : "h-[2px] w-full",
+          "rounded-[var(--radius-pill)] bg-[var(--border)] transition-all duration-200 group-hover:bg-[var(--accent)] group-active:bg-[var(--accent)]",
+          isVertical ? "h-6 w-[2px] group-hover:h-full group-active:h-full" : "w-6 h-[2px] group-hover:w-full group-active:w-full",
         ].join(" ")}
       />
-      <div
-        className={[
-          "pointer-events-none absolute rounded-[var(--radius-pill)] bg-[var(--accent-subtle)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100",
-          isVertical ? "h-14 w-[6px]" : "h-[6px] w-14",
-        ].join(" ")}
-      />
+      
+      {/* Invisible larger hit area for easier dragging */}
+      <div className={`absolute ${isVertical ? 'w-4 h-full' : 'h-4 w-full'} z-[-1]`} />
     </Separator>
   );
 }

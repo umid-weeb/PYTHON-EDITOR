@@ -1,4 +1,6 @@
-import { Group as ResizablePanelGroup, Panel, useDefaultLayout } from "react-resizable-panels";
+import { Group as ResizablePanelGroup, Panel } from "react-resizable-panels";
+import { useSplitLayout } from "../../hooks/useSplitLayout.js";
+import { useMediaQuery } from "../../hooks/useMediaQuery.js";
 import ResizeHandle from "./ResizeHandle.jsx";
 
 function Surface({ children }) {
@@ -16,9 +18,13 @@ export default function ArenaLayout({
   result,
   authModal,
 }) {
-  const rootLayout = useDefaultLayout({ id: "arena-workspace-panels-v1" });
-  const rightLayout = useDefaultLayout({ id: "arena-right-column-v5" });
-  const bottomLayout = useDefaultLayout({ id: "arena-bottom-row-v5" });
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const rootLayout = useSplitLayout({ 
+    id: isMobile ? "arena-workspace-mobile-v1" : "arena-workspace-panels-v1", 
+    defaultLayout: isMobile ? [40, 60] : [48, 52] 
+  });
+  const rightLayout = useSplitLayout({ id: "arena-right-column-v5", defaultLayout: [56, 44] });
+  const bottomLayout = useSplitLayout({ id: "arena-bottom-row-v5", defaultLayout: [50, 50] });
 
   return (
     <div className="mx-auto flex h-[calc(100vh-var(--h-navbar)-16px)] w-[min(1500px,calc(100vw-20px))] max-w-full flex-col py-[10px] max-[860px]:w-[min(100vw-12px,100%)]">
@@ -27,12 +33,12 @@ export default function ArenaLayout({
           className="h-full min-h-0 min-w-0"
           defaultLayout={rootLayout.defaultLayout}
           onLayoutChanged={rootLayout.onLayoutChanged}
-          orientation="horizontal"
+          orientation={isMobile ? "vertical" : "horizontal"}
         >
-          <Panel defaultSize={48} maxSize={70} minSize={26}>
+          <Panel defaultSize={48} maxSize={isMobile ? 100 : 70} minSize={isMobile ? 0 : 26}>
             <Surface>{viewer}</Surface>
           </Panel>
-          <ResizeHandle orientation="vertical" />
+          <ResizeHandle orientation={isMobile ? "horizontal" : "vertical"} />
           <Panel defaultSize={52} maxSize={74} minSize={28}>
             <ResizablePanelGroup
               className="h-full min-h-0 min-w-0"

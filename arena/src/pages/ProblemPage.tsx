@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Group as ResizablePanelGroup, Panel, useDefaultLayout } from "react-resizable-panels";
+import { Group as ResizablePanelGroup, Panel } from "react-resizable-panels";
+import { useSplitLayout } from "../hooks/useSplitLayout.js";
+import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import AuthPromptModal from "../components/common/AuthPromptModal.jsx";
 import CodeEditorPanel from "../components/editor/CodeEditorPanel.jsx";
 import ResizeHandle from "../components/layout/ResizeHandle.jsx";
@@ -38,8 +40,12 @@ export default function ProblemPage() {
   } = useArena();
 
   const problemKey = useMemo(() => slug || selectedProblem?.slug || selectedProblemId, [selectedProblem?.slug, selectedProblemId, slug]);
-  const horizontalLayout = useDefaultLayout({ id: "pyzone-problem-horizontal-v4" });
-  const verticalLayout = useDefaultLayout({ id: "pyzone-problem-vertical-v4" });
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const horizontalLayout = useSplitLayout({ 
+    id: isMobile ? "pyzone-problem-mobile-v4" : "pyzone-problem-horizontal-v4", 
+    defaultLayout: isMobile ? [40, 60] : [48, 52] 
+  });
+  const verticalLayout = useSplitLayout({ id: "pyzone-problem-vertical-v4", defaultLayout: [52, 48] });
 
   useEffect(() => {
     let mounted = true;
@@ -92,9 +98,9 @@ export default function ProblemPage() {
           className="flex-1 min-w-0 overflow-hidden"
           defaultLayout={horizontalLayout.defaultLayout}
           onLayoutChanged={horizontalLayout.onLayoutChanged}
-          orientation="horizontal"
+          orientation={isMobile ? "vertical" : "horizontal"}
         >
-          <Panel defaultSize={48} maxSize={75} minSize={20}>
+          <Panel defaultSize={48} maxSize={isMobile ? 100 : 75} minSize={isMobile ? 0 : 20}>
             <div className="h-full min-h-0 min-w-0 overflow-hidden pr-0">
               <ProblemDescription 
                 loading={problemStatus === "loading"} 
@@ -104,7 +110,7 @@ export default function ProblemPage() {
             </div>
           </Panel>
 
-          <ResizeHandle orientation="vertical" />
+          <ResizeHandle orientation={isMobile ? "horizontal" : "vertical"} />
 
           <Panel defaultSize={52} maxSize={80} minSize={20}>
             <ResizablePanelGroup
