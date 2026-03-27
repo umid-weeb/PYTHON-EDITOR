@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { arenaApi } from "../lib/apiClient.js";
+import { useAuth } from "./AuthContext.jsx";
 import { buildResultState } from "../lib/formatters.js";
 import {
   clearPendingSubmission,
@@ -36,6 +37,15 @@ export function ArenaProvider({ children }) {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [activeCaseIndex, setActiveCaseIndex] = useState(0);
   const cacheRef = useRef(new Map());
+
+  const { token } = useAuth();
+
+  useEffect(() => {
+    if (token) {
+      setShowAuthModal(false);
+    }
+  }, [token]);
+
 
   const getSubmissionProblemKey = useCallback(
     () => selectedProblem?.id || selectedProblem?.slug || selectedProblemId,
