@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 from functools import lru_cache
 from typing import Any
 
@@ -29,6 +30,10 @@ class SubmissionService:
         self.problem_service: ProblemService = get_problem_service()
         self.judge = JudgeRunner(self.settings)
         self.logger = logging.getLogger("pyzone.arena.submission")
+        self._recovery_stop = threading.Event()
+        self._recovery_thread: threading.Thread | None = None
+        self._scheduled_submissions: set[str] = set()
+        self._scheduled_lock = threading.Lock()
 
     def create_submission(self, payload: SubmissionRequest, mode: str, user_id: int | None = None) -> str:
         if mode == "submit" and user_id is None:
@@ -80,12 +85,7 @@ class SubmissionService:
 
     def enqueue_submission(self, submission_id: str) -> None:
         if self.settings.use_inline_execution:
-            worker = threading.Thread(
-                target=self.process_submission,
-                args=(submission_id,),
-                daemon=True,
-            )
-            worker.start()
+            self._schedule_processing(submission_id, reason="inline")
             return
 
         try:
@@ -94,17 +94,20 @@ class SubmissionService:
             process_submission_task.delay(submission_id)
             self.logger.info("submission.enqueued id=%s backend=celery", submission_id)
         except Exception:
-            worker = threading.Thread(
-                target=self.process_submission,
-                args=(submission_id,),
-                daemon=True,
-            )
-            worker.start()
             self.logger.warning("submission.celery_fallback id=%s running_inline", submission_id)
+            self._schedule_processing(submission_id, reason="celery-fallback")
+            return
 
-    def process_submission(self, submission_id: str) -> None:
+        self._schedule_processing(
+            submission_id,
+            reason="watchdog",
+            delay_seconds=self.settings.submission_watchdog_delay_seconds,
+            recover_stale=True,
+        )
+
+    def process_submission(self, submission_id: str, *, recover_stale: bool = False) -> None:
         try:
-            payload = self._prepare_for_execution(int(submission_id))
+            payload = self._prepare_for_execution(int(submission_id), recover_stale=recover_stale)
             if payload is None:
                 return
 
@@ -142,6 +145,7 @@ class SubmissionService:
             row = self.repository.get_submission(db, int(submission_id))
             if row is None:
                 return None
+            self._ensure_submission_processing(row)
             return profile_service.serialize_submission_status(row)
 
     def get_submission_for_user(self, submission_id: str, user_id: int | None = None) -> dict[str, Any] | None:
@@ -153,18 +157,20 @@ class SubmissionService:
                 return None
             if row.user_id is not None and user_id is None:
                 return None
+            self._ensure_submission_processing(row)
             return profile_service.serialize_submission_status(row)
 
-    def _prepare_for_execution(self, submission_id: int) -> dict[str, Any] | None:
+    def _prepare_for_execution(self, submission_id: int, *, recover_stale: bool = False) -> dict[str, Any] | None:
         with SessionLocal() as db:
-            submission = self.repository.get_submission(db, submission_id, lock=True)
+            submission = self.repository.claim_submission_for_processing(
+                db,
+                submission_id,
+                recover_running_after_seconds=(
+                    self.settings.submission_recovery_stale_after_seconds if recover_stale else None
+                ),
+            )
             if submission is None:
                 return None
-            normalized_status = str(submission.status or "").strip().lower()
-            if normalized_status != "pending":
-                return None
-
-            self.repository.mark_running(db, submission_id)
             payload = {
                 "problem_id": str(submission.problem_id),
                 "user_id": submission.user_id,
@@ -174,6 +180,54 @@ class SubmissionService:
             }
             db.commit()
             return payload
+
+    def recover_stale_submissions(
+        self,
+        *,
+        limit: int | None = None,
+        stale_after_seconds: int | None = None,
+    ) -> list[str]:
+        safe_limit = max(1, int(limit or self.settings.submission_recovery_batch_size))
+        safe_stale_after = max(
+            0,
+            int(
+                stale_after_seconds
+                if stale_after_seconds is not None
+                else self.settings.submission_recovery_stale_after_seconds
+            ),
+        )
+
+        with SessionLocal() as db:
+            stale_ids = self.repository.list_stale_submission_ids(
+                db,
+                stale_after_seconds=safe_stale_after,
+                limit=safe_limit,
+            )
+
+        processed: list[str] = []
+        for submission_id in stale_ids:
+            submission_key = str(submission_id)
+            self.process_submission(submission_key, recover_stale=True)
+            processed.append(submission_key)
+        return processed
+
+    def start_recovery_loop(self) -> None:
+        if self._recovery_thread and self._recovery_thread.is_alive():
+            return
+
+        self._recovery_stop.clear()
+        self._recovery_thread = threading.Thread(
+            target=self._recovery_worker,
+            name="arena-submission-recovery",
+            daemon=True,
+        )
+        self._recovery_thread.start()
+
+    def stop_recovery_loop(self) -> None:
+        self._recovery_stop.set()
+        if self._recovery_thread and self._recovery_thread.is_alive():
+            self._recovery_thread.join(timeout=2.0)
+        self._recovery_thread = None
 
     def _finalize_success(self, submission_id: int, result: dict[str, Any]) -> dict[str, Any] | None:
         side_effects: dict[str, Any] = {}
@@ -279,7 +333,12 @@ class SubmissionService:
                     verdict=verdict,
                     is_first_solve=True,
                 )
-                engagement_service.update_streak_for_accept(db, user_id)
+                submission = self.repository.get_submission(db, int(submission_id))
+                engagement_service.update_streak_for_accept(
+                    db,
+                    user_id,
+                    solved_at=submission.created_at if submission is not None else None,
+                )
                 db.commit()
             except Exception as side_effect_error:
                 db.rollback()
@@ -289,6 +348,61 @@ class SubmissionService:
                     user_id,
                     side_effect_error,
                 )
+
+    def _schedule_processing(
+        self,
+        submission_id: str,
+        *,
+        reason: str,
+        delay_seconds: float = 0.0,
+        recover_stale: bool = False,
+    ) -> bool:
+        submission_key = str(submission_id)
+        with self._scheduled_lock:
+            if submission_key in self._scheduled_submissions:
+                return False
+            self._scheduled_submissions.add(submission_key)
+
+        def runner() -> None:
+            try:
+                if delay_seconds > 0:
+                    time.sleep(delay_seconds)
+                self.process_submission(submission_key, recover_stale=recover_stale)
+            finally:
+                with self._scheduled_lock:
+                    self._scheduled_submissions.discard(submission_key)
+
+        worker = threading.Thread(
+            target=runner,
+            name=f"arena-submission-{reason}-{submission_key}",
+            daemon=True,
+        )
+        worker.start()
+        return True
+
+    def _ensure_submission_processing(self, submission) -> None:
+        normalized_status = str(submission.status or "").strip().lower()
+        if normalized_status not in {"pending", "running"}:
+            return
+
+        self._schedule_processing(
+            str(submission.id),
+            reason="status-poll",
+            delay_seconds=0.0,
+            recover_stale=True,
+        )
+
+    def _recovery_worker(self) -> None:
+        while not self._recovery_stop.is_set():
+            try:
+                processed = self.recover_stale_submissions()
+                if processed:
+                    self.logger.info("submission.recovered count=%s ids=%s", len(processed), ",".join(processed))
+            except Exception as recovery_error:
+                self.logger.exception("submission.recovery_failed error=%s", recovery_error)
+
+            if self._recovery_stop.wait(self.settings.submission_recovery_interval_seconds):
+                break
 
     @staticmethod
     def _sync_contest_submission(

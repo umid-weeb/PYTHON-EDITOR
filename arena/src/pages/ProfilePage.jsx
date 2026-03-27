@@ -210,7 +210,7 @@ export default function ProfilePage() {
                         {submission.created_at ? new Date(submission.created_at).toLocaleDateString() : "Recent"}
                       </div>
                     </div>
-                    <div className={styles.muted}>{submission.status || submission.verdict || "--"}</div>
+                    <div className={styles.muted}>{submission.verdict || submission.status || "--"}</div>
                   </div>
                 ))}
                 {submissions.length === 0 ? <div className={styles.muted}>No submissions yet.</div> : null}

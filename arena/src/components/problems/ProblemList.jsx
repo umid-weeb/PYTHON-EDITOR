@@ -54,6 +54,23 @@ function StatusMark({ solved, attempted }) {
   return <span className="inline-block h-4 w-4 rounded-full border border-transparent" />;
 }
 
+function StatusLabel({ solved, attempted }) {
+  if (!solved && !attempted) return null;
+
+  return (
+    <span
+      className={[
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.04em]",
+        solved
+          ? "border-[rgba(87,223,180,0.22)] bg-[rgba(87,223,180,0.1)] text-arena-success"
+          : "border-[rgba(255,214,102,0.22)] bg-[rgba(255,214,102,0.1)] text-arena-warning",
+      ].join(" ")}
+    >
+      {solved ? "Yechilgan" : "Ishlangan"}
+    </span>
+  );
+}
+
 export default function ProblemList({
   problems,
   loading,
@@ -130,7 +147,8 @@ export default function ProblemList({
                   >
                     <div className="flex items-center gap-3">
                       <StatusMark attempted={problem.is_attempted} solved={problem.is_solved} />
-                      <div className="font-semibold">{problem.title || problem.id}</div>
+                      <div className="min-w-0 flex-1 font-semibold">{problem.title || problem.id}</div>
+                      <StatusLabel attempted={problem.is_attempted} solved={problem.is_solved} />
                     </div>
                     <div className="flex items-center justify-between gap-3 text-sm text-arena-muted">
                       <span

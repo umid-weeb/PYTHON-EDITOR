@@ -21,6 +21,7 @@ from app import models as _models  # noqa: F401
 from app.services.problem_catalog import ensure_problem_catalog_seeded
 from app.services.db_bootstrap import run_startup_migrations
 from app.services.engagement_service import engagement_service
+from app.services.submission_service import get_submission_service
 
 
 settings = get_settings()
@@ -40,7 +41,12 @@ async def lifespan(_: FastAPI):
         ensure_problem_catalog_seeded(db)
         engagement_service.ensure_upcoming_daily_challenges(db)
         db.commit()
-    yield
+    submission_service = get_submission_service()
+    submission_service.start_recovery_loop()
+    try:
+        yield
+    finally:
+        submission_service.stop_recovery_loop()
 
 
 app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import DashboardShell from "../components/layout/DashboardShell.jsx";
 import { API_BASE_URL } from "../lib/apiClient.js";
 import { readStoredToken } from "../lib/storage.js";
-import { getMySubmissions, hydrateSubmissionRows } from "../services/profileService";
+import { getMySubmissions, hydrateSubmissionRows, resolveSubmissionOutcome } from "../services/profileService";
 
 // NeetCode-style topic categories with icons
 const TOPICS = [
@@ -287,7 +287,7 @@ export default function RoadmapPage() {
       const problems = problemRes.items || problemRes || [];
       const solvedProblemIds = new Set(
         submissionRows
-          .filter((submission) => String(submission.status || submission.verdict || "").toLowerCase().includes("accepted"))
+          .filter((submission) => resolveSubmissionOutcome(submission).includes("accepted"))
           .map((submission) => String(submission.problem_id || "").trim())
           .filter(Boolean)
       );

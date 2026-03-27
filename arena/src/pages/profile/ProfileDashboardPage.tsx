@@ -19,6 +19,7 @@ import {
   getPublicProfile,
   hydrateSubmissionRows,
   getUserSubmissionsById,
+  resolveSubmissionOutcome,
   type PublicProfile,
   type SubmissionRow,
 } from "../../services/profileService";
@@ -31,7 +32,7 @@ function cx(...parts: Array<string | false | null | undefined>) {
 }
 
 function isAcceptedSubmission(submission: SubmissionRow) {
-  return String(submission.status || submission.verdict || "").toLowerCase().includes("accepted");
+  return resolveSubmissionOutcome(submission).includes("accepted");
 }
 
 function deriveActivityFromSubmissions(submissions: SubmissionRow[]): ActivityRow[] {
@@ -51,7 +52,7 @@ function deriveSolvedStats(submissions: SubmissionRow[]) {
   const accepted = new Map<string, string>();
 
   submissions.forEach((submission) => {
-    const status = String(submission.status || submission.verdict || "").toLowerCase();
+    const status = resolveSubmissionOutcome(submission);
     if (!status.includes("accepted")) return;
     if (!submission.problem_id) return;
     if (!accepted.has(submission.problem_id)) {
@@ -255,11 +256,18 @@ export default function ProfileDashboardPage() {
 
   const problemTotals = useMemo(
     () => ({
-      easy: { solved: solvedTotals.easy, total: 150 },
-      medium: { solved: solvedTotals.medium, total: 300 },
-      hard: { solved: solvedTotals.hard, total: 150 },
+      easy: { solved: solvedTotals.easy, total: Number(profile?.problem_bank_easy ?? 0) },
+      medium: { solved: solvedTotals.medium, total: Number(profile?.problem_bank_medium ?? 0) },
+      hard: { solved: solvedTotals.hard, total: Number(profile?.problem_bank_hard ?? 0) },
     }),
-    [solvedTotals.easy, solvedTotals.hard, solvedTotals.medium],
+    [
+      profile?.problem_bank_easy,
+      profile?.problem_bank_hard,
+      profile?.problem_bank_medium,
+      solvedTotals.easy,
+      solvedTotals.hard,
+      solvedTotals.medium,
+    ],
   );
 
   const totalSubmissions = useMemo(
@@ -527,7 +535,7 @@ export default function ProfileDashboardPage() {
                         accepted ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300",
                       )}
                     >
-                      {accepted ? "Accepted" : statValue(submission.status || submission.verdict, "Pending")}
+                      {accepted ? "Accepted" : statValue(submission.verdict || submission.status, "Pending")}
                     </div>
                   </div>
                 );

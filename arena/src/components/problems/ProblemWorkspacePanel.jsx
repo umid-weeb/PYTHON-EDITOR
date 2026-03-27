@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { formatMemory, formatRuntime, localizeVerdictLabel } from "../../lib/formatters.js";
 import { formatProblemTitle, localizeDifficultyLabel } from "../../lib/problemPresentation.js";
-import { getMySubmissions, hydrateSubmissionRows } from "../../services/profileService";
+import { getMySubmissions, hydrateSubmissionRows, resolveSubmissionOutcome } from "../../services/profileService";
 import ProblemDescription from "../problem/ProblemDescription.tsx";
 
 const DIFFICULTY_FILTERS = [
@@ -53,9 +53,9 @@ function EmptyStateCard({ eyebrow, title, copy, action }) {
 }
 
 function SubmissionPanel({ username, rows, status }) {
-  const acceptedCount = rows.filter((row) => String(row.status || row.verdict || "").toLowerCase().includes("accepted")).length;
+  const acceptedCount = rows.filter((row) => resolveSubmissionOutcome(row).includes("accepted")).length;
   const fastestAccepted = rows
-    .filter((row) => String(row.status || row.verdict || "").toLowerCase().includes("accepted") && row.runtime_ms != null)
+    .filter((row) => resolveSubmissionOutcome(row).includes("accepted") && row.runtime_ms != null)
     .sort((left, right) => Number(left.runtime_ms || 0) - Number(right.runtime_ms || 0))[0];
 
   if (!username) {
@@ -126,7 +126,7 @@ function SubmissionPanel({ username, rows, status }) {
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="space-y-2">
           {rows.map((submission, index) => {
-            const verdict = String(submission.status || submission.verdict || "pending");
+            const verdict = String(submission.verdict || submission.status || "pending");
             return (
               <div
                 key={`${submission.submission_id || submission.created_at || submission.problem_id}-${index}`}

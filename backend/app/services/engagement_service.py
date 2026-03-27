@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.orm import Session
@@ -23,6 +23,15 @@ def _today_for_timezone(tz_name: str | None) -> date:
     return datetime.now(_coerce_timezone(tz_name)).date()
 
 
+def _date_for_timezone(value: datetime | date | None, tz_name: str | None) -> date:
+    if value is None:
+        return _today_for_timezone(tz_name)
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    comparable = value if value.tzinfo else value.replace(tzinfo=_coerce_timezone("UTC"))
+    return comparable.astimezone(_coerce_timezone(tz_name)).date()
+
+
 @dataclass(frozen=True)
 class StreakSnapshot:
     streak: int
@@ -38,7 +47,7 @@ class StreakSnapshot:
 
 class EngagementService:
     def touch_last_active(self, db: Session, user: User) -> None:
-        user.last_active = datetime.utcnow()
+        user.last_active = datetime.now(timezone.utc)
         db.flush()
 
     def get_streak_snapshot(self, db: Session, user_id: int) -> StreakSnapshot:
@@ -61,24 +70,35 @@ class EngagementService:
             today_solved=bool(today_row),
         )
 
-    def update_streak_for_accept(self, db: Session, user_id: int) -> StreakSnapshot:
+    def update_streak_for_accept(
+        self,
+        db: Session,
+        user_id: int,
+        *,
+        solved_at: datetime | date | None = None,
+    ) -> StreakSnapshot:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise ValueError("User not found")
 
         tz_name = user.timezone or "Asia/Tashkent"
-        today = _today_for_timezone(tz_name)
-        yesterday = today - timedelta(days=1)
+        solved_date = _date_for_timezone(solved_at, tz_name)
+        yesterday = solved_date - timedelta(days=1)
 
         history_row = (
             db.query(StreakHistory)
-            .filter(StreakHistory.user_id == user_id, StreakHistory.streak_date == today)
+            .filter(StreakHistory.user_id == user_id, StreakHistory.streak_date == solved_date)
             .first()
         )
 
-        if user.last_solve_date == today:
+        if user.last_solve_date == solved_date:
             if history_row is None:
-                history_row = StreakHistory(user_id=user_id, streak_date=today, solved=0, streak_day=int(user.streak or 0))
+                history_row = StreakHistory(
+                    user_id=user_id,
+                    streak_date=solved_date,
+                    solved=0,
+                    streak_day=int(user.streak or 0),
+                )
                 db.add(history_row)
             history_row.solved = int(history_row.solved or 0) + 1
             db.flush()
@@ -97,11 +117,11 @@ class EngagementService:
 
         user.streak = new_streak
         user.longest_streak = max(int(user.longest_streak or 0), new_streak)
-        user.last_solve_date = today
-        user.last_active = datetime.utcnow()
+        user.last_solve_date = solved_date
+        user.last_active = datetime.now(timezone.utc)
 
         if history_row is None:
-            history_row = StreakHistory(user_id=user_id, streak_date=today, solved=0, streak_day=new_streak)
+            history_row = StreakHistory(user_id=user_id, streak_date=solved_date, solved=0, streak_day=new_streak)
             db.add(history_row)
         history_row.solved = int(history_row.solved or 0) + 1
         history_row.streak_day = new_streak

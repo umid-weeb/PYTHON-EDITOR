@@ -3,7 +3,14 @@ import { Link, useParams } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
 import { formatMemory, formatRuntime } from "../../lib/formatters.js";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { getMySubmissions, getPublicProfile, getUserSubmissionsById, hydrateSubmissionRows, type SubmissionRow } from "../../services/profileService";
+import {
+  getMySubmissions,
+  getPublicProfile,
+  getUserSubmissionsById,
+  hydrateSubmissionRows,
+  resolveSubmissionOutcome,
+  type SubmissionRow,
+} from "../../services/profileService";
 
 function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -75,10 +82,11 @@ export default function UserSubmissionsPage() {
             </thead>
             <tbody className="text-sm text-arena-text">
               {rows.map((submission, index) => {
-                const verdict = String(submission.status || submission.verdict || "--");
-                const tone = verdict.toLowerCase().includes("accepted")
+                const normalizedVerdict = resolveSubmissionOutcome(submission);
+                const verdict = String(submission.verdict || submission.status || "--");
+                const tone = normalizedVerdict.includes("accepted")
                   ? "text-emerald-300"
-                  : verdict.toLowerCase().includes("wrong") || verdict.toLowerCase().includes("error")
+                  : normalizedVerdict.includes("wrong") || normalizedVerdict.includes("error")
                     ? "text-rose-300"
                     : "text-arena-muted";
 

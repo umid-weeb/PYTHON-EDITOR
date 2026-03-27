@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import case, desc, func, or_
@@ -74,6 +75,39 @@ class SubmissionTrackingRepository:
             query = query.with_for_update()
         return query.first()
 
+    def claim_submission_for_processing(
+        self,
+        db: Session,
+        submission_id: int,
+        *,
+        recover_running_after_seconds: int | None = None,
+    ) -> Submission | None:
+        row = self.get_submission(db, submission_id, lock=True)
+        if row is None:
+            return None
+
+        normalized_status = str(row.status or "").strip().lower()
+        if normalized_status == "completed":
+            return None
+
+        if normalized_status == "running":
+            if recover_running_after_seconds is None:
+                return None
+
+            updated_at = row.updated_at or row.created_at
+            if updated_at is not None:
+                comparable = updated_at if updated_at.tzinfo else updated_at.replace(tzinfo=timezone.utc)
+                cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(recover_running_after_seconds, 0))
+                if comparable > cutoff:
+                    return None
+        elif normalized_status != "pending":
+            return None
+
+        row.status = "running"
+        row.updated_at = datetime.now(timezone.utc)
+        db.flush()
+        return row
+
     def list_user_solved_problem_ids(self, db: Session, user_id: int) -> set[str]:
         return {
             str(problem_id)
@@ -108,14 +142,7 @@ class SubmissionTrackingRepository:
         }
 
     def mark_running(self, db: Session, submission_id: int) -> Submission | None:
-        row = self.get_submission(db, submission_id, lock=True)
-        if row is None:
-            return None
-        if str(row.status or "").strip().lower() == "completed":
-            return row
-        row.status = "running"
-        db.flush()
-        return row
+        return self.claim_submission_for_processing(db, submission_id)
 
     def finalize_submission(
         self,
@@ -155,6 +182,7 @@ class SubmissionTrackingRepository:
                 user_id=int(row.user_id),
                 problem_id=str(row.problem_id),
                 difficulty=str(difficulty or ""),
+                solved_at=row.created_at,
             )
 
         db.flush()
@@ -167,16 +195,55 @@ class SubmissionTrackingRepository:
         user_id: int,
         problem_id: str,
         difficulty: str,
+        solved_at: datetime | None = None,
     ) -> bool:
         insert_stmt = (
             self._insert_builder(db, SolvedProblem)
-            .values(user_id=user_id, problem_id=problem_id)
+            .values(
+                user_id=user_id,
+                problem_id=problem_id,
+                solved_at=solved_at or datetime.now(timezone.utc),
+            )
             .on_conflict_do_nothing(index_elements=["user_id", "problem_id"])
         )
         result = db.execute(insert_stmt)
         inserted = int(result.rowcount or 0) > 0
         if inserted:
             self.increment_user_stats(db, user_id=user_id, difficulty=difficulty)
+        return inserted
+
+    def backfill_solved_problems_for_user(self, db: Session, user_id: int) -> int:
+        accepted_rows = (
+            db.query(
+                Submission.problem_id,
+                func.min(Submission.created_at).label("solved_at"),
+                Problem.difficulty.label("difficulty"),
+            )
+            .join(Problem, Problem.id == Submission.problem_id)
+            .filter(
+                Submission.user_id == user_id,
+                Submission.problem_id.isnot(None),
+                Submission.mode == "submit",
+                or_(
+                    func.lower(func.coalesce(Submission.verdict, "")) == "accepted",
+                    func.lower(func.coalesce(Submission.status, "")) == "accepted",
+                ),
+            )
+            .group_by(Submission.problem_id, Problem.difficulty)
+            .all()
+        )
+
+        inserted = 0
+        for accepted_row in accepted_rows:
+            inserted += int(
+                self.record_first_solve(
+                    db,
+                    user_id=user_id,
+                    problem_id=str(accepted_row.problem_id),
+                    difficulty=str(accepted_row.difficulty or ""),
+                    solved_at=accepted_row.solved_at,
+                )
+            )
         return inserted
 
     def _seed_rating(self, db: Session, user_id: int) -> int:
@@ -311,6 +378,26 @@ class SubmissionTrackingRepository:
             .all()
         )
 
+    def list_stale_submission_ids(
+        self,
+        db: Session,
+        *,
+        stale_after_seconds: int,
+        limit: int = 25,
+    ) -> list[int]:
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(stale_after_seconds, 0))
+        rows = (
+            db.query(Submission.id)
+            .filter(
+                Submission.status.in_(["pending", "running"]),
+                func.coalesce(Submission.updated_at, Submission.created_at) <= cutoff,
+            )
+            .order_by(func.coalesce(Submission.updated_at, Submission.created_at).asc(), Submission.id.asc())
+            .limit(limit)
+            .all()
+        )
+        return [int(submission_id) for (submission_id,) in rows]
+
     def get_problem_stats(self, db: Session, problem_id: str) -> dict[str, Any]:
         solved_count = int(
             db.query(func.count(SolvedProblem.id))
@@ -336,6 +423,15 @@ class SubmissionTrackingRepository:
         }
 
     def get_leaderboard_rows(self, db: Session, *, limit: int = 50) -> list[tuple]:
+        solved_subquery = (
+            db.query(
+                SolvedProblem.user_id.label("user_id"),
+                func.count(SolvedProblem.id).label("solved"),
+            )
+            .group_by(SolvedProblem.user_id)
+            .subquery()
+        )
+
         submissions_subquery = (
             db.query(
                 Submission.user_id.label("user_id"),
@@ -352,20 +448,40 @@ class SubmissionTrackingRepository:
                 User.id.label("user_id"),
                 User.username,
                 func.coalesce(UserStats.rating, 1200).label("rating"),
-                func.coalesce(UserStats.solved_count, 0).label("solved"),
+                func.coalesce(solved_subquery.c.solved, UserStats.solved_count, 0).label("solved"),
                 submissions_subquery.c.submissions,
                 submissions_subquery.c.fastest_ms,
             )
             .outerjoin(UserStats, UserStats.user_id == User.id)
+            .outerjoin(solved_subquery, solved_subquery.c.user_id == User.id)
             .outerjoin(submissions_subquery, submissions_subquery.c.user_id == User.id)
             .order_by(
                 func.coalesce(UserStats.rating, 1200).desc(),
-                func.coalesce(UserStats.solved_count, 0).desc(),
+                func.coalesce(solved_subquery.c.solved, UserStats.solved_count, 0).desc(),
                 User.username.asc(),
             )
             .limit(limit)
             .all()
         )
+
+    def get_problem_bank_totals(self, db: Session) -> dict[str, int]:
+        counts = {"total": 0, "easy": 0, "medium": 0, "hard": 0}
+        aggregate_rows = (
+            db.query(Problem.difficulty, func.count(Problem.id).label("count"))
+            .group_by(Problem.difficulty)
+            .all()
+        )
+        for aggregate_row in aggregate_rows:
+            difficulty = str(aggregate_row.difficulty or "").strip().lower()
+            count = int(aggregate_row.count or 0)
+            counts["total"] += count
+            if difficulty == "easy":
+                counts["easy"] = count
+            elif difficulty == "medium":
+                counts["medium"] = count
+            elif difficulty == "hard":
+                counts["hard"] = count
+        return counts
 
     def decode_case_results(self, submission: Submission) -> list[dict[str, Any]]:
         raw_value = submission.case_results_json or "[]"

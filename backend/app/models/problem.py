@@ -44,6 +44,12 @@ class Problem(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    translations = relationship(
+        "ProblemTranslation",
+        back_populates="problem",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class TestCase(Base):

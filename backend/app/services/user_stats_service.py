@@ -21,20 +21,18 @@ class UserStatsSnapshot:
 
 class UserStatsService:
     def get_or_create(self, db: Session, user_id: int) -> UserStats:
-        row = submission_tracking_repository.get_user_stats(db, user_id)
-        if row is None:
-            row = submission_tracking_repository.rebuild_user_stats(db, user_id)
-        return row
+        submission_tracking_repository.backfill_solved_problems_for_user(db, user_id)
+        return submission_tracking_repository.rebuild_user_stats(db, user_id)
 
     def rebuild(self, db: Session, user_id: int) -> UserStatsSnapshot:
+        submission_tracking_repository.backfill_solved_problems_for_user(db, user_id)
         row = submission_tracking_repository.rebuild_user_stats(db, user_id)
         return self._snapshot_from_row(row)
 
     def ensure_user_stats_fresh(self, db: Session, user_id: int) -> UserStatsSnapshot:
-        row = submission_tracking_repository.get_user_stats(db, user_id)
-        if row is None:
-            row = submission_tracking_repository.rebuild_user_stats(db, user_id)
-            db.flush()
+        submission_tracking_repository.backfill_solved_problems_for_user(db, user_id)
+        row = submission_tracking_repository.rebuild_user_stats(db, user_id)
+        db.flush()
         return self._snapshot_from_row(row)
 
     def backfill_all(self, db: Session) -> None:

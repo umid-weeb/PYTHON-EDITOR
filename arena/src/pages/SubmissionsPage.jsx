@@ -56,7 +56,7 @@ export default function SubmissionsPage() {
               </thead>
               <tbody>
                 {submissions.map((submission, index) => {
-                  const verdict = submission.status || submission.verdict || "--";
+                  const verdict = submission.verdict || submission.status || "--";
                   const verdictClass = verdict.toLowerCase().includes("accepted")
                     ? styles.success
                     : verdict.toLowerCase().includes("wrong") || verdict.toLowerCase().includes("error")

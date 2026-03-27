@@ -35,6 +35,10 @@ class Settings:
     hidden_github_problem_root: str
     redis_url: str
     use_inline_execution: bool
+    submission_watchdog_delay_seconds: float
+    submission_recovery_stale_after_seconds: int
+    submission_recovery_batch_size: int
+    submission_recovery_interval_seconds: int
     judge_use_docker: bool
     judge_docker_image: str
     judge_cpu_limit: float
@@ -103,6 +107,18 @@ def get_settings() -> Settings:
         ).strip("/"),
         redis_url=os.getenv("ARENA_REDIS_URL", "redis://localhost:6379/0"),
         use_inline_execution=_env_bool("ARENA_USE_INLINE_EXECUTION", True),
+        submission_watchdog_delay_seconds=float(
+            os.getenv("ARENA_SUBMISSION_WATCHDOG_DELAY_SECONDS", "2.0")
+        ),
+        submission_recovery_stale_after_seconds=int(
+            os.getenv("ARENA_SUBMISSION_RECOVERY_STALE_AFTER_SECONDS", "30")
+        ),
+        submission_recovery_batch_size=int(
+            os.getenv("ARENA_SUBMISSION_RECOVERY_BATCH_SIZE", "25")
+        ),
+        submission_recovery_interval_seconds=int(
+            os.getenv("ARENA_SUBMISSION_RECOVERY_INTERVAL_SECONDS", "15")
+        ),
         judge_use_docker=_env_bool("ARENA_JUDGE_USE_DOCKER", False),
         judge_docker_image=os.getenv("ARENA_JUDGE_DOCKER_IMAGE", "python:3.11-slim"),
         judge_cpu_limit=float(os.getenv("ARENA_JUDGE_CPU_LIMIT", "1")),

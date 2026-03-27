@@ -21,6 +21,10 @@ export type PublicProfile = {
   longest_streak?: number;
   streak_freeze?: number;
   timezone?: string | null;
+  problem_bank_total?: number;
+  problem_bank_easy?: number;
+  problem_bank_medium?: number;
+  problem_bank_hard?: number;
 };
 
 export type SubmissionRow = {
@@ -79,8 +83,15 @@ function normalizeLiveStatus(payload: {
   return status || null;
 }
 
+export function resolveSubmissionOutcome(submission: {
+  status?: string | null;
+  verdict?: string | null;
+}) {
+  return String(submission.verdict || submission.status || "").trim().toLowerCase();
+}
+
 function needsLiveRefresh(submission: SubmissionRow) {
-  const status = String(submission.status || submission.verdict || "").trim().toLowerCase();
+  const status = resolveSubmissionOutcome(submission);
   return Boolean(
     submission.submission_id &&
       (!status || status === "pending" || status === "queued" || status === "running" || status === "completed")

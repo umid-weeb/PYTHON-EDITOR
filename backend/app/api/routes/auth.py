@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
+from app.repositories.submission_tracking import submission_tracking_repository
 from app.services.user_stats_service import user_stats_service
 
 
@@ -105,6 +106,10 @@ class MeResponse(BaseModel):
     longest_streak: int = 0
     streak_freeze: int = 0
     timezone: str = "Asia/Tashkent"
+    problem_bank_total: int = 0
+    problem_bank_easy: int = 0
+    problem_bank_medium: int = 0
+    problem_bank_hard: int = 0
 
 
 class PublicProfileResponse(BaseModel):
@@ -124,6 +129,10 @@ class PublicProfileResponse(BaseModel):
     level: str | None = None
     streak: int = 0
     longest_streak: int = 0
+    problem_bank_total: int = 0
+    problem_bank_easy: int = 0
+    problem_bank_medium: int = 0
+    problem_bank_hard: int = 0
 
 
 def get_password_hash(password: str) -> str:
@@ -151,12 +160,17 @@ def create_access_token(user: User) -> str:
 
 def calculate_user_stats(db: Session, user_id: int) -> dict:
     snapshot = user_stats_service.ensure_user_stats_fresh(db, user_id)
+    problem_bank = submission_tracking_repository.get_problem_bank_totals(db)
 
     return {
         "solved_total": int(snapshot.solved_count or 0),
         "solved_easy": int(snapshot.easy_solved or 0),
         "solved_medium": int(snapshot.medium_solved or 0),
         "solved_hard": int(snapshot.hard_solved or 0),
+        "problem_bank_total": int(problem_bank["total"]),
+        "problem_bank_easy": int(problem_bank["easy"]),
+        "problem_bank_medium": int(problem_bank["medium"]),
+        "problem_bank_hard": int(problem_bank["hard"]),
     }
 
 
@@ -281,6 +295,10 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
         solved_easy=stats["solved_easy"],
         solved_medium=stats["solved_medium"],
         solved_hard=stats["solved_hard"],
+        problem_bank_total=stats["problem_bank_total"],
+        problem_bank_easy=stats["problem_bank_easy"],
+        problem_bank_medium=stats["problem_bank_medium"],
+        problem_bank_hard=stats["problem_bank_hard"],
         rating=rating.rating,
         global_rank=rating.global_rank,
         level=getattr(user, "level", None),

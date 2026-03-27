@@ -104,6 +104,21 @@ function StatusIcon({ solved, attempted }: { solved?: boolean; attempted?: boole
   return <span className="inline-block h-[14px] w-[14px]" />;
 }
 
+function StatusPill({ solved, attempted }: { solved?: boolean; attempted?: boolean }) {
+  if (!solved && !attempted) return null;
+
+  const label = solved ? "Yechilgan" : "Ishlangan";
+  const tone = solved
+    ? "border-[color:var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]"
+    : "border-[color:var(--warning)]/30 bg-[var(--warning-bg)] text-[var(--warning)]";
+
+  return (
+    <span className={["inline-flex h-[20px] items-center rounded-[var(--radius-xs)] border px-2 text-[10px] font-semibold uppercase tracking-[0.05em]", tone].join(" ")}>
+      {label}
+    </span>
+  );
+}
+
 function TagChip({ label, active = false, onClick }: { label: string; active?: boolean; onClick?: () => void }) {
   const shared = active
     ? "border-[color:var(--accent-border)] bg-[var(--accent-subtle)] text-[var(--text-primary)]"
@@ -458,8 +473,11 @@ export default function ProblemsPage() {
                       <StatusIcon attempted={problem.is_attempted} solved={problem.is_solved} />
                     </td>
                     <td className="pr-3">
-                      <div className="truncate text-[13px] text-[var(--text-primary)]">
-                        <HighlightedText query={searchQuery} text={formatProblemTitle(problem)} />
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 truncate text-[13px] text-[var(--text-primary)]">
+                          <HighlightedText query={searchQuery} text={formatProblemTitle(problem)} />
+                        </div>
+                        <StatusPill attempted={problem.is_attempted} solved={problem.is_solved} />
                       </div>
                     </td>
                     <td className="pr-3">

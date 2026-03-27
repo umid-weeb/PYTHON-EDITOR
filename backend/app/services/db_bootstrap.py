@@ -334,6 +334,18 @@ POSTGRES_BOOTSTRAP_SQL = [
     ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS memory_kb INTEGER;
     """,
     """
+    ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS penalty_minutes INTEGER NOT NULL DEFAULT 0;
+    """,
+    """
+    ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS is_first_solve BOOLEAN NOT NULL DEFAULT FALSE;
+    """,
+    """
+    ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS is_accepted BOOLEAN NOT NULL DEFAULT FALSE;
+    """,
+    """
+    ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    """,
+    """
     INSERT INTO user_stats (user_id)
     SELECT id FROM users
     ON CONFLICT (user_id) DO NOTHING;

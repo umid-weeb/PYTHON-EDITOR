@@ -154,7 +154,7 @@ export function buildActivityHeatmap(items = []) {
 export function calculateAcceptanceRate(submissions = []) {
   if (!submissions.length) return null;
   const accepted = submissions.filter((entry) =>
-    String(entry.status || entry.verdict || "").toLowerCase().includes("accepted")
+    String(entry.verdict || entry.status || "").toLowerCase().includes("accepted")
   ).length;
   return Math.round((accepted / submissions.length) * 100);
 }
