@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text
 from app.database import Base
 
 class Contest(Base):
     __tablename__ = "contests"
     id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
     starts_at = Column(DateTime(timezone=True), nullable=False)
     ends_at = Column(DateTime(timezone=True), nullable=False)
     is_rated = Column(Boolean, default=False)
