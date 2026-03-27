@@ -80,6 +80,11 @@ export default function ProblemPage() {
 
   const visibleCases = selectedProblem?.visible_testcases || [];
 
+  const handleBackToEditor = () => {
+    // Navigate back to the editor page
+    navigate("/arena", { replace: true });
+  };
+
   return (
     <>
       <div className="flex h-[calc(100vh-var(--h-navbar))] min-w-0 flex-col overflow-hidden">
@@ -89,22 +94,26 @@ export default function ProblemPage() {
           onLayoutChanged={horizontalLayout.onLayoutChanged}
           orientation="horizontal"
         >
-          <Panel defaultSize={48} maxSize={68} minSize={26}>
+          <Panel defaultSize={48} maxSize={75} minSize={20}>
             <div className="h-full min-h-0 min-w-0 overflow-hidden pr-0">
-              <ProblemDescription loading={problemStatus === "loading"} problem={selectedProblem} />
+              <ProblemDescription 
+                loading={problemStatus === "loading"} 
+                problem={selectedProblem} 
+                onBack={handleBackToEditor}
+              />
             </div>
           </Panel>
 
           <ResizeHandle orientation="vertical" />
 
-          <Panel defaultSize={52} maxSize={74} minSize={26}>
+          <Panel defaultSize={52} maxSize={80} minSize={20}>
             <ResizablePanelGroup
               className="h-full min-h-0 min-w-0"
               defaultLayout={verticalLayout.defaultLayout}
               onLayoutChanged={verticalLayout.onLayoutChanged}
               orientation="vertical"
             >
-              <Panel defaultSize={52} maxSize={82} minSize={26}>
+              <Panel defaultSize={52} maxSize={85} minSize={20}>
                 <CodeEditorPanel
                   code={code}
                   isRunning={isRunning}
@@ -119,7 +128,7 @@ export default function ProblemPage() {
 
               <ResizeHandle orientation="horizontal" />
 
-              <Panel defaultSize={48} maxSize={74} minSize={18}>
+              <Panel defaultSize={48} maxSize={80} minSize={15}>
                 <TestTabs
                   activeIndex={activeCaseIndex}
                   busy={isRunning || isSubmitting}

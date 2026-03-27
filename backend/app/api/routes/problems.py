@@ -5,7 +5,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.models.schemas import ProblemDetail, ProblemListResponse
+from app.models.schemas import ProblemListResponse
 from app.models.user import User
 from app.api.routes.auth import get_optional_user
 from app.services.problem_service import (
@@ -13,6 +13,7 @@ from app.services.problem_service import (
     ProblemService,
     get_problem_service,
 )
+from app.repositories.submission_tracking import submission_tracking_repository
 
 
 router = APIRouter(tags=["problems"])

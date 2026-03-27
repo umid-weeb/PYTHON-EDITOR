@@ -26,25 +26,50 @@ class ProfilePayload:
 
 class ProfileService:
     def get_user_profile(self, db: Session, user_id: int, *, recent_limit: int = 20) -> ProfilePayload:
+        """Get user profile with real-time data from solved_problems (source of truth)."""
         user = submission_tracking_repository.get_user(db, user_id)
         if user is None:
             raise ValueError("User not found")
 
-        snapshot = user_stats_service.ensure_user_stats_fresh(db, user_id)
+        # Get real-time stats from solved_problems table (source of truth)
+        solved_stats = self._get_realtime_solved_stats(db, user_id)
         rating = rating_service.snapshot(db, user_id)
         recent_rows = submission_tracking_repository.list_recent_submissions(db, user_id, limit=recent_limit)
         submissions_count = submission_tracking_repository.count_user_submissions(db, user_id)
 
         return ProfilePayload(
             user=user,
-            solved_count=int(snapshot.solved_count or 0),
-            easy_solved=int(snapshot.easy_solved or 0),
-            medium_solved=int(snapshot.medium_solved or 0),
-            hard_solved=int(snapshot.hard_solved or 0),
-            rating=int(rating.rating or snapshot.rating or 1200),
+            solved_count=int(solved_stats["solved_count"]),
+            easy_solved=int(solved_stats["easy_solved"]),
+            medium_solved=int(solved_stats["medium_solved"]),
+            hard_solved=int(solved_stats["hard_solved"]),
+            rating=int(rating.rating or 1200),
             recent_submissions=[self._serialize_submission_row(row[0], row, include_problem_key=False) for row in recent_rows],
             submissions_count=submissions_count,
         )
+
+    def _get_realtime_solved_stats(self, db: Session, user_id: int) -> dict[str, int]:
+        """Get real-time solved stats directly from solved_problems table (source of truth)."""
+        result = db.execute(
+            """
+            SELECT 
+                COUNT(*) as solved_count,
+                COUNT(*) FILTER (WHERE p.difficulty = 'easy') as easy_solved,
+                COUNT(*) FILTER (WHERE p.difficulty = 'medium') as medium_solved,
+                COUNT(*) FILTER (WHERE p.difficulty = 'hard') as hard_solved
+            FROM solved_problems sp
+            JOIN problems p ON sp.problem_id = p.id
+            WHERE sp.user_id = :user_id
+            """,
+            {"user_id": user_id}
+        ).fetchone()
+        
+        return {
+            "solved_count": int(result.solved_count or 0),
+            "easy_solved": int(result.easy_solved or 0),
+            "medium_solved": int(result.medium_solved or 0),
+            "hard_solved": int(result.hard_solved or 0),
+        }
 
     def get_problem_stats(self, db: Session, problem_key: str) -> dict[str, Any]:
         problem = submission_tracking_repository.resolve_problem(db, problem_key)

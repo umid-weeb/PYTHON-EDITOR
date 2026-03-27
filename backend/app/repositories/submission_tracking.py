@@ -188,31 +188,70 @@ class SubmissionTrackingRepository:
         db.flush()
         return FinalizedSubmission(submission=row, first_solve=first_solve)
 
-    def record_first_solve(
+    def record_solved_problem_safe(
         self,
         db: Session,
         *,
         user_id: int,
         problem_id: str,
-        difficulty: str,
         solved_at: datetime | None = None,
+        created_by: str = "submission_service",
     ) -> bool:
+        """Safely record a solved problem with proper transaction handling and idempotency.
+        
+        This function:
+        1. Uses INSERT ... ON CONFLICT DO NOTHING for idempotency
+        2. Only updates user_stats if this is a NEW solve
+        3. Returns True if a new solve was recorded, False if already solved
+        4. Includes debugging information
+        """
+        # Get problem difficulty for stats
+        difficulty = db.query(Problem.difficulty).filter(Problem.id == problem_id).scalar()
+        
+        # Use INSERT ... ON CONFLICT DO NOTHING for idempotency
         insert_stmt = (
             self._insert_builder(db, SolvedProblem)
             .values(
                 user_id=user_id,
                 problem_id=problem_id,
                 solved_at=solved_at or datetime.now(timezone.utc),
+                created_by=created_by,
+                debug_info={
+                    "difficulty": str(difficulty or ""),
+                    "timestamp": solved_at.timestamp() if solved_at else datetime.now(timezone.utc).timestamp(),
+                    "created_by": created_by
+                } if solved_at else None,
             )
             .on_conflict_do_nothing(index_elements=["user_id", "problem_id"])
         )
         result = db.execute(insert_stmt)
         inserted = int(result.rowcount or 0) > 0
+        
+        # Only update stats if this is a NEW solve (CRITICAL for consistency)
         if inserted:
-            self.increment_user_stats(db, user_id=user_id, difficulty=difficulty)
+            self.increment_user_stats(db, user_id=user_id, difficulty=str(difficulty or ""))
+            self.logger.info(
+                "solved_problem.recorded user_id=%s problem_id=%s difficulty=%s created_by=%s",
+                user_id,
+                problem_id,
+                difficulty,
+                created_by
+            )
+        else:
+            self.logger.info(
+                "solved_problem.skipped user_id=%s problem_id=%s already_solved=True",
+                user_id,
+                problem_id
+            )
+        
         return inserted
 
     def backfill_solved_problems_for_user(self, db: Session, user_id: int) -> int:
+        """Backfill solved problems for a user from existing accepted submissions.
+        
+        This function processes all accepted submissions for a user and creates
+        solved_problems entries, using the new safe function for consistency.
+        """
         accepted_rows = (
             db.query(
                 Submission.problem_id,
@@ -235,15 +274,22 @@ class SubmissionTrackingRepository:
 
         inserted = 0
         for accepted_row in accepted_rows:
-            inserted += int(
-                self.record_first_solve(
-                    db,
-                    user_id=user_id,
-                    problem_id=str(accepted_row.problem_id),
-                    difficulty=str(accepted_row.difficulty or ""),
-                    solved_at=accepted_row.solved_at,
-                )
-            )
+            # Use the new safe function for consistency
+            if self.record_solved_problem_safe(
+                db,
+                user_id=user_id,
+                problem_id=str(accepted_row.problem_id),
+                solved_at=accepted_row.solved_at,
+                created_by="backfill",
+            ):
+                inserted += 1
+        
+        self.logger.info(
+            "backfill.completed user_id=%s problems_found=%s inserted=%s",
+            user_id,
+            len(accepted_rows),
+            inserted
+        )
         return inserted
 
     def _seed_rating(self, db: Session, user_id: int) -> int:

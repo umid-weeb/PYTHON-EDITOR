@@ -104,7 +104,8 @@ class ProblemService:
             if matches_query and matches_tags and matches_difficulty:
                 filtered.append(item)
 
-        acceptance_rates, solved_ids, attempted_ids = self._load_problem_metrics(user_id=user_id)
+        # Get real-time metrics from solved_problems table (source of truth)
+        acceptance_rates, solved_ids, attempted_ids = self._load_problem_metrics_realtime(user_id=user_id)
         enriched = [
             item.model_copy(
                 update={
@@ -162,6 +163,56 @@ class ProblemService:
                 )
             }
 
+            if user_id is not None:
+                solved_ids = {
+                    str(problem_id)
+                    for (problem_id,) in db.query(SolvedProblem.problem_id).filter(SolvedProblem.user_id == user_id).all()
+                }
+                attempted_ids = {
+                    str(problem_id)
+                    for (problem_id,) in (
+                        db.query(Submission.problem_id)
+                        .filter(
+                            Submission.user_id == user_id,
+                            Submission.problem_id.isnot(None),
+                            Submission.mode == "submit",
+                        )
+                        .distinct()
+                        .all()
+                    )
+                }
+
+        return acceptance_rates, solved_ids, attempted_ids
+
+    def _load_problem_metrics_realtime(self, user_id: int | None = None) -> tuple[dict[str, int | None], set[str], set[str]]:
+        """Get real-time problem metrics from solved_problems table (source of truth)."""
+        acceptance_rates: dict[str, int | None] = {}
+        solved_ids: set[str] = set()
+        attempted_ids: set[str] = set()
+
+        with SessionLocal() as db:
+            # Get acceptance rates from submissions (this is still correct)
+            acceptance_rates = {
+                str(row.problem_id): int(round((int(row.accepted or 0) / int(row.total or 0)) * 100))
+                if int(row.total or 0)
+                else None
+                for row in (
+                    db.query(
+                        Submission.problem_id,
+                        func.count(Submission.id).label("total"),
+                        func.sum(case((func.lower(Submission.verdict) == "accepted", 1), else_=0)).label("accepted"),
+                    )
+                    .filter(
+                        Submission.problem_id.isnot(None),
+                        Submission.mode == "submit",
+                        Submission.status == "completed",
+                    )
+                    .group_by(Submission.problem_id)
+                    .all()
+                )
+            }
+
+            # Get solved status from solved_problems table (source of truth)
             if user_id is not None:
                 solved_ids = {
                     str(problem_id)

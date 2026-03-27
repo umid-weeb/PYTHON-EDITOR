@@ -21,6 +21,7 @@ type Props = {
   problem: Problem | null;
   loading: boolean;
   embedded?: boolean;
+  onBack?: () => void;
 };
 
 function difficultyStyles(difficulty?: string) {
@@ -31,7 +32,7 @@ function difficultyStyles(difficulty?: string) {
   return "bg-[var(--bg-subtle)] text-[var(--text-secondary)]";
 }
 
-export default function ProblemDescription({ problem, loading, embedded = false }: Props) {
+export default function ProblemDescription({ problem, loading, embedded = false, onBack }: Props) {
   if (loading) {
     return (
       <div className="space-y-3 p-4">
@@ -61,6 +62,15 @@ export default function ProblemDescription({ problem, loading, embedded = false 
     >
       <div className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/95 px-4 py-3 backdrop-blur">
         <div className="mb-2 flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="stroke-[var(--text-primary)]">
+              <path d="M19 12H5M12 19L5 12L12 5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Tahrirlashga qaytish
+          </button>
           <span
             className={[
               "inline-flex h-[var(--h-badge)] items-center rounded-[var(--radius-xs)] px-2 text-[11px] font-semibold uppercase tracking-[0.05em]",

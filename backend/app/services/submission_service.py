@@ -253,14 +253,34 @@ class SubmissionService:
                 if user is not None:
                     engagement_service.touch_last_active(db, user)
 
+            # CRITICAL FIX: Handle accepted submissions with proper transaction safety
+            is_accepted = (submission.verdict or "").strip().lower() == "accepted"
+            first_solve = False
+            
+            if is_accepted and submission.user_id is not None:
+                # Use the new safe function that handles idempotency and proper stats updates
+                first_solve = self.repository.record_solved_problem_safe(
+                    db,
+                    user_id=int(submission.user_id),
+                    problem_id=str(submission.problem_id),
+                    solved_at=submission.created_at,
+                    created_by="submission_service"
+                )
+                self.logger.info(
+                    "submission.accepted user_id=%s problem_id=%s inserted=%s",
+                    submission.user_id,
+                    submission.problem_id,
+                    first_solve
+                )
+
             self._sync_contest_submission(
                 db,
                 submission_id=str(submission.id),
                 verdict=submission.verdict,
                 runtime_ms=submission.runtime_ms,
                 memory_kb=submission.memory_kb,
-                is_first_solve=finalized.first_solve,
-                is_accepted=(submission.verdict or "").strip().lower() == "accepted",
+                is_first_solve=first_solve,
+                is_accepted=is_accepted,
             )
 
             side_effects = {
@@ -268,7 +288,8 @@ class SubmissionService:
                 "problem_id": str(submission.problem_id),
                 "verdict": submission.verdict,
                 "submission_id": str(submission.id),
-                "first_solve": finalized.first_solve,
+                "first_solve": first_solve,
+                "is_accepted": is_accepted,
             }
             db.commit()
 
