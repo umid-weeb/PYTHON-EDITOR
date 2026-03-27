@@ -58,6 +58,7 @@ export function formatCaseResults(cases = []) {
 }
 
 function translateErrorToUzbek(status, errorText = "") {
+  if (!errorText && !status) return "";
   const normalizedStatus = String(status || "").toLowerCase();
   const normalizedError = String(errorText || "").toLowerCase();
 
@@ -71,7 +72,7 @@ function translateErrorToUzbek(status, errorText = "") {
     return "Xato: nolga bo'lish mumkin emas.";
   }
   if (normalizedError.includes("syntaxerror") || normalizedStatus.includes("compilation")) {
-    return "Sintaksis xatosi: kod tuzilmasini tekshiring.";
+    return `Sintaksis xatosi: ${errorText || "kod tuzilmasini tekshiring."}`;
   }
   if (normalizedError.includes("indexerror")) {
     return "Xato: indeks chegaradan tashqarida.";
@@ -82,6 +83,13 @@ function translateErrorToUzbek(status, errorText = "") {
   if (normalizedError.includes("typeerror")) {
     return "Xato: noto'g'ri turdagi qiymat ishlatilgan.";
   }
+
+  // If it's a runtime error but we don't have a specific translation, 
+  // show the actual error message (traceback, etc.)
+  if (normalizedStatus.includes("runtime error") && errorText) {
+    return errorText;
+  }
+  
   if (normalizedStatus.includes("runtime error")) {
     return "Xato: dastur bajarilishida kutilmagan xato yuz berdi.";
   }

@@ -93,9 +93,20 @@ export default function ResultPanel({ result, busy = false }) {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
         {/* Main Status / Summary */}
-        <div className={`mb-4 text-[13px] ${statusTone(result.tone)}`}>
-          {result.summary}
-        </div>
+        {!hasDetails && result.tone !== "success" && result.summary ? (
+             <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className={`mb-2 text-[14px] font-bold ${statusTone(result.tone)}`}>
+                    Bajarilishda xatolik yuz berdi:
+                </div>
+                <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/20 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] whitespace-pre-wrap leading-relaxed">
+                    {result.summary}
+                </div>
+             </div>
+        ) : (
+            <div className={`mb-4 text-[13px] ${statusTone(result.tone)}`}>
+                {result.summary}
+            </div>
+        )}
 
         {hasDetails && (
           <div className="flex flex-col gap-4">
@@ -120,16 +131,30 @@ export default function ResultPanel({ result, busy = false }) {
             {/* Selected Case Content */}
             {activeCase && (
               <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200">
-                <CodeBlock label="Input" value={activeCase.input} />
-                <CodeBlock label="Output" value={activeCase.actual} />
-                <CodeBlock label="Expected" value={activeCase.expected} />
+                <CodeBlock label="Kirish (Input)" value={activeCase.input} />
                 
-                {activeCase.error && (
-                    <div className="mt-4 rounded-[var(--radius-sm)] border border-[color:var(--error)]/20 bg-[var(--error)]/5 p-3">
-                        <div className="text-[12px] font-bold text-[var(--error)] mb-1">Xatolik:</div>
-                        <div className="font-mono text-[12px] text-[var(--error)] leading-relaxed whitespace-pre-wrap italic">
+                {activeCase.rawVerdict !== "Accepted" && activeCase.error ? (
+                    <div className="mt-4 rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 overflow-auto">
+                        <div className="text-[13px] font-bold text-[var(--error)] mb-2 flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-[var(--error)]" />
+                            Xatolik yuz berdi:
+                        </div>
+                        <div className="font-mono text-[13px] text-[var(--error)] leading-relaxed whitespace-pre-wrap">
                             {activeCase.error}
                         </div>
+                    </div>
+                ) : (
+                    <>
+                        <CodeBlock label="Natija (Output)" value={activeCase.actual} />
+                        <CodeBlock label="Kutilgan natija (Expected)" value={activeCase.expected} />
+                    </>
+                )}
+                
+                {/* Performance stats if passed */}
+                {activeCase.passed && (activeCase.runtime || activeCase.memory) && (
+                    <div className="mt-4 flex gap-4 text-[12px] text-[var(--text-muted)]">
+                        {activeCase.runtime && <span>Vaqt: {activeCase.runtime}</span>}
+                        {activeCase.memory && <span>Xotira: {activeCase.memory}</span>}
                     </div>
                 )}
               </div>
