@@ -43,10 +43,16 @@ export function formatCaseResults(cases = []) {
     const verdictText = actual && entry.passed ? `${verdict}: Natija: ${String(actual).slice(0, 120)}` : verdict;
     return {
       id: `${index + 1}`,
-      label: `Test ${index + 1}`,
+      label: `Case ${index + 1}`,
       verdict: entry.error ? `${verdict}: ${entry.error}` : verdictText,
+      rawVerdict: rawVerdict,
       runtime: formatRuntime(entry.runtime_ms),
       memory: formatMemory(entry.memory_kb),
+      input: entry.input,
+      expected: entry.expected_output,
+      actual: entry.actual_output,
+      passed: entry.passed,
+      error: entry.error,
     };
   });
 }

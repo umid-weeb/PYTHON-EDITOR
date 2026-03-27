@@ -21,8 +21,13 @@ import io
 import json
 import pathlib
 import time
+import time
 import traceback
 import tracemalloc
+
+# Ensure UTF-8 output even on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 workspace = pathlib.Path(__file__).resolve().parent
 payload = json.loads((workspace / "payload.json").read_text(encoding="utf-8"))
@@ -373,6 +378,7 @@ class JudgeRunner:
                 cwd=workspace,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 timeout=timeout_seconds,
                 check=False,
             )

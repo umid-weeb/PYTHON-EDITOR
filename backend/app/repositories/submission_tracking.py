@@ -176,7 +176,8 @@ class SubmissionTrackingRepository:
         row.error_text = error_text
         row.passed_count = passed_count
         row.total_count = total_count
-        row.case_results_json = json.dumps(case_results or [], ensure_ascii=False)
+        from app.core.json_utils import arena_dumps
+        row.case_results_json = arena_dumps(case_results or [])
 
         first_solve = False
         if row.mode == "submit" and normalized_verdict.lower() == "accepted":

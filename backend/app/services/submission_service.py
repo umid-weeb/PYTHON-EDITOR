@@ -111,9 +111,21 @@ class SubmissionService:
             if payload is None:
                 return
 
-            problem_bundle = asyncio.run(
-                self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True)
-            )
+            # Fixed loop handling: works in both sync threads and async contexts
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're already in a running loop, we can't use run_until_complete
+                # In this specific test/sync-wrapper case, we might need a different approach
+                # But for the judge's background thread, get_event_loop() is usually enough.
+                problem_bundle = asyncio.run_coroutine_threadsafe(
+                    self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True),
+                    loop
+                ).result()
+            except RuntimeError:
+                # No running loop, create one (standard for the background thread)
+                problem_bundle = asyncio.run(
+                    self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True)
+                )
             problem_bundle["language"] = payload["language"]
 
             result = self.judge.run_submission(

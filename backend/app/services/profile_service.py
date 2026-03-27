@@ -123,8 +123,8 @@ class ProfileService:
             "memory_kb": submission.memory_kb,
             "passed_count": submission.passed_count,
             "total_count": submission.total_count,
-            "created_at": submission.created_at,
-            "updated_at": submission.updated_at,
+            "created_at": submission.created_at.isoformat() if submission.created_at else None,
+            "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
             "error_text": submission.error_text,
             "case_results": submission_tracking_repository.decode_case_results(submission),
         }
