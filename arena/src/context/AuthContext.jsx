@@ -29,13 +29,20 @@ export function AuthProvider({ children }) {
         const me = await authApi.me(token);
         if (!cancelled) {
           setUser(me);
+          writeStoredUsername(me.username);
           setStatus("ready");
         }
-      } catch {
-        clearStoredToken();
+      } catch (error) {
+        // ONLY logout on 401 Unauthorized.
+        // If 5xx (Server Error), don't wipe the token. The user might still be valid.
+        if (error?.status === 401) {
+          clearStoredToken();
+          if (!cancelled) {
+            setToken("");
+            setUser(null);
+          }
+        }
         if (!cancelled) {
-          setToken("");
-          setUser(null);
           setStatus("ready");
         }
       }
@@ -54,20 +61,27 @@ export function AuthProvider({ children }) {
       status,
       isAuthenticated: Boolean(token),
       async login(username, password) {
-        const payload = await authApi.login({ username, password });
-        setToken(payload.token);
-        const me = await authApi.me(payload.token);
-        setUser(me);
-        writeStoredUsername(me.username);
-        return me;
+        setStatus("loading");
+        try {
+          const payload = await authApi.login({ username, password });
+          // setToken triggers the useEffect which calls authApi.me
+          setToken(payload.token);
+          return payload;
+        } catch (error) {
+          setStatus("ready");
+          throw error;
+        }
       },
       async register(data) {
-        const payload = await authApi.register(data);
-        setToken(payload.token);
-        const me = await authApi.me(payload.token);
-        setUser(me);
-        writeStoredUsername(me.username);
-        return me;
+        setStatus("loading");
+        try {
+          const payload = await authApi.register(data);
+          setToken(payload.token);
+          return payload;
+        } catch (error) {
+          setStatus("ready");
+          throw error;
+        }
       },
       async refreshUser() {
         if (!token) return null;

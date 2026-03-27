@@ -256,31 +256,33 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 
 @router.get("/me", response_model=MeResponse)
-def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> MeResponse:
-    if credentials is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> MeResponse:
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("user_id")
-        username: str | None = payload.get("username") or payload.get("sub")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    if not (user_id or username):
-        raise HTTPException(status_code=401, detail="Invalid token")
+        user.last_active = datetime.now(timezone.utc)
+        db.commit()
+    except Exception:
+        db.rollback()
 
-    query = db.query(User)
-    if user_id is not None:
-        user = query.filter(User.id == int(user_id)).first()
-    else:
-        user = query.filter(User.username == username).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    user.last_active = datetime.now(timezone.utc)
-    db.commit()
+    # Resilient stats calculation - don't let stats failure block login/me
+    try:
+        stats = calculate_user_stats(db, user.id)
+    except Exception as e:
+        logger.error("Failed to calculate stats for user %s: %s", user.id, e)
+        # Fallback to empty stats
+        stats = {
+            "solved_total": 0, "solved_easy": 0, "solved_medium": 0, "solved_hard": 0,
+            "problem_bank_total": 0, "problem_bank_easy": 0, "problem_bank_medium": 0, "problem_bank_hard": 0
+        }
 
-    stats = calculate_user_stats(db, user.id)
-    from app.services.rating_service import rating_service
-    rating = rating_service.snapshot(db, user.id)
+    try:
+        from app.services.rating_service import rating_service
+        rating_snap = rating_service.snapshot(db, user.id)
+        rating_val = int(rating_snap.rating or 1200)
+        global_rank = rating_snap.global_rank
+    except Exception as e:
+        logger.error("Failed to calculate rating for user %s: %s", user.id, e)
+        rating_val = 1200
+        global_rank = None
 
     return MeResponse(
         id=user.id,
@@ -299,8 +301,8 @@ def me(credentials: HTTPAuthorizationCredentials | None = Depends(security), db:
         problem_bank_easy=stats["problem_bank_easy"],
         problem_bank_medium=stats["problem_bank_medium"],
         problem_bank_hard=stats["problem_bank_hard"],
-        rating=rating.rating,
-        global_rank=rating.global_rank,
+        rating=rating_val,
+        global_rank=global_rank,
         level=getattr(user, "level", None),
         goal=getattr(user, "goal", None),
         weekly_hours=getattr(user, "weekly_hours", None),

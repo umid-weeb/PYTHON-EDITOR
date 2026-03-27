@@ -18,7 +18,8 @@ export function clearStoredToken() {
 }
 
 export function getDraftKey(problemId) {
-  return `arena_draft_${problemId}`;
+  const username = readStoredUsername() || "anonymous";
+  return `arena_draft_${username}_${problemId}`;
 }
 
 export function readDraft(problemId, fallback = "") {
