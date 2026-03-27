@@ -14,6 +14,7 @@ from app.services.problem_service import (
     get_problem_service,
 )
 from app.repositories.submission_tracking import submission_tracking_repository
+from app.database import SessionLocal
 
 
 router = APIRouter(tags=["problems"])
@@ -136,7 +137,7 @@ async def get_problem(
     try:
         # Use multilingual version if language is specified
         if lang in ["uz", "en"]:
-            with service.cache._db_session() as db:
+            with SessionLocal() as db:
                 from app.models.problem import Problem
                 problem_obj = db.query(Problem).filter(Problem.slug == problem_slug).first()
                 if problem_obj is None:

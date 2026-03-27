@@ -23,6 +23,10 @@ class FinalizedSubmission:
 
 
 class SubmissionTrackingRepository:
+    def __init__(self):
+        import logging
+        self.logger = logging.getLogger("pyzone.arena.submission_tracking")
+
     def _insert_builder(self, db: Session, model: type[Any]):
         dialect = db.get_bind().dialect.name
         if dialect == "postgresql":

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "D:\Projects\PYTHON-EDITOR\dump_errs_2.py", line 12, in <module>
+    with service.cache._db_session() as session:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ProblemCache' object has no attribute '_db_session'
