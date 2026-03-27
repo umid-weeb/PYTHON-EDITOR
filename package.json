@@ -17,7 +17,8 @@
   "dependencies": {
     "python": "^0.0.4",
     "react": "^19.2.4",
-    "react-router-dom": "^7.13.2"
+    "react-router-dom": "^7.13.2",
+    "sys": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

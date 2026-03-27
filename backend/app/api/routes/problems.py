@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from app.models.schemas import ProblemDetail
 import logging
 from time import perf_counter
 
