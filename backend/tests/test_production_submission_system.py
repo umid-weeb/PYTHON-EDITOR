@@ -19,12 +19,14 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, List
 
 import requests
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.problem import Problem
 from app.models.submission import Submission, SolvedProblem, UserStats
 from app.models.user import User
+from app.services.user_stats_service import user_stats_service
 
 
 def test_database_schema():
@@ -37,7 +39,7 @@ def test_database_schema():
         tables = ["submissions", "solved_problems", "user_stats"]
         for table in tables:
             try:
-                db.execute(f"SELECT 1 FROM {table} LIMIT 1")
+                db.execute(text(f"SELECT 1 FROM {table} LIMIT 1"))
                 print(f"✓ Table {table} exists")
             except Exception as e:
                 print(f"✗ Table {table} missing: {str(e)}")
@@ -74,7 +76,7 @@ def test_database_schema():
         ]
         for index in indexes:
             try:
-                result = db.execute(f"SELECT indexname FROM pg_indexes WHERE indexname = '{index}'").fetchone()
+                result = db.execute(text(f"SELECT indexname FROM pg_indexes WHERE indexname = '{index}'")).fetchone()
                 if result:
                     print(f"✓ Index {index} exists")
                 else:
@@ -174,7 +176,7 @@ def test_transaction_safety():
         problem_id = problem.id
         
         # Clean up any existing test data
-        db.execute("DELETE FROM solved_problems WHERE user_id = :user_id", {"user_id": user_id})
+        db.execute(text("DELETE FROM solved_problems WHERE user_id = :user_id"), {"user_id": user_id})
         db.commit()
         
         # Run concurrent solve attempts
@@ -198,7 +200,7 @@ def test_transaction_safety():
         
         # Verify only one record exists
         final_count = db.execute(
-            "SELECT COUNT(*) FROM solved_problems WHERE user_id = :user_id AND problem_id = :problem_id",
+            text("SELECT COUNT(*) FROM solved_problems WHERE user_id = :user_id AND problem_id = :problem_id"),
             {"user_id": user_id, "problem_id": problem_id}
         ).scalar()
         
@@ -269,8 +271,8 @@ def test_stats_calculation():
         user_id = user.id
         
         # Clean up existing data
-        db.execute("DELETE FROM solved_problems WHERE user_id = :user_id", {"user_id": user_id})
-        db.execute("DELETE FROM user_stats WHERE user_id = :user_id", {"user_id": user_id})
+        db.execute(text("DELETE FROM solved_problems WHERE user_id = :user_id"), {"user_id": user_id})
+        db.execute(text("DELETE FROM user_stats WHERE user_id = :user_id"), {"user_id": user_id})
         db.commit()
         
         # Get some test problems
@@ -290,7 +292,7 @@ def test_stats_calculation():
         for problem_id, difficulty in test_solves:
             # Update problem difficulty
             db.execute(
-                "UPDATE problems SET difficulty = :difficulty WHERE id = :problem_id",
+                text("UPDATE problems SET difficulty = :difficulty WHERE id = :problem_id"),
                 {"difficulty": difficulty, "problem_id": problem_id}
             )
             
@@ -300,9 +302,9 @@ def test_stats_calculation():
         
         db.commit()
         
-        # Trigger stats update (this would normally be done by trigger)
-        from app.models.submission import update_user_stats
-        update_user_stats(user_id)
+        # Rebuild cached stats from solved_problems source of truth
+        user_stats_service.rebuild(db, user_id)
+        db.commit()
         
         # Check stats
         stats = db.query(UserStats).filter(UserStats.user_id == user_id).first()
@@ -336,7 +338,7 @@ def test_performance():
         start_time = time.time()
         
         # Test complex query (stats calculation)
-        result = db.execute("""
+        result = db.execute(text("""
             SELECT 
                 COUNT(sp.id) as solved_count,
                 COUNT(s.id) as total_submissions,
@@ -351,7 +353,7 @@ def test_performance():
             LEFT JOIN submissions s ON p.id = s.problem_id
             GROUP BY p.id
             LIMIT 10
-        """).fetchall()
+        """)).fetchall()
         
         query_time = time.time() - start_time
         

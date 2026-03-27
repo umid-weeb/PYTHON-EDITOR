@@ -15,14 +15,12 @@ from app.api.routes.submissions import router as submission_router
 from app.api.routes.contests import router as contest_router, ws_router as contest_ws_router
 from app.api.routes.engagement import router as engagement_router
 from app.core.config import get_settings
-from app.repositories.submissions import SubmissionRepository
 from app.database import Base, engine
 from app.database import SessionLocal
 from app import models as _models  # noqa: F401
 from app.services.problem_catalog import ensure_problem_catalog_seeded
 from app.services.db_bootstrap import run_startup_migrations
 from app.services.engagement_service import engagement_service
-from app.services.user_stats_service import user_stats_service
 
 
 settings = get_settings()
@@ -34,7 +32,6 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    SubmissionRepository(settings.submissions_db_path)
     Base.metadata.create_all(bind=engine)
     run_startup_migrations(engine)
     # Run once more after bootstrap alters/creates auxiliary tables.
@@ -42,7 +39,6 @@ async def lifespan(_: FastAPI):
     with SessionLocal() as db:
         ensure_problem_catalog_seeded(db)
         engagement_service.ensure_upcoming_daily_challenges(db)
-        user_stats_service.backfill_all(db)
         db.commit()
     yield
 

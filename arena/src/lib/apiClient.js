@@ -135,7 +135,7 @@ export const arenaApi = {
         await delay(700);
         continue;
       }
-      if (payload.status === "queued" || payload.status === "running") {
+      if (payload.status === "queued" || payload.status === "pending" || payload.status === "running") {
         await delay(800);
         continue;
       }

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.problem import Problem
 from app.models.rating import RatingHistory
-from app.models.submission_stats import UserStats, UserSubmission
+from app.models.submission import UserStats
 
 
 @dataclass(frozen=True)
@@ -50,22 +50,9 @@ class RatingService:
         problem_id: str,
         submission_id: str,
         verdict: str | None,
+        is_first_solve: bool = False,
     ) -> None:
-        if (verdict or "").strip().lower() != "accepted":
-            return
-
-        # Only award rating for the first accepted submission per problem.
-        already_solved = (
-            db.query(UserSubmission.id)
-            .filter(
-                UserSubmission.user_id == user_id,
-                UserSubmission.problem_id == problem_id,
-                UserSubmission.verdict == "Accepted",
-                UserSubmission.submission_id != submission_id,
-            )
-            .first()
-        )
-        if already_solved:
+        if (verdict or "").strip().lower() != "accepted" or not is_first_solve:
             return
 
         exists = (

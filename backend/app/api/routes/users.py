@@ -23,8 +23,7 @@ from uuid import uuid4
 
 from app.database import get_db
 from app.models.user import User
-from app.models.problem import Problem
-from app.models.submission_stats import SubmissionRecord, UserStats, UserSubmission
+from app.models.submission import UserStats
 from app.api.routes.auth import (
     ALGORITHM,
     SECRET_KEY,
@@ -33,52 +32,13 @@ from app.api.routes.auth import (
     security,
 )
 from app.api.routes.auth import get_current_user
+from app.services.profile_service import profile_service
 from app.services.user_stats_service import user_stats_service
 
 
 router = APIRouter(tags=["users"])
 account_router = APIRouter(tags=["account"])
 LOGGER = logging.getLogger("pyzone.arena.users")
-
-
-def _serialize_submission_feed_rows(db: Session, rows: list[tuple]) -> list[dict]:
-    changed = False
-    items: list[dict] = []
-
-    for row in rows:
-        record: SubmissionRecord = row[0]
-        problem_title = row.problem_title
-        difficulty = row.difficulty
-        problem_slug = getattr(row, "problem_slug", None)
-
-        if record.external_submission_id and (
-            not record.verdict or str(record.status or "").strip().lower() in {"pending", "queued", "running", "completed"}
-        ):
-            changed = user_stats_service.repair_submission_record_from_judge_store(db, record) or changed
-
-        normalized_status = str(record.status or record.verdict or "").strip()
-        normalized_verdict = str(record.verdict or "").strip()
-
-        items.append(
-            {
-                "submission_id": record.external_submission_id,
-                "problem_id": record.problem_id,
-                "problem_slug": problem_slug,
-                "problem_title": problem_title,
-                "language": record.language,
-                "difficulty": difficulty,
-                "verdict": normalized_verdict or None,
-                "runtime_ms": int(record.runtime) if record.runtime is not None else None,
-                "memory_kb": record.memory_kb,
-                "created_at": record.created_at.isoformat() if record.created_at else None,
-                "status": normalized_status or None,
-            }
-        )
-
-    if changed:
-        db.commit()
-
-    return items
 
 
 class UserSearchItem(BaseModel):
@@ -279,82 +239,18 @@ def upload_avatar(
 
 @account_router.get("/user/activity")
 def user_activity(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list:
-    rows = (
-        db.query(
-            func.date(UserSubmission.created_at).label("date"),
-            func.count().label("count"),
-        )
-        .filter(UserSubmission.user_id == current_user.id)
-        .group_by(func.date(UserSubmission.created_at))
-        .order_by(func.date(UserSubmission.created_at))
-        .all()
-    )
-    return [{"date": str(row.date), "count": int(row.count)} for row in rows]
+    return profile_service.get_user_activity(db, current_user.id)
 
 
 @account_router.get("/user/submissions")
 def user_submissions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list:
     user_stats_service.ensure_user_stats_fresh(db, current_user.id)
-    rows = (
-        db.query(
-            SubmissionRecord,
-            Problem.title.label("problem_title"),
-            Problem.difficulty.label("difficulty"),
-            Problem.slug.label("problem_slug"),
-        )
-        .outerjoin(Problem, Problem.id == SubmissionRecord.problem_id)
-        .filter(SubmissionRecord.user_id == current_user.id)
-        .order_by(SubmissionRecord.created_at.desc())
-        .limit(200)
-        .all()
-    )
-    return _serialize_submission_feed_rows(db, rows)
+    return profile_service.get_user_submission_feed(db, current_user.id)
 
 
 @router.get("/leaderboard")
 def leaderboard(db: Session = Depends(get_db)) -> list:
-    """
-    Global leaderboard sorted by rating, then solved.
-    """
-    subq = (
-        db.query(
-            SubmissionRecord.user_id.label("user_id"),
-            func.count().label("submissions"),
-            func.min(SubmissionRecord.runtime).label("fastest_ms"),
-        )
-        .filter(SubmissionRecord.user_id.isnot(None))
-        .group_by(SubmissionRecord.user_id)
-        .subquery()
-    )
-
-    rows = (
-        db.query(
-            User.id.label("user_id"),
-            User.username,
-            func.coalesce(UserStats.rating, 1200).label("rating"),
-            func.coalesce(UserStats.solved_count, 0).label("solved"),
-            subq.c.submissions,
-            subq.c.fastest_ms,
-        )
-        .outerjoin(UserStats, UserStats.user_id == User.id)
-        .outerjoin(subq, subq.c.user_id == User.id)
-        .order_by(func.coalesce(UserStats.rating, 1200).desc(), func.coalesce(UserStats.solved_count, 0).desc(), User.username.asc())
-        .limit(50)
-        .all()
-    )
-
-    return [
-        {
-            "user_id": int(row.user_id),
-            "username": row.username,
-            "rating": int(row.rating or 1200),
-            "solved": int(row.solved or 0),
-            "solved_count": int(row.solved or 0),
-            "submissions": int(row.submissions or 0),
-            "fastest_ms": int(row.fastest_ms) if row.fastest_ms is not None else None,
-        }
-        for row in rows
-    ]
+    return profile_service.get_leaderboard(db, limit=50)
 
 
 @router.get("/users/{user_id}/stats")
@@ -384,17 +280,4 @@ def get_user_submissions_by_id(user_id: int, db: Session = Depends(get_db)) -> l
         raise HTTPException(status_code=404, detail="User not found")
 
     user_stats_service.ensure_user_stats_fresh(db, user_id)
-    rows = (
-        db.query(
-            SubmissionRecord,
-            Problem.title.label("problem_title"),
-            Problem.difficulty.label("difficulty"),
-            Problem.slug.label("problem_slug"),
-        )
-        .outerjoin(Problem, Problem.id == SubmissionRecord.problem_id)
-        .filter(SubmissionRecord.user_id == user_id)
-        .order_by(SubmissionRecord.created_at.desc())
-        .limit(200)
-        .all()
-    )
-    return _serialize_submission_feed_rows(db, rows)
+    return profile_service.get_user_submission_feed(db, user_id)

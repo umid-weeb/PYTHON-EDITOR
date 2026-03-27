@@ -14,7 +14,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.submission_stats import UserStats
 from app.models.user import User
 from app.services.user_stats_service import user_stats_service
 

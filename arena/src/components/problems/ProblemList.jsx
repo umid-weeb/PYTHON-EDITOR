@@ -32,6 +32,28 @@ const difficultyPillClass = {
   hard: "text-arena-danger",
 };
 
+function StatusMark({ solved, attempted }) {
+  if (solved) {
+    return (
+      <svg aria-hidden="true" className="h-4 w-4 text-arena-success" fill="none" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M4.8 8.2 7 10.3l4.2-4.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+
+  if (attempted) {
+    return (
+      <svg aria-hidden="true" className="h-4 w-4 text-arena-warning" fill="none" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M8 4.4v3.8l2.3 1.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
+      </svg>
+    );
+  }
+
+  return <span className="inline-block h-4 w-4 rounded-full border border-transparent" />;
+}
+
 export default function ProblemList({
   problems,
   loading,
@@ -106,7 +128,10 @@ export default function ProblemList({
                     type="button"
                     onClick={() => onSelect(key)}
                   >
-                    <div className="font-semibold">{problem.title || problem.id}</div>
+                    <div className="flex items-center gap-3">
+                      <StatusMark attempted={problem.is_attempted} solved={problem.is_solved} />
+                      <div className="font-semibold">{problem.title || problem.id}</div>
+                    </div>
                     <div className="flex items-center justify-between gap-3 text-sm text-arena-muted">
                       <span
                         className={[

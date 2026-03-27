@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import Any
 
 import redis
-from sqlalchemy import or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import joinedload
 
 from app.core.config import get_settings
@@ -13,7 +13,7 @@ from app.database import SessionLocal
 from app.models.problem import Problem
 from app.models.problem_translation import ProblemTranslation
 from app.models.schemas import ProblemDetail, ProblemSummary
-from app.models.submission_stats import SubmissionRecord, UserProgress
+from app.models.submission import SolvedProblem, Submission
 from app.services.problem_cache import ProblemCache
 from app.services.problem_catalog import build_problem_order_map
 
@@ -142,37 +142,40 @@ class ProblemService:
         attempted_ids: set[str] = set()
 
         with SessionLocal() as db:
-            submission_rows = (
-                db.query(SubmissionRecord.problem_id, SubmissionRecord.status, SubmissionRecord.verdict)
-                .filter(SubmissionRecord.problem_id.isnot(None))
-                .all()
-            )
-            aggregates: dict[str, tuple[int, int]] = {}
-            for problem_id, status, verdict in submission_rows:
-                key = str(problem_id)
-                total, accepted = aggregates.get(key, (0, 0))
-                total += 1
-                normalized_status = str(status or "").strip().lower()
-                normalized_verdict = str(verdict or "").strip().lower()
-                if normalized_status == "accepted" or normalized_verdict == "accepted":
-                    accepted += 1
-                aggregates[key] = (total, accepted)
-
             acceptance_rates = {
-                problem_id: int(round((accepted / total) * 100)) if total else None
-                for problem_id, (total, accepted) in aggregates.items()
+                str(row.problem_id): int(round((int(row.accepted or 0) / int(row.total or 0)) * 100))
+                if int(row.total or 0)
+                else None
+                for row in (
+                    db.query(
+                        Submission.problem_id,
+                        func.count(Submission.id).label("total"),
+                        func.sum(case((func.lower(Submission.verdict) == "accepted", 1), else_=0)).label("accepted"),
+                    )
+                    .filter(
+                        Submission.problem_id.isnot(None),
+                        Submission.mode == "submit",
+                        Submission.status == "completed",
+                    )
+                    .group_by(Submission.problem_id)
+                    .all()
+                )
             }
 
             if user_id is not None:
                 solved_ids = {
                     str(problem_id)
-                    for (problem_id,) in db.query(UserProgress.problem_id).filter(UserProgress.user_id == user_id).all()
+                    for (problem_id,) in db.query(SolvedProblem.problem_id).filter(SolvedProblem.user_id == user_id).all()
                 }
                 attempted_ids = {
                     str(problem_id)
                     for (problem_id,) in (
-                        db.query(SubmissionRecord.problem_id)
-                        .filter(SubmissionRecord.user_id == user_id, SubmissionRecord.problem_id.isnot(None))
+                        db.query(Submission.problem_id)
+                        .filter(
+                            Submission.user_id == user_id,
+                            Submission.problem_id.isnot(None),
+                            Submission.mode == "submit",
+                        )
                         .distinct()
                         .all()
                     )
@@ -393,4 +396,3 @@ class ProblemService:
 @lru_cache(maxsize=1)
 def get_problem_service() -> ProblemService:
     return ProblemService()
-

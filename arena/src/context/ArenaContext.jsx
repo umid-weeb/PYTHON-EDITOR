@@ -200,6 +200,33 @@ export function ArenaProvider({ children }) {
         clearPendingSubmission();
         const formatted = buildResultState(payload, "submit");
         setResult(formatted);
+        const normalizedVerdict = String(payload?.verdict || "").trim().toLowerCase();
+        const normalizedStatus = String(payload?.status || "").trim().toLowerCase();
+        const accepted = normalizedVerdict === "accepted";
+        const attempted = accepted || normalizedStatus === "completed";
+
+        if (selectedProblemId) {
+          setProblems((current) =>
+            current.map((problem) =>
+              (problem.id || problem.slug) === selectedProblemId
+                ? {
+                    ...problem,
+                    is_attempted: problem.is_attempted || attempted,
+                    is_solved: problem.is_solved || accepted,
+                  }
+                : problem
+            )
+          );
+          setSelectedProblem((current) =>
+            current
+              ? {
+                  ...current,
+                  is_attempted: current.is_attempted || attempted,
+                  is_solved: current.is_solved || accepted,
+                }
+              : current
+          );
+        }
         return formatted;
       } catch (error) {
         setResult({
