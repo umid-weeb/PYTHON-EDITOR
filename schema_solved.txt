@@ -1,0 +1,35 @@
+
+TABLE: solved_problems
+id INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A144050>, for_update=False)
+user_id INTEGER Nullable: False Default: None
+problem_id VARCHAR(36) Nullable: False Default: None
+solved_at TIMESTAMP Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A148410>, for_update=False)
+
+TABLE: submissions
+id INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A4B8210>, for_update=False)
+external_submission_id TEXT Nullable: True Default: None
+user_id INTEGER Nullable: True Default: None
+problem_id VARCHAR(36) Nullable: True Default: None
+code TEXT Nullable: False Default: None
+language TEXT Nullable: False Default: None
+status TEXT Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A132B60>, for_update=False)
+verdict TEXT Nullable: True Default: None
+runtime DOUBLE PRECISION Nullable: True Default: None
+memory_kb INTEGER Nullable: True Default: None
+error_text TEXT Nullable: True Default: None
+created_at TIMESTAMP Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A111610>, for_update=False)
+mode VARCHAR(10) Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A1116D0>, for_update=False)
+runtime_ms INTEGER Nullable: True Default: None
+passed_count INTEGER Nullable: True Default: None
+total_count INTEGER Nullable: True Default: None
+case_results_json TEXT Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A168260>, for_update=False)
+updated_at TIMESTAMP Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A168100>, for_update=False)
+
+TABLE: user_stats
+user_id INTEGER Nullable: False Default: None
+solved_count INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A4BD130>, for_update=False)
+easy_solved INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A4BD270>, for_update=False)
+medium_solved INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B09FDA2A0>, for_update=False)
+hard_solved INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B09FF1650>, for_update=False)
+rating INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A120CD0>, for_update=False)
+updated_at TIMESTAMP Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x0000019B0A1216D0>, for_update=False)

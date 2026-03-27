@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,11 @@ class ProblemCache:
         return payload
 
     def _save_json(self, path: Path, payload: dict[str, Any], redis_key: str | None = None) -> None:
+        def json_serial(obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            raise TypeError(f"Type {type(obj)} not serializable")
+
         envelope = {
             "_saved_at": time.time(),
             "_ttl_seconds": self.ttl_seconds,
@@ -71,9 +77,13 @@ class ProblemCache:
         }
 
         if self.redis and redis_key:
-            self.redis.setex(redis_key, self.ttl_seconds, json.dumps(payload, ensure_ascii=False))
+            self.redis.setex(
+                redis_key, 
+                self.ttl_seconds, 
+                json.dumps(payload, ensure_ascii=False, default=json_serial)
+            )
 
         path.write_text(
-            json.dumps(envelope, ensure_ascii=False, indent=2),
+            json.dumps(envelope, ensure_ascii=False, indent=2, default=json_serial),
             encoding="utf-8",
         )

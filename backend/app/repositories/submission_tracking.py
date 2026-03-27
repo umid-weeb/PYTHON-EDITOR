@@ -219,12 +219,6 @@ class SubmissionTrackingRepository:
                 user_id=user_id,
                 problem_id=problem_id,
                 solved_at=solved_at or datetime.now(timezone.utc),
-                created_by=created_by,
-                debug_info={
-                    "difficulty": str(difficulty or ""),
-                    "timestamp": solved_at.timestamp() if solved_at else datetime.now(timezone.utc).timestamp(),
-                    "created_by": created_by
-                } if solved_at else None,
             )
             .on_conflict_do_nothing(index_elements=["user_id", "problem_id"])
         )

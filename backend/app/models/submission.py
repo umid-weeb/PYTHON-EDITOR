@@ -10,6 +10,7 @@ class Submission(Base):
     __tablename__ = "submissions"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    external_submission_id = Column(Text, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True)
     problem_id = Column(String(36), ForeignKey("problems.id", ondelete="CASCADE"), index=True, nullable=False)
     code = Column(Text, nullable=False)
