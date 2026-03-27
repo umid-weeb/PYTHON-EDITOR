@@ -1,0 +1,18 @@
+id INTEGER Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x000001BDF0FFC050>, for_update=False)
+external_submission_id TEXT Nullable: False Default: None
+user_id INTEGER Nullable: True Default: None
+problem_id VARCHAR(36) Nullable: True Default: None
+code TEXT Nullable: False Default: None
+language TEXT Nullable: False Default: None
+status TEXT Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x000001BDF0FCCB90>, for_update=False)
+verdict TEXT Nullable: True Default: None
+runtime DOUBLE PRECISION Nullable: True Default: None
+memory_kb INTEGER Nullable: True Default: None
+error_text TEXT Nullable: True Default: None
+created_at TIMESTAMP Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x000001BDF0FCD450>, for_update=False)
+mode VARCHAR(10) Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x000001BDF0F81A70>, for_update=False)
+runtime_ms INTEGER Nullable: True Default: None
+passed_count INTEGER Nullable: True Default: None
+total_count INTEGER Nullable: True Default: None
+case_results_json TEXT Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x000001BDF0F81E00>, for_update=False)
+updated_at TIMESTAMP Nullable: False Default: DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x000001BDF0D47890>, for_update=False)
