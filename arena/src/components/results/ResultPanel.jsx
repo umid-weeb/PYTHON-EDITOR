@@ -24,14 +24,17 @@ function StatusChip({ verdict, tone }) {
   );
 }
 
-function CodeBlock({ label, value }) {
-  if (value === undefined || value === null) return null;
-  const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+function CodeBlock({ label, value, placeholder = "Ma'lumot mavjud emas" }) {
+  const displayValue = value === undefined || value === null || String(value).trim() === "" 
+    ? placeholder 
+    : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+
+  const isPlaceholder = displayValue === placeholder;
 
   return (
     <div className="flex flex-col gap-1.5 mt-3">
       <div className="text-[12px] font-medium text-[var(--text-secondary)]">{label} =</div>
-      <div className="rounded-[var(--radius-sm)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 py-2 font-mono text-[13px] text-[var(--text-primary)] whitespace-pre-wrap break-all">
+      <div className={`rounded-[var(--radius-sm)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 py-2 font-mono text-[13px] whitespace-pre-wrap break-all ${isPlaceholder ? 'text-[var(--text-muted)] italic' : 'text-[var(--text-primary)]'}`}>
         {displayValue}
       </div>
     </div>
@@ -85,7 +88,7 @@ export default function ResultPanel({ result, busy = false }) {
         <div className="flex items-center gap-3">
             <StatusChip verdict={result.chip} tone={result.tone} />
             <div className="text-[13px] text-[var(--text-secondary)]">
-                {result.runtime && `Runtime: ${result.runtime}`}
+                {result.runtime && `Vaqt: ${result.runtime}`}
             </div>
         </div>
         {busy && <Spinner />}
@@ -130,29 +133,27 @@ export default function ResultPanel({ result, busy = false }) {
 
             {/* Selected Case Content */}
             {activeCase && (
-              <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200 pb-4">
                 <CodeBlock label="Kirish (Input)" value={activeCase.input} />
+                <CodeBlock label="Kutilgan natija (Expected)" value={activeCase.expected} />
                 
                 {activeCase.rawVerdict !== "Accepted" && activeCase.error ? (
                     <div className="mt-4 rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 overflow-auto">
                         <div className="text-[13px] font-bold text-[var(--error)] mb-2 flex items-center gap-2">
                             <div className="h-2 w-2 rounded-full bg-[var(--error)]" />
-                            Xatolik yuz berdi:
+                            Programma bajarilishida xatolik:
                         </div>
-                        <div className="font-mono text-[13px] text-[var(--error)] leading-relaxed whitespace-pre-wrap">
+                        <div className="font-mono text-[13px] text-[var(--error)] leading-relaxed whitespace-pre-wrap italic">
                             {activeCase.error}
                         </div>
                     </div>
                 ) : (
-                    <>
-                        <CodeBlock label="Natija (Output)" value={activeCase.actual} />
-                        <CodeBlock label="Kutilgan natija (Expected)" value={activeCase.expected} />
-                    </>
+                    <CodeBlock label="Sizning natijangiz (Output)" value={activeCase.actual} placeholder="Natija yo'q" />
                 )}
                 
                 {/* Performance stats if passed */}
-                {activeCase.passed && (activeCase.runtime || activeCase.memory) && (
-                    <div className="mt-4 flex gap-4 text-[12px] text-[var(--text-muted)]">
+                {(activeCase.runtime || activeCase.memory) && (
+                    <div className="mt-4 flex gap-4 text-[12px] text-[var(--text-muted)] border-t border-[color:var(--border)] pt-3">
                         {activeCase.runtime && <span>Vaqt: {activeCase.runtime}</span>}
                         {activeCase.memory && <span>Xotira: {activeCase.memory}</span>}
                     </div>

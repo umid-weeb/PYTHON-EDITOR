@@ -20,7 +20,7 @@ import importlib.util
 import io
 import json
 import pathlib
-import time
+import sys
 import time
 import traceback
 import tracemalloc
@@ -39,20 +39,24 @@ module = importlib.util.module_from_spec(spec)
 try:
     spec.loader.exec_module(module)
 except SyntaxError as exc:
+    print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Compilation Error",
         "error": "".join(traceback.format_exception_only(type(exc), exc)).strip(),
         "runtime_ms": 0,
         "memory_kb": 0
     }, ensure_ascii=False))
+    print("<<<JSON_END>>>")
     raise SystemExit(0)
 except Exception as exc:
+    print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Runtime Error",
         "error": traceback.format_exc(),
         "runtime_ms": 0,
         "memory_kb": 0
     }, ensure_ascii=False))
+    print("<<<JSON_END>>>")
     raise SystemExit(0)
 
 try:
@@ -61,12 +65,14 @@ try:
     else:
         target = getattr(module, payload["function_name"])
 except AttributeError as exc:
+    print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Runtime Error",
         "error": f"Function topilmadi: {payload['function_name']}",
         "runtime_ms": 0,
         "memory_kb": 0
     }, ensure_ascii=False))
+    print("<<<JSON_END>>>")
     raise SystemExit(0)
 
 stdout_buffer = io.StringIO()
@@ -79,30 +85,36 @@ try:
     runtime_ms = int((time.perf_counter() - started) * 1000)
     current, peak = tracemalloc.get_traced_memory()
     actual = result if result is not None else stdout_buffer.getvalue().strip()
+    print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Accepted",
         "actual": actual,
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False, default=repr))
+    print("<<<JSON_END>>>")
 except MemoryError as exc:
     runtime_ms = int((time.perf_counter() - started) * 1000)
     current, peak = tracemalloc.get_traced_memory()
+    print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Memory Limit Exceeded",
         "error": "".join(traceback.format_exception_only(type(exc), exc)).strip(),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False))
+    print("<<<JSON_END>>>")
 except Exception:
     runtime_ms = int((time.perf_counter() - started) * 1000)
     current, peak = tracemalloc.get_traced_memory()
+    print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Runtime Error",
         "error": traceback.format_exc(),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False))
+    print("<<<JSON_END>>>")
 finally:
     tracemalloc.stop()
 """
@@ -392,30 +404,48 @@ class JudgeRunner:
                 "error": "Execution timed out.",
             }
 
-        if completed.returncode != 0 and not completed.stdout.strip():
+        stdout = completed.stdout or ""
+        stderr = completed.stderr or ""
+        
+        # Extract JSON between markers
+        payload_found = False
+        start_marker = "<<<JSON_START>>>"
+        end_marker = "<<<JSON_END>>>"
+        
+        if start_marker in stdout and end_marker in stdout:
+            try:
+                raw_json = stdout.split(start_marker)[1].split(end_marker)[0].strip()
+                payload = json.loads(raw_json)
+                payload_found = True
+            except (IndexError, json.JSONDecodeError):
+                pass
+
+        if not payload_found:
+            # Fallback to full stdout if no markers (legacy support or catastrophic failure)
+            try:
+                payload = json.loads(stdout.strip() or "{}")
+                if payload:
+                    payload_found = True
+            except json.JSONDecodeError:
+                pass
+
+        if not payload_found:
+            verdict = "Runtime Error"
             if completed.returncode in {137, 139}:
                 verdict = "Memory Limit Exceeded"
-            else:
-                verdict = "Runtime Error"
+            
+            error_msg = stderr.strip()
+            if not error_msg:
+                # If stderr is empty, maybe the error is in stdout (e.g. half-printed JSON)
+                error_msg = stdout.strip() or "Judge natija qaytarmadi."
+                
             return {
                 "verdict": verdict,
                 "passed": False,
                 "runtime_ms": 0,
                 "memory_kb": 0,
-                "actual_output": completed.stdout.strip(),
-                "error": completed.stderr.strip() or "Judge process failed.",
-            }
-
-        try:
-            payload = json.loads(completed.stdout.strip() or "{}")
-        except json.JSONDecodeError:
-            return {
-                "verdict": "Runtime Error",
-                "passed": False,
-                "runtime_ms": 0,
-                "memory_kb": 0,
-                "actual_output": completed.stdout.strip(),
-                "error": completed.stderr.strip() or "Judge JSON natija qaytarmadi.",
+                "actual_output": None,
+                "error": error_msg,
             }
 
         payload["passed"] = payload.get("verdict") == "Accepted"
