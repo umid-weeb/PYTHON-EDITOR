@@ -86,6 +86,10 @@ export function ArenaProvider({ children }) {
     setSelectedProblemId(problemId);
     writeLastProblem(problemId);
 
+    // Reset cooldowns when switching problems so the user can immediately test
+    setRunCooldown(0);
+    setSubmitCooldown(0);
+
     if (cacheRef.current.has(problemId)) {
       const cached = cacheRef.current.get(problemId);
       setSelectedProblem(cached);
@@ -126,6 +130,7 @@ export function ArenaProvider({ children }) {
       throw error;
     }
   }, []);
+
 
   const persistDraft = useCallback(
     (problemId = selectedProblemId, value = code) => {
