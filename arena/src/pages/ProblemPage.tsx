@@ -110,7 +110,7 @@ export default function ProblemPage() {
             </div>
           </Panel>
 
-          <ResizeHandle orientation={isMobile ? "horizontal" : "vertical"} />
+          <ResizeHandle id="problem-main-handle" orientation={isMobile ? "horizontal" : "vertical"} />
 
           <Panel defaultSize={52} maxSize={80} minSize={20}>
             <ResizablePanelGroup

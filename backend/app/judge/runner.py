@@ -29,6 +29,21 @@ import tracemalloc
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+def format_user_error(exc):
+    tb = traceback.extract_tb(exc.__traceback__)
+    clean_tb = []
+    for f in tb:
+        if "submission.py" in f.filename:
+            # Hide the absolute temp path, show only 'solution.py'
+            clean_f = traceback.FrameSummary("solution.py", f.lineno, f.name, line=f.line)
+            clean_tb.append(clean_f)
+            
+    lines = traceback.format_list(clean_tb)
+    if lines:
+        lines.insert(0, "Traceback (most recent call last):\\n")
+    lines.extend(traceback.format_exception_only(type(exc), exc))
+    return "".join(lines).strip()
+
 workspace = pathlib.Path(__file__).resolve().parent
 payload = json.loads((workspace / "payload.json").read_text(encoding="utf-8"))
 submission_path = workspace / "submission.py"
@@ -42,7 +57,7 @@ except SyntaxError as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Compilation Error",
-        "error": "".join(traceback.format_exception_only(type(exc), exc)).strip(),
+        "error": format_user_error(exc),
         "runtime_ms": 0,
         "memory_kb": 0
     }, ensure_ascii=False))
@@ -52,7 +67,7 @@ except Exception as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Runtime Error",
-        "error": traceback.format_exc(),
+        "error": format_user_error(exc),
         "runtime_ms": 0,
         "memory_kb": 0
     }, ensure_ascii=False))
@@ -99,18 +114,18 @@ except MemoryError as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Memory Limit Exceeded",
-        "error": "".join(traceback.format_exception_only(type(exc), exc)).strip(),
+        "error": format_user_error(exc),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False))
     print("<<<JSON_END>>>")
-except Exception:
+except Exception as exc:
     runtime_ms = int((time.perf_counter() - started) * 1000)
     current, peak = tracemalloc.get_traced_memory()
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Runtime Error",
-        "error": traceback.format_exc(),
+        "error": format_user_error(exc),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False))
@@ -449,7 +464,9 @@ class JudgeRunner:
             }
 
         payload["passed"] = payload.get("verdict") == "Accepted"
-        payload["actual_output"] = stringify_value(payload.get("actual"))
+        
+        actual_val = payload.get("actual")
+        payload["actual_output"] = None if actual_val is None else stringify_value(actual_val)
         return payload
 
     def _evaluate_case_result(
@@ -465,7 +482,7 @@ class JudgeRunner:
         passed = compare_expected_to_actual(testcase.get("expected_output", ""), actual_value)
         if passed:
             execution_result["passed"] = True
-            execution_result["actual_output"] = stringify_value(actual_value)
+            execution_result["actual_output"] = None if actual_value is None else stringify_value(actual_value)
             return execution_result
 
         return {
@@ -473,6 +490,7 @@ class JudgeRunner:
             "passed": False,
             "runtime_ms": execution_result.get("runtime_ms", 0),
             "memory_kb": execution_result.get("memory_kb", 0),
-            "actual_output": stringify_value(actual_value),
+            "actual_output": None if actual_value is None else stringify_value(actual_value),
             "error": None,
         }
+

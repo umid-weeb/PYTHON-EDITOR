@@ -25,6 +25,51 @@ SECRET_KEY = os.getenv("ARENA_JWT_SECRET", os.getenv("JWT_SECRET", "dev-secret-c
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ARENA_JWT_EXPIRE_MINUTES", str(60 * 24 * 7)))  # default 7 days
 security = HTTPBearer(auto_error=False)
+
+def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> User:
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        from app.api.routes.auth import ALGORITHM, SECRET_KEY
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        username: str | None = payload.get("username") or payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if not (user_id or username):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    query = db.query(User)
+    if user_id is not None:
+        user = query.filter(User.id == int(user_id)).first()
+    else:
+        user = query.filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if credentials is None:
+        return None
+    try:
+        from app.api.routes.auth import ALGORITHM, SECRET_KEY
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        username: str | None = payload.get("username") or payload.get("sub")
+    except JWTError:
+        return None
+    if not (user_id or username):
+        return None
+
+    query = db.query(User)
+    if user_id is not None:
+        return query.filter(User.id == int(user_id)).first()
+    return query.filter(User.username == username).first()
+
 logger = logging.getLogger(__name__)
 
 
@@ -347,47 +392,7 @@ class ResetVerifyRequest(BaseModel):
     phone: str | None = None
     code: str
 
-def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> User:
-    if credentials is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("user_id")
-        username: str | None = payload.get("username") or payload.get("sub")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    if not (user_id or username):
-        raise HTTPException(status_code=401, detail="Invalid token")
 
-    query = db.query(User)
-    if user_id is not None:
-        user = query.filter(User.id == int(user_id)).first()
-    else:
-        user = query.filter(User.username == username).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
-
-
-def get_optional_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-    db: Session = Depends(get_db),
-) -> User | None:
-    if credentials is None:
-        return None
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("user_id")
-        username: str | None = payload.get("username") or payload.get("sub")
-    except JWTError:
-        return None
-    if not (user_id or username):
-        return None
-
-    query = db.query(User)
-    if user_id is not None:
-        return query.filter(User.id == int(user_id)).first()
-    return query.filter(User.username == username).first()
 
 
 @router.get("/users/{username}", response_model=PublicProfileResponse)

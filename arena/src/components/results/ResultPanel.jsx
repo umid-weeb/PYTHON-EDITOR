@@ -6,25 +6,7 @@ function Spinner() {
   );
 }
 
-function statusTone(tone) {
-  if (tone === "success") return "text-[var(--success)]";
-  if (tone === "danger") return "text-[var(--error)]";
-  if (tone === "warning") return "text-[var(--warning)]";
-  return "text-[var(--text-primary)]";
-}
-
-function StatusChip({ verdict, tone }) {
-  const bgColor = tone === "success" ? "bg-[var(--success)]/10" : tone === "danger" ? "bg-[var(--error)]/10" : "bg-[var(--warning)]/10";
-  const textColor = tone === "success" ? "text-[var(--success)]" : tone === "danger" ? "text-[var(--error)]" : "text-[var(--warning)]";
-  
-  return (
-    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[13px] font-bold ${bgColor} ${textColor}`}>
-      {verdict}
-    </div>
-  );
-}
-
-function CodeBlock({ label, value, placeholder = "Ma'lumot mavjud emas" }) {
+function CodeBlock({ label, value, placeholder = "Ma'lumot mavjud emas", highlight = false }) {
   const displayValue = value === undefined || value === null || String(value).trim() === "" 
     ? placeholder 
     : (typeof value === 'object' ? JSON.stringify(value) : String(value));
@@ -32,9 +14,9 @@ function CodeBlock({ label, value, placeholder = "Ma'lumot mavjud emas" }) {
   const isPlaceholder = displayValue === placeholder;
 
   return (
-    <div className="flex flex-col gap-1.5 mt-3">
-      <div className="text-[12px] font-medium text-[var(--text-secondary)]">{label} =</div>
-      <div className={`rounded-[var(--radius-sm)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 py-2 font-mono text-[13px] whitespace-pre-wrap break-all ${isPlaceholder ? 'text-[var(--text-muted)] italic' : 'text-[var(--text-primary)]'}`}>
+    <div className="flex flex-col gap-2 mt-4">
+      <div className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-tight">{label}</div>
+      <div className={`rounded-[var(--radius-sm)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-4 py-3 font-mono text-[13px] whitespace-pre-wrap break-all leading-relaxed ${isPlaceholder ? 'text-[var(--text-muted)] italic' : 'text-[var(--text-primary)]'} ${highlight ? 'ring-1 ring-[var(--error)]/20' : ''}`}>
         {displayValue}
       </div>
     </div>
@@ -46,7 +28,6 @@ export default function ResultPanel({ result, busy = false }) {
   const details = Array.isArray(result?.details) ? result.details : [];
   const hasDetails = details.length > 0;
   
-  // Auto-select first case if active one is missing or when results change
   useEffect(() => {
     if (hasDetails) {
       const exists = details.find(d => d.id === activeCaseId);
@@ -60,7 +41,7 @@ export default function ResultPanel({ result, busy = false }) {
 
   if (busy && !hasDetails) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-6">
+      <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-8">
         <div className="flex flex-col items-center gap-4 text-center">
           <Spinner />
           <div className="text-[14px] font-medium text-[var(--text-secondary)]">
@@ -73,59 +54,70 @@ export default function ResultPanel({ result, busy = false }) {
 
   if (!result || (!hasDetails && !busy)) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-6 text-center">
-        <div className="text-[14px] text-[var(--text-muted)]">
-          Natijani ko'rish uchun kodni ishga tushiring (Sinash) yoki yuboring (Yuborish).
+      <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-8 text-center">
+        <div className="max-w-[300px] flex flex-col gap-2">
+            <div className="text-[15px] font-bold text-[var(--text-primary)]">Hozircha natija yo'q</div>
+            <div className="text-[13px] text-[var(--text-muted)]">
+                Natijani ko'rish uchun "Sinash" yoki "Yuborish" tugmasini bosing.
+            </div>
         </div>
       </div>
     );
   }
 
+  const isAccepted = result.tone === "success" || String(result.status).toLowerCase().includes("accepted");
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-[var(--bg-surface)]">
       {/* Header Info */}
-      <div className="flex shrink-0 items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
-        <div className="flex items-center gap-3">
-            <StatusChip verdict={result.chip} tone={result.tone} />
-            <div className="text-[13px] text-[var(--text-secondary)]">
-                {result.runtime && `Vaqt: ${result.runtime}`}
+      <div className="flex shrink-0 flex-col gap-2 border-b border-[color:var(--border)] px-6 py-4">
+        <div className="flex items-center justify-between">
+            <div className={`text-[20px] font-black tracking-tight ${result.tone === "success" ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
+                {result.chip}
             </div>
+            {busy && <Spinner />}
         </div>
-        {busy && <Spinner />}
+        <div className="flex gap-4 text-[13px] text-[var(--text-muted)]">
+            {result.runtime && (
+                <div className="flex items-center gap-1.5 font-medium">
+                    <span>Vaqt:</span>
+                    <span className="text-[var(--text-primary)]">{result.runtime}</span>
+                </div>
+            )}
+            {result.memory && (
+                <div className="flex items-center gap-1.5 font-medium">
+                    <span>Xotira:</span>
+                    <span className="text-[var(--text-primary)]">{result.memory}</span>
+                </div>
+            )}
+        </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto px-6 py-4">
         {/* Main Status / Summary */}
         {!hasDetails && result.tone !== "success" && result.summary ? (
-             <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200">
-                <div className={`mb-2 text-[14px] font-bold ${statusTone(result.tone)}`}>
-                    Bajarilishda xatolik yuz berdi:
-                </div>
-                <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/20 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] whitespace-pre-wrap leading-relaxed">
+             <div className="flex flex-col animate-in fade-in slide-in-from-top-1">
+                <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] whitespace-pre-wrap leading-relaxed shadow-inner">
                     {result.summary}
                 </div>
              </div>
-        ) : (
-            <div className={`mb-4 text-[13px] ${statusTone(result.tone)}`}>
-                {result.summary}
-            </div>
-        )}
+        ) : null}
 
         {hasDetails && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             {/* Case Tabs */}
-            <div className="flex flex-wrap gap-2 border-b border-[color:var(--border)] pb-2">
+            <div className="flex flex-wrap gap-2 pt-1">
               {details.map((entry) => (
                 <button
                   key={entry.id}
                   onClick={() => setActiveCaseId(entry.id)}
-                  className={`flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-1.5 text-[13px] font-medium transition ${
+                  className={`group relative flex items-center gap-2 rounded-[var(--radius-sm)] px-4 py-2 text-[13px] font-bold transition-all border ${
                     activeCaseId === entry.id
-                      ? "bg-[var(--bg-overlay)] text-[var(--text-primary)] shadow-sm"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      ? "bg-[var(--bg-overlay)] text-[var(--text-primary)] border-[color:var(--border)] shadow-sm"
+                      : "bg-transparent text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]"
                   }`}
                 >
-                  <div className={`h-1.5 w-1.5 rounded-full ${entry.passed ? "bg-[var(--success)]" : "bg-[var(--error)]"}`} />
+                  <div className={`h-2 w-2 rounded-full transition-shadow ${entry.passed ? "bg-[var(--success)]" : "bg-[var(--error)] shadow-[0_0_8px] shadow-[var(--error)]/50"}`} />
                   {entry.label}
                 </button>
               ))}
@@ -133,29 +125,37 @@ export default function ResultPanel({ result, busy = false }) {
 
             {/* Selected Case Content */}
             {activeCase && (
-              <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200 pb-4">
-                <CodeBlock label="Kirish (Input)" value={activeCase.input} />
-                <CodeBlock label="Kutilgan natija (Expected)" value={activeCase.expected} />
+              <div className="flex flex-col animate-in fade-in slide-in-from-bottom-1 duration-200 pb-10">
+                <CodeBlock label="Input" value={activeCase.input} />
                 
-                {activeCase.rawVerdict !== "Accepted" && activeCase.error ? (
-                    <div className="mt-4 rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 overflow-auto">
-                        <div className="text-[13px] font-bold text-[var(--error)] mb-2 flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-[var(--error)]" />
-                            Programma bajarilishida xatolik:
-                        </div>
-                        <div className="font-mono text-[13px] text-[var(--error)] leading-relaxed whitespace-pre-wrap italic">
+                {/* Error handling */}
+                {activeCase.error ? (
+                    <div className="mt-6 flex flex-col gap-2">
+                        <div className="text-[12px] font-bold text-[var(--error)] uppercase tracking-tight">Xatolik (Error)</div>
+                        <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] leading-relaxed whitespace-pre-wrap italic shadow-inner">
                             {activeCase.error}
                         </div>
                     </div>
                 ) : (
-                    <CodeBlock label="Sizning natijangiz (Output)" value={activeCase.actual} placeholder="Natija yo'q" />
+                    <>
+                        <CodeBlock 
+                            label="Natija (Output)" 
+                            value={activeCase.actual} 
+                            placeholder="Natija mavjud emas" 
+                            highlight={!activeCase.passed}
+                        />
+                        <CodeBlock 
+                            label="Kutilgan (Expected)" 
+                            value={activeCase.expected} 
+                        />
+                    </>
                 )}
                 
-                {/* Performance stats if passed */}
+                {/* Individual per-case metrics if available */}
                 {(activeCase.runtime || activeCase.memory) && (
-                    <div className="mt-4 flex gap-4 text-[12px] text-[var(--text-muted)] border-t border-[color:var(--border)] pt-3">
-                        {activeCase.runtime && <span>Vaqt: {activeCase.runtime}</span>}
-                        {activeCase.memory && <span>Xotira: {activeCase.memory}</span>}
+                    <div className="mt-8 flex gap-5 text-[12px] text-[var(--text-muted)] border-t border-[color:var(--border)]/50 pt-5">
+                        {activeCase.runtime && <span>Sur’at: <span className="font-mono text-[var(--text-secondary)]">{activeCase.runtime}</span></span>}
+                        {activeCase.memory && <span>Xotira: <span className="font-mono text-[var(--text-secondary)]">{activeCase.memory}</span></span>}
                     </div>
                 )}
               </div>

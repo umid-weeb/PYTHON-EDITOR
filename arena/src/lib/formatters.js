@@ -119,20 +119,29 @@ export function buildResultState(payload, mode = "run") {
   }
 
   const status = payload.verdict || payload.status || (payload.ok ? "Accepted" : "Result");
-  const details = payload.output
+  const details = payload.output && !payload.case_results
     ? [{ id: "output", label: "Konsol chiqishi", verdict: payload.output, runtime: "", memory: "" }]
-    : formatCaseResults(payload.case_results);
+    : formatCaseResults(payload.case_results || []);
 
   const summaryParts = [];
   if (typeof payload.passed_count === "number" && typeof payload.total_count === "number") {
     summaryParts.push(`O'tgan testlar: ${payload.passed_count}/${payload.total_count}`);
   }
-  summaryParts.push(`Vaqt: ${formatRuntime(payload.runtime_ms)}`);
-  summaryParts.push(`Xotira: ${formatMemory(payload.memory_kb)}`);
+  
+  const runtime = formatRuntime(payload.runtime_ms);
+  const memory = formatMemory(payload.memory_kb);
+  
+  if (runtime !== "--") summaryParts.push(`Vaqt: ${runtime}`);
+  if (memory !== "--") summaryParts.push(`Xotira: ${memory}`);
 
   return {
     tone: resolveResultTone(status),
     chip: localizeVerdictLabel(status),
+    status: status,
+    runtime: runtime !== "--" ? runtime : null,
+    memory: memory !== "--" ? memory : null,
+    passedCount: payload.passed_count,
+    totalCount: payload.total_count,
     summary:
       payload.error_text && String(status).toLowerCase() !== "accepted"
         ? translateErrorToUzbek(status, payload.error_text)

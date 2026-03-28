@@ -1,24 +1,23 @@
 import { Separator } from "react-resizable-panels";
 
-export default function ResizeHandle({ orientation = "vertical" }) {
+export default function ResizeHandle({ orientation = "vertical", id, ...props }) {
   const isVertical = orientation === "vertical";
 
   return (
     <Separator
+      id={id}
       className={[
-        "group relative z-[10] flex shrink-0 items-center justify-center transition-colors bg-[var(--bg-surface)] hover:bg-[var(--accent-subtle)]/30",
-        isVertical ? "w-2 cursor-col-resize active:transition-none" : "h-2 cursor-row-resize active:transition-none",
+        "group relative flex shrink-0 items-center justify-center bg-[var(--bg-surface)] transition-colors hover:bg-[var(--accent-subtle)]/30",
+        isVertical ? "w-2 cursor-col-resize px-1" : "h-2 cursor-row-resize py-1",
       ].join(" ")}
+      {...props}
     >
       <div
         className={[
           "rounded-[var(--radius-pill)] bg-[var(--border)] transition-all duration-200 group-hover:bg-[var(--accent)] group-active:bg-[var(--accent)]",
-          isVertical ? "h-6 w-[2px] group-hover:h-full group-active:h-full" : "w-6 h-[2px] group-hover:w-full group-active:w-full",
+          isVertical ? "h-8 w-[2px] group-hover:h-full" : "w-8 h-[2px] group-hover:w-full",
         ].join(" ")}
       />
-      
-      {/* Invisible larger hit area for easier dragging */}
-      <div className={`absolute ${isVertical ? 'w-4 h-full' : 'h-4 w-full'} z-[-1]`} />
     </Separator>
   );
 }

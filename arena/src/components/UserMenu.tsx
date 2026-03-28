@@ -35,6 +35,8 @@ function resolveAvatarSrc(user?: ArenaUser | null) {
     user?.profile_image ||
     user?.avatarUrl ||
     user?.avatar_url ||
+    user?.avatar ||
+    user?.picture ||
     "";
 
   if (!candidate) return "";

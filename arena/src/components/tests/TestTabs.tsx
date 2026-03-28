@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TestCasePanel from "../results/TestCasePanel.jsx";
 import ResultPanel from "../results/ResultPanel.jsx";
 
@@ -27,6 +27,13 @@ type Tab = "cases" | "result" | "console";
 
 export default function TestTabs({ cases, activeIndex, onSelect, result, busy }: Props) {
   const [active, setActive] = useState<Tab>("cases");
+
+  // Auto-switch to result tab when busy or when results arrive
+  useEffect(() => {
+    if (busy || (result && result.details && result.details.length > 0)) {
+        setActive("result");
+    }
+  }, [busy, result]);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col border-t border-[color:var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]">

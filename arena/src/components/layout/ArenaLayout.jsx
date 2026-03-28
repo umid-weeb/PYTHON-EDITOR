@@ -38,7 +38,7 @@ export default function ArenaLayout({
           <Panel defaultSize={48} maxSize={isMobile ? 100 : 70} minSize={isMobile ? 0 : 26}>
             <Surface>{viewer}</Surface>
           </Panel>
-          <ResizeHandle orientation={isMobile ? "horizontal" : "vertical"} />
+          <ResizeHandle id="arena-main-handle" orientation={isMobile ? "horizontal" : "vertical"} />
           <Panel defaultSize={52} maxSize={74} minSize={28}>
             <ResizablePanelGroup
               className="h-full min-h-0 min-w-0"
@@ -49,7 +49,7 @@ export default function ArenaLayout({
               <Panel defaultSize={56} maxSize={82} minSize={24}>
                 <Surface>{editor}</Surface>
               </Panel>
-              <ResizeHandle orientation="horizontal" />
+              <ResizeHandle id="arena-editor-result-handle" orientation="horizontal" />
               <Panel defaultSize={44} maxSize={70} minSize={16}>
                 <ResizablePanelGroup
                   className="h-full min-h-0 min-w-0"
@@ -60,7 +60,7 @@ export default function ArenaLayout({
                   <Panel defaultSize={50} maxSize={76} minSize={20}>
                     <Surface>{testCases}</Surface>
                   </Panel>
-                  <ResizeHandle orientation="vertical" />
+                  <ResizeHandle id="arena-tests-result-handle" orientation="vertical" />
                   <Panel defaultSize={50} maxSize={80} minSize={20}>
                     <Surface>{result}</Surface>
                   </Panel>

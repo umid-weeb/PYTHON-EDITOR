@@ -161,13 +161,14 @@ export function ArenaProvider({ children }) {
       setResult(formatted);
       return formatted;
     } catch (error) {
+      console.error("Run solution failed:", error);
       setResult({
         tone: "danger",
         chip: "Xato",
         summary: error.message || "Bajarish muvaffaqiyatsiz tugadi",
         details: [],
       });
-      throw error;
+      return null;
     } finally {
       setIsRunning(false);
     }
@@ -239,13 +240,14 @@ export function ArenaProvider({ children }) {
         }
         return formatted;
       } catch (error) {
+        console.error("Submit solution failed:", error);
         setResult({
           tone: "danger",
           chip: "Xato",
           summary: error.message || "Bajarish muvaffaqiyatsiz tugadi",
           details: [],
         });
-        throw error;
+        return null;
       } finally {
         setIsSubmitting(false);
       }
