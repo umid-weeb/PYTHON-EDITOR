@@ -137,7 +137,14 @@ class SubmissionService:
             
             problem_bundle["language"] = payload["language"]
 
-            self.logger.info("submission.judge_running id=%s mode=%s", submission_id, payload["mode"])
+            # PRE-FLIGHT CHECK: Verify test cases exist to avoid "silent" failures
+            all_cases = problem_bundle.get("visible_testcases", []) + problem_bundle.get("hidden_testcases", [])
+            if not all_cases:
+                self.logger.error("submission.config_error id=%s problem=%s error=no_test_cases", submission_id, payload["problem_id"])
+                self._finalize_failure(int(submission_id), "System Error: Ushbu masala uchun testlar topilmadi. Iltimos, administratorga xabar bering.")
+                return
+
+            self.logger.info("submission.judge_running id=%s mode=%s cases=%s", submission_id, payload["mode"], len(all_cases))
             result = self.judge.run_submission(
                 problem=problem_bundle,
                 code=payload["code"],

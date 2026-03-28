@@ -462,6 +462,12 @@ POSTGRES_BOOTSTRAP_SQL = [
     ALTER TABLE user_ratings ADD COLUMN IF NOT EXISTS max_rating INTEGER NOT NULL DEFAULT 1200;
     """,
     """
+    ALTER TABLE contest_problems ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 100;
+    """,
+    """
+    ALTER TABLE contest_problems ADD COLUMN IF NOT EXISTS order_num INTEGER NOT NULL DEFAULT 0;
+    """,
+    """
     ALTER TABLE user_stats ALTER COLUMN solved_count SET DEFAULT 0;
     """,
     """

@@ -164,6 +164,7 @@ def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
     for problem_seed in catalog:
         existing_problem = existing_problems.get(problem_seed.slug)
         if existing_problem is not None:
+            # Update basic metadata
             existing_problem.title = problem_seed.title
             existing_problem.difficulty = problem_seed.difficulty
             existing_problem.description = problem_seed.description
@@ -173,6 +174,22 @@ def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
             existing_problem.starter_code = problem_seed.starter_code
             existing_problem.function_name = problem_seed.function_name
             existing_problem.tags_json = json.dumps(problem_seed.tags, ensure_ascii=False)
+            
+            # CRITICAL: Check if test cases are missing (common error in previous builds)
+            test_case_count = db.query(TestCase).filter(TestCase.problem_id == existing_problem.id).count()
+            if test_case_count == 0:
+                logger.info("Seeding missing test cases for existing problem: %s", problem_seed.slug)
+                for test_case in problem_seed.test_cases:
+                    db.add(
+                        TestCase(
+                            problem_id=existing_problem.id,
+                            input=test_case.input,
+                            expected_output=test_case.expected_output,
+                            is_hidden=test_case.is_hidden,
+                            sort_order=test_case.sort_order,
+                        )
+                    )
+            
             skipped_count += 1
             continue
 
