@@ -19,7 +19,9 @@ export default function CodeEditorPanel({
   language,
   isRunning,
   isSubmitting,
-  onChange,
+  runCooldown = 0,
+  submitCooldown = 0,
+  onCodeChange,
   onLanguageChange,
   onRun,
   onSubmit,
@@ -68,19 +70,19 @@ export default function CodeEditorPanel({
 
         <button
           className="inline-flex h-[var(--h-btn-md)] items-center rounded-[var(--radius-xs)] border border-[color:var(--border-strong)] px-4 text-[12px] font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-overlay)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isRunning || isSubmitting}
+          disabled={isRunning || runCooldown > 0}
           type="button"
           onClick={onRun}
         >
-          {isRunning ? "Ishlayapti..." : "Sinash"}
+          {isRunning ? "Ishlayapti..." : runCooldown > 0 ? `Sinash (${runCooldown}s)` : "Sinash"}
         </button>
         <button
           className="inline-flex h-[var(--h-btn-md)] items-center rounded-[var(--radius-xs)] bg-[var(--accent)] px-4 text-[12px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-          disabled={isSubmitting}
+          disabled={isSubmitting || submitCooldown > 0}
           type="button"
           onClick={onSubmit}
         >
-          {isSubmitting ? "Yuborilmoqda..." : "Yuborish"}
+          {isSubmitting ? "Yuborilmoqda..." : submitCooldown > 0 ? `Yuborish (${submitCooldown}s)` : "Yuborish"}
         </button>
       </div>
 
@@ -99,7 +101,7 @@ export default function CodeEditorPanel({
           }}
           theme={theme === "dark" ? "vs-dark" : "vs"}
           value={code}
-          onChange={(value) => onChange(value || "")}
+          onChange={(value) => onCodeChange(value || "")}
         />
       </div>
     </div>
