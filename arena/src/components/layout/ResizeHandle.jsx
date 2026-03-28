@@ -1,14 +1,13 @@
-import { Separator } from "react-resizable-panels";
-
 export default function ResizeHandle({ orientation = "vertical", id, ...props }) {
   const isVertical = orientation === "vertical";
 
   return (
-    <Separator
+    <div
       id={id}
       className={[
         "group relative flex shrink-0 items-center justify-center bg-[var(--bg-surface)] transition-colors hover:bg-[var(--accent-subtle)]/30",
-        isVertical ? "w-2 cursor-col-resize px-1" : "h-2 cursor-row-resize py-1",
+        isVertical ? "w-2 z-10" : "h-2 z-10",
+        props.className || ""
       ].join(" ")}
       {...props}
     >
@@ -18,6 +17,6 @@ export default function ResizeHandle({ orientation = "vertical", id, ...props })
           isVertical ? "h-8 w-[2px] group-hover:h-full" : "w-8 h-[2px] group-hover:w-full",
         ].join(" ")}
       />
-    </Separator>
+    </div>
   );
 }

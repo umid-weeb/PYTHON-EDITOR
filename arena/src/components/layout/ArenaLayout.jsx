@@ -1,5 +1,4 @@
-import { Group as ResizablePanelGroup, Panel } from "react-resizable-panels";
-import { useSplitLayout } from "../../hooks/useSplitLayout.js";
+import { useResizableSplit } from "../../hooks/useResizableSplit.js";
 import { useMediaQuery } from "../../hooks/useMediaQuery.js";
 import ResizeHandle from "./ResizeHandle.jsx";
 
@@ -19,56 +18,88 @@ export default function ArenaLayout({
   authModal,
 }) {
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const rootLayout = useSplitLayout({ 
-    id: isMobile ? "arena-workspace-mobile-v1" : "arena-workspace-panels-v1", 
-    defaultLayout: isMobile ? [40, 60] : [48, 52] 
+
+  const root = useResizableSplit({ 
+    id: "arena-workspace-panels-v1", 
+    defaultRatio: 48,
+    direction: isMobile ? "vertical" : "horizontal",
+    minPixels: 260,
+    disabled: isMobile
   });
-  const rightLayout = useSplitLayout({ id: "arena-right-column-v5", defaultLayout: [56, 44] });
-  const bottomLayout = useSplitLayout({ id: "arena-bottom-row-v5", defaultLayout: [50, 50] });
+
+  const right = useResizableSplit({ 
+    id: "arena-right-column-v5", 
+    defaultRatio: 56,
+    direction: "vertical",
+    minPixels: 150
+  });
+
+  const bottom = useResizableSplit({ 
+    id: "arena-bottom-row-v5", 
+    defaultRatio: 50,
+    direction: "horizontal",
+    minPixels: 150
+  });
 
   return (
     <div className="mx-auto flex h-[calc(100vh-var(--h-navbar)-16px)] w-[min(1500px,calc(100vw-20px))] max-w-full flex-col py-[10px] max-[860px]:w-[min(100vw-12px,100%)]">
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        <ResizablePanelGroup
-          className="h-full min-h-0 min-w-0"
-          defaultLayout={rootLayout.defaultLayout}
-          onLayoutChanged={rootLayout.onLayoutChanged}
-          orientation={isMobile ? "vertical" : "horizontal"}
+      <div 
+        ref={root.containerRef}
+        className={`flex flex-1 min-h-0 min-w-0 ${isMobile ? "flex-col overflow-y-auto" : "flex-row overflow-hidden"}`}
+      >
+        {/* Viewer / Description Area */}
+        <div style={{ flex: isMobile ? "0 0 auto" : `${root.ratio} 1 0%`, minHeight: isMobile ? "300px" : 0, minWidth: 0 }}>
+          <Surface>{viewer}</Surface>
+        </div>
+
+        {!isMobile && (
+          <ResizeHandle 
+            id="arena-main-handle" 
+            orientation="vertical" 
+            {...root.handleProps} 
+          />
+        )}
+
+        {/* Right Pane (Editor + Tests + Results) */}
+        <div 
+          style={{ flex: isMobile ? "1 1 auto" : `${100 - root.ratio} 1 0%`, minHeight: 0, minWidth: 0 }}
+          className="flex flex-col"
         >
-          <Panel defaultSize={48} maxSize={isMobile ? 100 : 70} minSize={isMobile ? 0 : 26}>
-            <Surface>{viewer}</Surface>
-          </Panel>
-          <ResizeHandle id="arena-main-handle" orientation={isMobile ? "horizontal" : "vertical"} />
-          <Panel defaultSize={52} maxSize={74} minSize={28}>
-            <ResizablePanelGroup
-              className="h-full min-h-0 min-w-0"
-              defaultLayout={rightLayout.defaultLayout}
-              onLayoutChanged={rightLayout.onLayoutChanged}
-              orientation="vertical"
+          <div ref={right.containerRef} className="flex flex-col flex-1 min-h-0">
+            {/* Editor */}
+            <div style={{ flex: `${right.ratio} 1 0%`, minHeight: 0 }}>
+              <Surface>{editor}</Surface>
+            </div>
+
+            <ResizeHandle 
+              id="arena-editor-result-handle" 
+              orientation="horizontal" 
+              {...right.handleProps} 
+            />
+
+            {/* Bottom Row (Tests & Result Tabs) */}
+            <div 
+              style={{ flex: `${100 - right.ratio} 1 0%`, minHeight: 0 }}
+              className="flex"
             >
-              <Panel defaultSize={56} maxSize={82} minSize={24}>
-                <Surface>{editor}</Surface>
-              </Panel>
-              <ResizeHandle id="arena-editor-result-handle" orientation="horizontal" />
-              <Panel defaultSize={44} maxSize={70} minSize={16}>
-                <ResizablePanelGroup
-                  className="h-full min-h-0 min-w-0"
-                  defaultLayout={bottomLayout.defaultLayout}
-                  onLayoutChanged={bottomLayout.onLayoutChanged}
-                  orientation="horizontal"
-                >
-                  <Panel defaultSize={50} maxSize={76} minSize={20}>
-                    <Surface>{testCases}</Surface>
-                  </Panel>
-                  <ResizeHandle id="arena-tests-result-handle" orientation="vertical" />
-                  <Panel defaultSize={50} maxSize={80} minSize={20}>
-                    <Surface>{result}</Surface>
-                  </Panel>
-                </ResizablePanelGroup>
-              </Panel>
-            </ResizablePanelGroup>
-          </Panel>
-        </ResizablePanelGroup>
+              <div ref={bottom.containerRef} className="flex flex-1 min-h-0">
+                <div style={{ flex: `${bottom.ratio} 1 0%`, minWidth: 0 }}>
+                  <Surface>{testCases}</Surface>
+                </div>
+
+                <ResizeHandle 
+                  id="arena-tests-result-handle" 
+                  orientation="vertical" 
+                  {...bottom.handleProps} 
+                />
+
+                <div style={{ flex: `${100 - bottom.ratio} 1 0%`, minWidth: 0 }}>
+                  <Surface>{result}</Surface>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {authModal}

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Group as ResizablePanelGroup, Panel } from "react-resizable-panels";
-import { useSplitLayout } from "../hooks/useSplitLayout.js";
+import { useResizableSplit } from "../hooks/useResizableSplit.js";
 import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import AuthPromptModal from "../components/common/AuthPromptModal.jsx";
 import CodeEditorPanel from "../components/editor/CodeEditorPanel.jsx";
@@ -41,11 +40,21 @@ export default function ProblemPage() {
 
   const problemKey = useMemo(() => slug || selectedProblem?.slug || selectedProblemId, [selectedProblem?.slug, selectedProblemId, slug]);
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const horizontalLayout = useSplitLayout({ 
-    id: isMobile ? "pyzone-problem-mobile-v4" : "pyzone-problem-horizontal-v4", 
-    defaultLayout: isMobile ? [40, 60] : [48, 52] 
+  
+  const horizontal = useResizableSplit({ 
+    id: "pyzone-problem-horizontal-v4", 
+    defaultRatio: 48,
+    direction: isMobile ? "vertical" : "horizontal",
+    minPixels: 300,
+    disabled: isMobile
   });
-  const verticalLayout = useSplitLayout({ id: "pyzone-problem-vertical-v4", defaultLayout: [52, 48] });
+
+  const vertical = useResizableSplit({ 
+    id: "pyzone-problem-vertical-v4", 
+    defaultRatio: 52,
+    direction: "vertical",
+    minPixels: 200
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -93,59 +102,67 @@ export default function ProblemPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-var(--h-navbar))] min-w-0 flex-col overflow-hidden">
-        <ResizablePanelGroup
-          className="flex-1 min-w-0 overflow-hidden"
-          defaultLayout={horizontalLayout.defaultLayout}
-          onLayoutChanged={horizontalLayout.onLayoutChanged}
-          orientation={isMobile ? "vertical" : "horizontal"}
+      <div 
+        ref={horizontal.containerRef}
+        className={`flex h-[calc(100vh-var(--h-navbar))] min-w-0 ${isMobile ? "flex-col overflow-y-auto" : "flex-row overflow-hidden"}`}
+      >
+        {/* Description Panel */}
+        <div style={{ flex: isMobile ? "0 0 auto" : `${horizontal.ratio} 1 0%`, minHeight: isMobile ? "400px" : 0, minWidth: 0 }}>
+          <div className="h-full min-h-0 min-w-0 overflow-hidden pr-0">
+            <ProblemDescription 
+              loading={problemStatus === "loading"} 
+              problem={selectedProblem} 
+              onBack={handleBackToEditor}
+            />
+          </div>
+        </div>
+
+        {!isMobile && (
+          <ResizeHandle 
+            id="problem-main-handle" 
+            orientation="vertical" 
+            {...horizontal.handleProps} 
+          />
+        )}
+
+        {/* Editor + Tests Panel */}
+        <div 
+          style={{ flex: isMobile ? "1 1 auto" : `${100 - horizontal.ratio} 1 0%`, minHeight: 0, minWidth: 0 }}
+          className="flex flex-col"
         >
-          <Panel defaultSize={48} maxSize={isMobile ? 100 : 75} minSize={isMobile ? 0 : 20}>
-            <div className="h-full min-h-0 min-w-0 overflow-hidden pr-0">
-              <ProblemDescription 
-                loading={problemStatus === "loading"} 
-                problem={selectedProblem} 
-                onBack={handleBackToEditor}
+          <div ref={vertical.containerRef} className="flex flex-col flex-1 min-h-0">
+            {/* Code Editor */}
+            <div style={{ flex: `${vertical.ratio} 1 0%`, minHeight: 0 }}>
+              <CodeEditorPanel
+                code={code}
+                isRunning={isRunning}
+                isSubmitting={isSubmitting}
+                language={language}
+                onChange={setCode}
+                onLanguageChange={setLanguage}
+                onRun={() => runCode().catch(() => {})}
+                onSubmit={() => submitCode(token).catch(() => {})}
               />
             </div>
-          </Panel>
 
-          <ResizeHandle id="problem-main-handle" orientation={isMobile ? "horizontal" : "vertical"} />
+            <ResizeHandle 
+              id="problem-vertical-handle"
+              orientation="horizontal" 
+              {...vertical.handleProps} 
+            />
 
-          <Panel defaultSize={52} maxSize={80} minSize={20}>
-            <ResizablePanelGroup
-              className="h-full min-h-0 min-w-0"
-              defaultLayout={verticalLayout.defaultLayout}
-              onLayoutChanged={verticalLayout.onLayoutChanged}
-              orientation="vertical"
-            >
-              <Panel defaultSize={52} maxSize={85} minSize={20}>
-                <CodeEditorPanel
-                  code={code}
-                  isRunning={isRunning}
-                  isSubmitting={isSubmitting}
-                  language={language}
-                  onChange={setCode}
-                  onLanguageChange={setLanguage}
-                  onRun={() => runCode().catch(() => {})}
-                  onSubmit={() => submitCode(token).catch(() => {})}
-                />
-              </Panel>
-
-              <ResizeHandle orientation="horizontal" />
-
-              <Panel defaultSize={48} maxSize={80} minSize={15}>
-                <TestTabs
-                  activeIndex={activeCaseIndex}
-                  busy={isRunning || isSubmitting}
-                  cases={visibleCases}
-                  result={result}
-                  onSelect={setActiveCaseIndex}
-                />
-              </Panel>
-            </ResizablePanelGroup>
-          </Panel>
-        </ResizablePanelGroup>
+            {/* Test Case / Result Panel */}
+            <div style={{ flex: `${100 - vertical.ratio} 1 0%`, minHeight: 0 }}>
+              <TestTabs
+                activeIndex={activeCaseIndex}
+                busy={isRunning || isSubmitting}
+                cases={visibleCases}
+                result={result}
+                onSelect={setActiveCaseIndex}
+              />
+            </div>
+          </div>
+        </div>
       </div>
       <AuthPromptModal open={showAuthModal} problemId={problemKey} onClose={dismissAuthModal} />
     </>
