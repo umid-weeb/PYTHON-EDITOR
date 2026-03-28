@@ -183,13 +183,16 @@ class SubmissionTrackingRepository:
         if row.mode == "submit" and normalized_verdict.lower() == "accepted":
             # Enforcement: normalize to capitalized 'Accepted' for database consistency
             row.verdict = "Accepted"
-            first_solve = self.record_solved_problem_safe(
-                db,
-                user_id=int(row.user_id),
-                problem_id=str(row.problem_id),
-                solved_at=row.created_at,
-                created_by="finalize_submission"
-            )
+            
+            # Robust user ID check to prevent TypeError: int(None)
+            if row.user_id is not None:
+                first_solve = self.record_solved_problem_safe(
+                    db,
+                    user_id=int(row.user_id),
+                    problem_id=str(row.problem_id),
+                    solved_at=row.created_at,
+                    created_by="finalize_submission"
+                )
 
         db.flush()
         return FinalizedSubmission(submission=row, first_solve=first_solve)
@@ -301,7 +304,8 @@ class SubmissionTrackingRepository:
         )
         if latest_history is not None:
             # SQLAlchemy first() returns a Row if using query(Model.attr), we need the first value
-            return int(latest_history[0] if isinstance(latest_history, tuple) else latest_history)
+            val = latest_history[0] if isinstance(latest_history, tuple) else latest_history
+            return int(val) if val is not None else 1200
 
         legacy_rating = db.query(UserRating.rating).filter(UserRating.user_id == user_id).first()
         if legacy_rating is not None:
