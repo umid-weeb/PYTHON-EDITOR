@@ -441,6 +441,27 @@ POSTGRES_BOOTSTRAP_SQL = [
     );
     """,
     """
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS solved_count INTEGER NOT NULL DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS easy_solved INTEGER NOT NULL DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS medium_solved INTEGER NOT NULL DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS hard_solved INTEGER NOT NULL DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS rating INTEGER NOT NULL DEFAULT 1200;
+    """,
+    """
+    ALTER TABLE user_ratings ADD COLUMN IF NOT EXISTS rating INTEGER NOT NULL DEFAULT 1200;
+    """,
+    """
+    ALTER TABLE user_ratings ADD COLUMN IF NOT EXISTS max_rating INTEGER NOT NULL DEFAULT 1200;
+    """,
+    """
     ALTER TABLE user_stats ALTER COLUMN solved_count SET DEFAULT 0;
     """,
     """
