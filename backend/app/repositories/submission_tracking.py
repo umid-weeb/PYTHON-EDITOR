@@ -297,14 +297,15 @@ class SubmissionTrackingRepository:
             db.query(RatingHistory.rating_after)
             .filter(RatingHistory.user_id == user_id)
             .order_by(RatingHistory.created_at.desc(), RatingHistory.id.desc())
-            .scalar()
+            .first()
         )
         if latest_history is not None:
-            return int(latest_history)
+            # SQLAlchemy first() returns a Row if using query(Model.attr), we need the first value
+            return int(latest_history[0] if isinstance(latest_history, tuple) else latest_history)
 
-        legacy_rating = db.query(UserRating.rating).filter(UserRating.user_id == user_id).scalar()
+        legacy_rating = db.query(UserRating.rating).filter(UserRating.user_id == user_id).first()
         if legacy_rating is not None:
-            return int(legacy_rating)
+            return int(legacy_rating[0] if isinstance(legacy_rating, tuple) else legacy_rating)
 
         return 1200
 

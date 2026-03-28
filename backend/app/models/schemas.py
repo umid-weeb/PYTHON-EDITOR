@@ -14,6 +14,7 @@ class ProblemSummary(BaseModel):
     difficulty: str
     tags: list[str] = Field(default_factory=list)
     preview: str | None = None
+    solvers_count: int = 0
     acceptance_rate: int | None = None
     is_solved: bool = False
     is_attempted: bool = False

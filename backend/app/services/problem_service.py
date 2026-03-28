@@ -105,11 +105,12 @@ class ProblemService:
                 filtered.append(item)
 
         # Get real-time metrics from solved_problems table (source of truth)
-        acceptance_rates, solved_ids, attempted_ids = self._load_problem_metrics_realtime(user_id=user_id)
+        acceptance_rates, solvers_counts, solved_ids, attempted_ids = self._load_problem_metrics_realtime(user_id=user_id)
         enriched = [
             item.model_copy(
                 update={
                     "acceptance_rate": acceptance_rates.get(item.id),
+                    "solvers_count": solvers_counts.get(item.id, 0),
                     "is_solved": item.id in solved_ids,
                     "is_attempted": item.id in attempted_ids,
                 }
@@ -184,9 +185,10 @@ class ProblemService:
 
         return acceptance_rates, solved_ids, attempted_ids
 
-    def _load_problem_metrics_realtime(self, user_id: int | None = None) -> tuple[dict[str, int | None], set[str], set[str]]:
+    def _load_problem_metrics_realtime(self, user_id: int | None = None) -> tuple[dict[str, int | None], dict[str, int], set[str], set[str]]:
         """Get real-time problem metrics from solved_problems table (source of truth)."""
         acceptance_rates: dict[str, int | None] = {}
+        solvers_counts: dict[str, int] = {}
         solved_ids: set[str] = set()
         attempted_ids: set[str] = set()
 
@@ -218,6 +220,19 @@ class ProblemService:
                 )
             }
 
+            # Get unique solvers count from SolvedProblem table
+            solvers_counts = {
+                str(row.problem_id): int(row.count or 0)
+                for row in (
+                    db.query(
+                        SolvedProblem.problem_id,
+                        func.count(SolvedProblem.user_id).label("count")
+                    )
+                    .group_by(SolvedProblem.problem_id)
+                    .all()
+                )
+            }
+
             # Get solved status from solved_problems table (source of truth)
             if user_id is not None:
                 solved_ids = {
@@ -238,7 +253,7 @@ class ProblemService:
                     )
                 }
 
-        return acceptance_rates, solved_ids, attempted_ids
+        return acceptance_rates, solvers_counts, solved_ids, attempted_ids
 
     async def get_problem(self, problem_key: str, force_refresh: bool = False) -> ProblemDetail:
         bundle = await self.get_problem_bundle(problem_key, force_refresh=force_refresh)
@@ -284,6 +299,7 @@ class ProblemService:
             tags=tags,
             preview=preview,
             acceptance_rate=None,
+            solvers_count=0,
             is_solved=False,
             time_limit_seconds=2.0,
             memory_limit_mb=256,
@@ -400,6 +416,7 @@ class ProblemService:
             tags=tags,
             preview=preview,
             acceptance_rate=None,
+            solvers_count=0,
             is_solved=False,
             time_limit_seconds=2.0,
             memory_limit_mb=256,

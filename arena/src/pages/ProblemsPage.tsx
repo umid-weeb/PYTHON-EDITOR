@@ -11,6 +11,7 @@ type Problem = {
   order_index?: number;
   difficulty: string;
   acceptance_rate?: number;
+  solvers_count?: number;
   tags?: string[];
   is_solved?: boolean;
   is_attempted?: boolean;
@@ -458,7 +459,7 @@ export default function ProblemsPage() {
             </colgroup>
             <thead className="sticky top-0 z-10 bg-[var(--bg-base)]">
               <tr className="h-[var(--h-table-head)] border-b border-[color:var(--border)]">
-                {["", "Masala", "Qiyinlik", "Qabul", "Teglar"].map((header, index) => (
+                {["", "Masala", "Qiyinlik", "Yechilgan", "Teglar"].map((header, index) => (
                   <th
                     key={header || index}
                     className={[
@@ -508,14 +509,22 @@ export default function ProblemsPage() {
                     <td
                       className={[
                         "pr-3 text-[12px] tabular-nums",
-                        (problem.acceptance_rate || 0) >= 50
+                        (problem.solvers_count || 0) > 10
                           ? "text-[var(--success)]"
-                          : (problem.acceptance_rate || 0) >= 30
-                            ? "text-[var(--warning)]"
+                          : (problem.solvers_count || 0) > 0
+                            ? "text-[var(--text-primary)]"
                             : "text-[var(--text-secondary)]",
                       ].join(" ")}
                     >
-                      {problem.acceptance_rate != null ? `${Math.round(problem.acceptance_rate)}%` : "--"}
+                      {problem.solvers_count != null ? (
+                        <div className="flex items-center gap-1.5">
+                          <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                            <circle cx="8.5" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                          </svg>
+                          <span>{problem.solvers_count}</span>
+                        </div>
+                      ) : "--"}
                     </td>
                     <td className="pr-4">
                       <div className="flex items-center gap-1 overflow-hidden">
