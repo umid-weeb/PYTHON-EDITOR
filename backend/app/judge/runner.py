@@ -353,7 +353,10 @@ class JudgeRunner:
     ) -> dict[str, Any]:
         timeout_seconds = max(1.0, float(time_limit_seconds) + 1.0)
 
-        command = [sys.executable, "-I", "harness.py"]
+        # Better Python resolution: use sys.executable as primary, python3 as secondary.
+        # This is more robust on various Linux/Container environments.
+        python_bin = sys.executable or "python3"
+        command = [python_bin, "-I", "harness.py"]
 
         if self.settings.judge_use_docker:
             if not self.docker_available:
@@ -400,12 +403,14 @@ class JudgeRunner:
             ]
 
         try:
+            # Explicitly set current directory and ensure encoding
             completed = subprocess.run(
                 command,
-                cwd=workspace,
+                cwd=workspace.absolute(),
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
+                errors="replace", # Handle potential encoding issues in user output
                 timeout=timeout_seconds,
                 check=False,
             )
@@ -417,6 +422,16 @@ class JudgeRunner:
                 "memory_kb": 0,
                 "actual_output": "",
                 "error": "Execution timed out.",
+            }
+        except Exception as startup_error:
+            # Catch fork/exec issues (e.g. OOM or permissions)
+            return {
+                "verdict": "Runtime Error",
+                "passed": False,
+                "runtime_ms": 0,
+                "memory_kb": 0,
+                "actual_output": "",
+                "error": f"Judge startup failure: {startup_error}",
             }
 
         stdout = completed.stdout or ""
@@ -438,21 +453,28 @@ class JudgeRunner:
         if not payload_found:
             # Fallback to full stdout if no markers (legacy support or catastrophic failure)
             try:
-                payload = json.loads(stdout.strip() or "{}")
-                if payload:
-                    payload_found = True
+                # Try to find a valid JSON object in the haystack
+                # This helps if the harness printed something before the markers
+                trimmed = stdout.strip()
+                if trimmed.startswith("{") and trimmed.endswith("}"):
+                    payload = json.loads(trimmed)
+                    if payload:
+                        payload_found = True
             except json.JSONDecodeError:
                 pass
 
         if not payload_found:
             verdict = "Runtime Error"
+            # Return codes like 137/139 are usually OOM/Segfault on Linux
             if completed.returncode in {137, 139}:
                 verdict = "Memory Limit Exceeded"
+            elif completed.returncode != 0:
+                verdict = "Runtime Error"
             
             error_msg = stderr.strip()
             if not error_msg:
-                # If stderr is empty, maybe the error is in stdout (e.g. half-printed JSON)
-                error_msg = stdout.strip() or "Judge natija qaytarmadi."
+                # If stderr is empty, maybe the error is in stdout (e.g. half-printed JSON or SystemExit)
+                error_msg = stdout.strip() or f"Judge exited with code {completed.returncode}"
                 
             return {
                 "verdict": verdict,

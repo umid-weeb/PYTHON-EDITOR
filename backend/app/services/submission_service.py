@@ -111,23 +111,33 @@ class SubmissionService:
             if payload is None:
                 return
 
-            # Fixed loop handling: works in both sync threads and async contexts
+            # Better loop handling for background threads:
+            # We always want a fresh loop in our dedicated thread to avoid deadlock.
+            self.logger.info("submission.processing_start id=%s problem=%s", submission_id, payload["problem_id"])
             try:
-                loop = asyncio.get_running_loop()
-                # If we're already in a running loop, we can't use run_until_complete
-                # In this specific test/sync-wrapper case, we might need a different approach
-                # But for the judge's background thread, get_event_loop() is usually enough.
-                problem_bundle = asyncio.run_coroutine_threadsafe(
-                    self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True),
-                    loop
-                ).result()
-            except RuntimeError:
-                # No running loop, create one (standard for the background thread)
+                # Use a specific asyncio utility to run the coroutine in a sync context
+                # and handle both cases: no loop (common for background thread) and 
+                # accidental loop (if someone called this from an async context).
                 problem_bundle = asyncio.run(
                     self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True)
                 )
+            except RuntimeError as loop_error:
+                # Fallback if asyncio.run fails due to an already running loop - though this is rare in our thread
+                self.logger.warning("submission.async_run_fallback id=%s reason=%s", submission_id, loop_error)
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    problem_bundle = asyncio.run_coroutine_threadsafe(
+                        self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True),
+                        loop
+                    ).result()
+                else:
+                    problem_bundle = loop.run_until_complete(
+                        self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True)
+                    )
+            
             problem_bundle["language"] = payload["language"]
 
+            self.logger.info("submission.judge_running id=%s mode=%s", submission_id, payload["mode"])
             result = self.judge.run_submission(
                 problem=problem_bundle,
                 code=payload["code"],
@@ -136,6 +146,7 @@ class SubmissionService:
 
             finalized = self._finalize_success(int(submission_id), result)
             if finalized is None:
+                self.logger.warning("submission.finalize_skipped id=%s", submission_id)
                 return
 
             self.logger.info(
