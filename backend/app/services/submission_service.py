@@ -17,6 +17,7 @@ from app.services.engagement_service import engagement_service
 from app.services.problem_service import ProblemService, get_problem_service
 from app.services.profile_service import profile_service
 from app.services.rating_service import rating_service
+from app.services.user_stats_service import user_stats_service
 
 
 class SubmissionProblemNotFoundError(Exception):
@@ -43,6 +44,14 @@ class SubmissionService:
             problem = self.repository.resolve_problem(db, payload.problem_id)
             if problem is None:
                 raise SubmissionProblemNotFoundError(payload.problem_id)
+
+            # AUTO-HEAL: Ensure user stats and rating records exist before submission
+            if user_id is not None:
+                try:
+                    user_stats_service.get_or_create(db, user_id)
+                    rating_service.get_or_create(db, user_id)
+                except Exception as e:
+                    self.logger.warning("submission.auto_heal_failed id=%s user=%s error=%s", payload.problem_id, user_id, str(e))
 
             submission = self.repository.create_submission(
                 db,

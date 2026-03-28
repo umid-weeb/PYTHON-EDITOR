@@ -491,12 +491,19 @@ POSTGRES_BOOTSTRAP_SQL = [
     """
     INSERT INTO user_stats (user_id, solved_count, easy_solved, medium_solved, hard_solved, rating)
     SELECT id, 0, 0, 0, 0, 1200 FROM users
-    ON CONFLICT (user_id) DO NOTHING;
+    ON CONFLICT (user_id) DO UPDATE SET
+        solved_count = COALESCE(user_stats.solved_count, 0),
+        easy_solved = COALESCE(user_stats.easy_solved, 0),
+        medium_solved = COALESCE(user_stats.medium_solved, 0),
+        hard_solved = COALESCE(user_stats.hard_solved, 0),
+        rating = COALESCE(user_stats.rating, 1200);
     """,
     """
     INSERT INTO user_ratings (user_id, rating, max_rating)
     SELECT id, 1200, 1200 FROM users
-    ON CONFLICT (user_id) DO NOTHING;
+    ON CONFLICT (user_id) DO UPDATE SET
+        rating = COALESCE(user_ratings.rating, 1200),
+        max_rating = COALESCE(user_ratings.max_rating, 1200);
     """,
 ]
 
