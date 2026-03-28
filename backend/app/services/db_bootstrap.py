@@ -346,7 +346,107 @@ POSTGRES_BOOTSTRAP_SQL = [
     ALTER TABLE contest_submissions ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     """,
     """
+    ALTER TABLE contests ADD COLUMN IF NOT EXISTS description TEXT;
+    """,
+    """
+    ALTER TABLE contests ADD COLUMN IF NOT EXISTS is_rated BOOLEAN NOT NULL DEFAULT FALSE;
+    """,
+    """
+    ALTER TABLE submissions ADD COLUMN IF NOT EXISTS external_submission_id TEXT;
+    """,
+    """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(120);
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS problems (
+      id VARCHAR(36) PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      slug VARCHAR(180) UNIQUE NOT NULL,
+      difficulty VARCHAR(20) NOT NULL,
+      description TEXT NOT NULL,
+      input_format TEXT,
+      output_format TEXT,
+      constraints TEXT,
+      starter_code TEXT NOT NULL,
+      function_name VARCHAR(64) NOT NULL DEFAULT 'solve',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      leetcode_id INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS input_format TEXT;
+    """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS output_format TEXT;
+    """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS constraints TEXT;
+    """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS starter_code TEXT;
+    """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS function_name VARCHAR(64) NOT NULL DEFAULT 'solve';
+    """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS tags_json TEXT NOT NULL DEFAULT '[]';
+    """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS leetcode_id INTEGER;
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS test_cases (
+      id SERIAL PRIMARY KEY,
+      problem_id VARCHAR(36) REFERENCES problems(id) ON DELETE CASCADE,
+      input TEXT NOT NULL,
+      expected_output TEXT NOT NULL,
+      is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS problem_translations (
+      id SERIAL PRIMARY KEY,
+      problem_id VARCHAR(36) REFERENCES problems(id) ON DELETE CASCADE,
+      language_code VARCHAR(5) NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      input_format TEXT,
+      output_format TEXT,
+      constraints TEXT,
+      starter_code TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS user_ratings (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      rating INTEGER NOT NULL DEFAULT 1200,
+      max_rating INTEGER NOT NULL DEFAULT 1200,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS rating_history (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      delta INTEGER NOT NULL,
+      rating_after INTEGER NOT NULL,
+      reason VARCHAR(120) NOT NULL DEFAULT 'submission',
+      submission_id VARCHAR(64),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT uq_rating_history_user_submission UNIQUE (user_id, submission_id)
+    );
+    """,
+    """
     INSERT INTO user_stats (user_id)
+    SELECT id FROM users
+    ON CONFLICT (user_id) DO NOTHING;
+    """,
+    """
+    INSERT INTO user_ratings (user_id)
     SELECT id FROM users
     ON CONFLICT (user_id) DO NOTHING;
     """,
