@@ -44,6 +44,7 @@ class SubmissionStatusResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     error_text: str | None = None
+    code: str | None = None
     case_results: list[dict[str, Any]] = Field(default_factory=list)
 
 

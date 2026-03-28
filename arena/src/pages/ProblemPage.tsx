@@ -9,6 +9,8 @@ import ProblemDescription from "../components/problem/ProblemDescription.tsx";
 import TestTabs from "../components/tests/TestTabs.tsx";
 import { useArena } from "../context/ArenaContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import SubmissionDetailsModal from "../components/submissions/SubmissionDetailsModal.tsx";
+import { useState } from "react";
 
 export default function ProblemPage() {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ export default function ProblemPage() {
   const [params, setParams] = useSearchParams();
   const { token } = useAuth();
   const resumedRef = useRef("");
+  const [viewingSubmissionId, setViewingSubmissionId] = useState<string | null>(null);
 
   const {
     problemStatus,
@@ -167,12 +170,19 @@ export default function ProblemPage() {
                 result={result}
                 onSelect={setActiveCaseIndex}
                 problemId={problemKey}
+                code={code}
+                language={language}
+                onViewSubmission={setViewingSubmissionId}
               />
             </div>
           </div>
         </div>
       </div>
       <AuthPromptModal open={showAuthModal} problemId={problemKey} onClose={dismissAuthModal} />
+      <SubmissionDetailsModal 
+        submissionId={viewingSubmissionId} 
+        onClose={() => setViewingSubmissionId(null)} 
+      />
     </>
   );
 }

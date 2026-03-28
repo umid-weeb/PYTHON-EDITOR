@@ -4,28 +4,6 @@ import { API_BASE_URL, arenaApi, userApi } from "../lib/apiClient.js";
 import { formatProblemTitle, localizeDifficultyLabel, localizeTagLabel } from "../lib/problemPresentation.js";
 import { readStoredToken } from "../lib/storage.js";
 
-const TOPIC_CATEGORIES = [
-  "array",
-  "hashmap",
-  "two-pointers",
-  "sliding-window",
-  "stack",
-  "binary-search",
-  "linked-list",
-  "Trees",
-  "Tries",
-  "heap / priority queue",
-  "Backtracking",
-  "Graphs",
-  "dynamic-programming",
-  "Greedy",
-  "Intervals",
-  "math",
-  "bit-manipulation",
-  "recursion",
-  "sorting",
-];
-
 type Problem = {
   id: string;
   slug: string;
@@ -213,7 +191,6 @@ export default function ProblemsPage() {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallengePayload | null>(null);
   const [streak, setStreak] = useState<StreakPayload | null>(null);
 
@@ -262,7 +239,6 @@ export default function ProblemsPage() {
       const data: PaginatedResponse = await response.json();
       setProblems(data.items || []);
       setTotal(data.total || 0);
-      setAvailableTags(data.available_tags || []);
     } catch (error) {
       console.error("Failed to fetch problems:", error);
       setProblems([]);
@@ -332,67 +308,113 @@ export default function ProblemsPage() {
 
   const totalPages = Math.ceil(total / perPage);
   const hasActiveFilters = Boolean(searchQuery || difficultyFilter || statusFilter || selectedTags.length > 0);
-  const displayTags = availableTags.length > 0 ? availableTags : TOPIC_CATEGORIES;
-
+  
   return (
     <div className="flex h-[calc(100vh-var(--h-navbar))] flex-col overflow-hidden lg:flex-row">
-      <aside className="w-full shrink-0 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/92 px-3 py-3 backdrop-blur lg:h-full lg:w-[272px] lg:overflow-y-auto lg:border-b-0 lg:border-r">
-        <div className="space-y-3">
-          <form onSubmit={handleSearchSubmit}>
-            <input
-              className="h-[var(--h-input)] w-full rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-input)] px-3 text-[12px] text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
-              placeholder="Masalalarni qidiring..."
-              type="text"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-            />
-          </form>
-
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: "", label: "Barchasi" },
-              { value: "easy", label: "Oson" },
-              { value: "medium", label: "O'rtacha" },
-              { value: "hard", label: "Qiyin" },
-            ].map((difficulty) => (
-              <TagChip
-                key={difficulty.value || "all"}
-                active={difficultyFilter === difficulty.value}
-                label={difficulty.label}
-                onClick={() => updateFilter("difficulty", difficulty.value)}
-              />
-            ))}
+      <aside className="w-full shrink-0 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/92 px-4 py-4 backdrop-blur lg:h-full lg:w-[300px] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <div className="space-y-6">
+          {/* Search Section */}
+          <div className="space-y-2">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Qidiruv</h3>
+            <form onSubmit={handleSearchSubmit}>
+              <div className="relative">
+                <input
+                  className="h-[var(--h-input)] w-full rounded-[var(--radius-sm)] border border-[color:var(--border)] bg-[var(--bg-input)] pl-9 pr-3 text-[12px] text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20"
+                  placeholder="Masalani qidiring..."
+                  type="text"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                  </svg>
+                </div>
+              </div>
+            </form>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: "", label: "Barchasi" },
-              { value: "solved", label: "Yechilgan" },
-              { value: "attempted", label: "Urinilgan" },
-              { value: "unsolved", label: "Boshlanmagan" },
-            ].map((option) => (
-              <TagChip
-                key={option.value || "all"}
-                active={statusFilter === option.value}
-                label={option.label}
-                onClick={() => updateFilter("status", option.value)}
-              />
-            ))}
+          {/* Difficulty & Status Section */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Qiyinlik</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { value: "", label: "Barchasi" },
+                  { value: "easy", label: "Oson" },
+                  { value: "medium", label: "O'rtacha" },
+                  { value: "hard", label: "Qiyin" },
+                ].map((difficulty) => (
+                  <TagChip
+                    key={difficulty.value || "all"}
+                    active={difficultyFilter === difficulty.value}
+                    label={difficulty.label}
+                    onClick={() => updateFilter("difficulty", difficulty.value)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Holat</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { value: "", label: "Barchasi" },
+                  { value: "solved", label: "Yechilgan" },
+                  { value: "attempted", label: "Urinilgan" },
+                  { value: "unsolved", label: "Yangi" },
+                ].map((option) => (
+                  <TagChip
+                    key={option.value || "all"}
+                    active={statusFilter === option.value}
+                    label={option.label}
+                    onClick={() => updateFilter("status", option.value)}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="flex max-h-[180px] flex-wrap gap-2 overflow-y-auto lg:max-h-none">
-            {displayTags.map((tag) => (
-              <TagChip key={tag} active={selectedTags.includes(tag)} label={localizeTagLabel(tag)} onClick={() => toggleTag(tag)} />
-            ))}
+          {/* Categorized Tags */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Mavzular</h3>
+              {selectedTags.length > 0 && (
+                <button
+                  onClick={() => updateFilter("tags", "")}
+                  className="text-[10px] text-[var(--accent)] hover:underline"
+                >
+                  Tozalash
+                </button>
+              )}
+            </div>
+            
+            <div className="space-y-5">
+              {[
+                { label: "Asosiy", tags: ["array", "hashmap", "sorting", "math", "bit-manipulation"] },
+                { label: "Algoritmlar", tags: ["two-pointers", "sliding-window", "binary-search", "recursion", "backtracking", "greedy"] },
+                { label: "Ma'lumot Tuzilmalari", tags: ["stack", "linked-list", "Trees", "Graphs", "heap / priority queue"] },
+                { label: "Murakkab", tags: ["dynamic-programming", "Tries", "Intervals"] }
+              ].map((category) => (
+                <div key={category.label} className="space-y-2">
+                  <div className="text-[10px] font-semibold text-[var(--text-muted)]">{category.label}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {category.tags.map((tag) => (
+                      <TagChip key={tag} active={selectedTags.includes(tag)} label={localizeTagLabel(tag)} onClick={() => toggleTag(tag)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {hasActiveFilters ? (
             <button
-              className="inline-flex h-[var(--h-btn-md)] items-center rounded-[var(--radius-xs)] border border-[color:var(--border)] px-3 text-[12px] font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
+              className="flex h-[var(--h-btn-md)] w-full items-center justify-center rounded-[var(--radius-sm)] border border-[color:var(--border)] bg-[var(--bg-surface)] text-[12px] font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
               type="button"
               onClick={clearFilters}
             >
-              Filtrlarni tozalash
+              Hammasini tozalash
             </button>
           ) : null}
         </div>

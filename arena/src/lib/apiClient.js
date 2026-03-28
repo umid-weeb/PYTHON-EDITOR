@@ -248,6 +248,15 @@ export const contestApi = {
   },
 };
 
+export const aiApi = {
+  async getReview(payload) {
+    return request("/api/ai/review", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

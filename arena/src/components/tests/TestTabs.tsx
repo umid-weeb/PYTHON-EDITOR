@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import TestCasePanel from "../results/TestCasePanel.jsx";
 import ResultPanel from "../results/ResultPanel.jsx";
 import SubmissionHistory from "../submissions/SubmissionHistory.tsx";
+import AIReviewPanel from "../ai/AIReviewPanel.tsx";
 
 type VisibleTestcase = {
   name?: string;
@@ -23,11 +24,14 @@ type Props = {
   result: Result;
   busy: boolean;
   problemId: string;
+  code: string;
+  language: string;
+  onViewSubmission?: (id: string) => void;
 };
 
-type Tab = "cases" | "result" | "console" | "history";
+type Tab = "cases" | "result" | "console" | "history" | "ai";
 
-export default function TestTabs({ cases, activeIndex, onSelect, result, busy, problemId }: Props) {
+export default function TestTabs({ cases, activeIndex, onSelect, result, busy, problemId, code, language, onViewSubmission }: Props) {
   const [active, setActive] = useState<Tab>("cases");
   
   // Track last submission ID to trigger history refresh
@@ -49,6 +53,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
           { key: "cases", label: "Testlar" },
           { key: "result", label: "Natija" },
           { key: "history", label: "Tarix" },
+          { key: "ai", label: "AI Analiz (Beta)" },
           { key: "console", label: "Konsol" },
         ].map((tab) => (
           <button
@@ -70,7 +75,8 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
       <div className="min-h-0 flex-1 overflow-hidden">
         {active === "cases" ? <TestCasePanel activeIndex={activeIndex} cases={cases} onSelect={onSelect} /> : null}
         {active === "result" ? <ResultPanel busy={busy} result={result} /> : null}
-        {active === "history" ? <SubmissionHistory problemId={problemId} lastSubmissionId={lastSubmissionId} /> : null}
+        {active === "history" ? <SubmissionHistory problemId={problemId} lastSubmissionId={lastSubmissionId} onViewSubmission={onViewSubmission} /> : null}
+        {active === "ai" ? <AIReviewPanel code={code} language={language} problemId={problemId} /> : null}
         {active === "console" ? (
           <div className="flex h-full flex-col overflow-auto p-[10px]">
             <div className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] text-[var(--text-secondary)]">

@@ -17,9 +17,10 @@ type Submission = {
 type Props = {
   problemId: string;
   lastSubmissionId?: string | null;
+  onViewSubmission?: (id: string) => void;
 };
 
-export default function SubmissionHistory({ problemId, lastSubmissionId }: Props) {
+export default function SubmissionHistory({ problemId, lastSubmissionId, onViewSubmission }: Props) {
   const { token } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +96,11 @@ export default function SubmissionHistory({ problemId, lastSubmissionId }: Props
             const verdict = s.verdict || s.status;
             const isAccepted = String(verdict).toLowerCase().includes("accepted");
             return (
-              <tr key={s.id} className="hover:bg-[var(--bg-overlay)]">
+              <tr 
+                key={s.id} 
+                className="cursor-pointer hover:bg-[var(--bg-overlay)]"
+                onClick={() => onViewSubmission?.(s.id)}
+              >
                 <td className={`px-4 py-2.5 font-semibold ${isAccepted ? "text-[var(--easy)]" : "text-[var(--hard)]"}`}>
                   {localizeVerdictLabel(verdict)}
                 </td>
