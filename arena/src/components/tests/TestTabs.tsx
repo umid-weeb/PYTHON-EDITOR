@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import TestCasePanel from "../results/TestCasePanel.jsx";
 import ResultPanel from "../results/ResultPanel.jsx";
+import SubmissionHistory from "../submissions/SubmissionHistory.tsx";
 
 type VisibleTestcase = {
   name?: string;
@@ -21,12 +22,18 @@ type Props = {
   onSelect: (index: number) => void;
   result: Result;
   busy: boolean;
+  problemId: string;
 };
 
-type Tab = "cases" | "result" | "console";
+type Tab = "cases" | "result" | "console" | "history";
 
-export default function TestTabs({ cases, activeIndex, onSelect, result, busy }: Props) {
+export default function TestTabs({ cases, activeIndex, onSelect, result, busy, problemId }: Props) {
   const [active, setActive] = useState<Tab>("cases");
+  
+  // Track last submission ID to trigger history refresh
+  const lastSubmissionId = useMemo(() => {
+    return (result as any)?.submissionId || (result as any)?.id || null;
+  }, [result]);
 
   // Auto-switch to result tab when busy or when results arrive
   useEffect(() => {
@@ -41,6 +48,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy }:
         {[
           { key: "cases", label: "Testlar" },
           { key: "result", label: "Natija" },
+          { key: "history", label: "Tarix" },
           { key: "console", label: "Konsol" },
         ].map((tab) => (
           <button
@@ -62,6 +70,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy }:
       <div className="min-h-0 flex-1 overflow-hidden">
         {active === "cases" ? <TestCasePanel activeIndex={activeIndex} cases={cases} onSelect={onSelect} /> : null}
         {active === "result" ? <ResultPanel busy={busy} result={result} /> : null}
+        {active === "history" ? <SubmissionHistory problemId={problemId} lastSubmissionId={lastSubmissionId} /> : null}
         {active === "console" ? (
           <div className="flex h-full flex-col overflow-auto p-[10px]">
             <div className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] text-[var(--text-secondary)]">

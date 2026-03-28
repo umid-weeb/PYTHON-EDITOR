@@ -1,34 +1,33 @@
 {
-"$schema": "https://openapi.vercel.sh/vercel.json",
-"cleanUrls": true,
-"redirects": [
-  {
-    "source": "/arena",
-    "destination": "/zone",
-    "permanent": true
-  },
-  {
-    "source": "/arena/(.*)",
-    "destination": "/zone/$1",
-    "permanent": true
-  }
-],
-"rewrites": [
-  {
-    "source": "/api/(.*)",
-    "destination": "https://python-editor-b87c.onrender.com/api/$1"
-  },
-  {
-    "source": "/uploads/(.*)",
-    "destination": "https://python-editor-b87c.onrender.com/uploads/$1"
-  },
-  {
-    "source": "/zone",
-    "destination": "/zone/index.html"
-  },
-  {
-    "source": "/zone/(.*)",
-    "destination": "/zone/index.html"
-  }
-]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/arena",
+      "destination": "/zone",
+      "permanent": true
+    },
+    {
+      "source": "/arena/(.*)",
+      "destination": "/zone/$1",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://python-editor-b87c.onrender.com/api/$1"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "https://python-editor-b87c.onrender.com/uploads/$1"
+    },
+    {
+      "source": "/zone/(.*)",
+      "destination": "/zone/index.html"
+    },
+    {
+      "source": "/zone",
+      "destination": "/zone/index.html"
+    }
+  ]
 }

@@ -21,7 +21,9 @@ type Props = {
   problem: Problem | null;
   loading: boolean;
   embedded?: boolean;
+  siblings?: { prev: string | null; next: string | null } | null;
   onBack?: () => void;
+  onNavigate?: (slug: string) => void;
 };
 
 function difficultyStyles(difficulty?: string) {
@@ -32,7 +34,7 @@ function difficultyStyles(difficulty?: string) {
   return "bg-[var(--bg-subtle)] text-[var(--text-secondary)]";
 }
 
-export default function ProblemDescription({ problem, loading, embedded = false, onBack }: Props) {
+export default function ProblemDescription({ problem, loading, embedded = false, siblings, onBack, onNavigate }: Props) {
   if (loading) {
     return (
       <div className="space-y-3 p-4">
@@ -61,27 +63,57 @@ export default function ProblemDescription({ problem, loading, embedded = false,
       ].join(" ")}
     >
       <div className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/95 px-4 py-3 backdrop-blur">
-        <div className="mb-2 flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="stroke-[var(--text-primary)]">
-              <path d="M19 12H5M12 19L5 12L12 5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Tahrirlashga qaytish
-          </button>
-          <span
-            className={[
-              "inline-flex h-[var(--h-badge)] items-center rounded-[var(--radius-xs)] px-2 text-[11px] font-semibold uppercase tracking-[0.05em]",
-              difficultyStyles(problem.difficulty),
-            ].join(" ")}
-          >
-            {localizeDifficultyLabel(problem.difficulty)}
-          </span>
-          <h1 className="text-[18px] font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
-            {formatProblemTitle(problem)}
-          </h1>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <button
+              onClick={onBack}
+              title="Ro'yxatga qaytish"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="stroke-[var(--text-primary)]">
+                <path d="M19 12H5M12 19L5 12L12 5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <div className="flex flex-col overflow-hidden">
+              <div className="flex items-center gap-2">
+                <span
+                  className={[
+                    "inline-flex h-4 items-center rounded-[var(--radius-xs)] px-1.5 text-[9px] font-bold uppercase tracking-[0.05em]",
+                    difficultyStyles(problem.difficulty),
+                  ].join(" ")}
+                >
+                  {localizeDifficultyLabel(problem.difficulty)}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Masala {problem.order_index || ""}</span>
+              </div>
+              <h1 className="truncate text-sm font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+                {formatProblemTitle(problem)}
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              disabled={!siblings?.prev}
+              onClick={() => siblings?.prev && onNavigate?.(siblings.prev)}
+              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)] disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Oldingi"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button
+              disabled={!siblings?.next}
+              onClick={() => siblings?.next && onNavigate?.(siblings.next)}
+              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)] disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Keyingi"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M9 18l6-6-6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 

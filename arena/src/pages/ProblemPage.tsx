@@ -35,6 +35,7 @@ export default function ProblemPage() {
     selectProblem,
     runCode,
     submitCode,
+    siblings,
     dismissAuthModal,
   } = useArena();
 
@@ -55,6 +56,10 @@ export default function ProblemPage() {
     direction: "vertical",
     minPixels: 200
   });
+
+  const handleNavigate = (nextSlug: string) => {
+    navigate(`/problems/${nextSlug}`, { replace: true });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -112,7 +117,9 @@ export default function ProblemPage() {
             <ProblemDescription 
               loading={problemStatus === "loading"} 
               problem={selectedProblem} 
+              siblings={siblings}
               onBack={handleBackToEditor}
+              onNavigate={handleNavigate}
             />
           </div>
         </div>
@@ -159,6 +166,7 @@ export default function ProblemPage() {
                 cases={visibleCases}
                 result={result}
                 onSelect={setActiveCaseIndex}
+                problemId={problemKey}
               />
             </div>
           </div>

@@ -282,10 +282,22 @@ export function ArenaProvider({ children }) {
     [difficulty, problems, search]
   );
 
+  const siblings = useMemo(() => {
+    if (!selectedProblemId || !filteredProblems.length) return { prev: null, next: null };
+    const index = filteredProblems.findIndex(p => p.id === selectedProblemId || p.slug === selectedProblemId);
+    if (index === -1) return { prev: null, next: null };
+    
+    return {
+      prev: index > 0 ? filteredProblems[index - 1].slug || filteredProblems[index - 1].id : null,
+      next: index < filteredProblems.length - 1 ? filteredProblems[index + 1].slug || filteredProblems[index + 1].id : null,
+    };
+  }, [filteredProblems, selectedProblemId]);
+
   const value = useMemo(
     () => ({
       problems,
       filteredProblems,
+      siblings,
       problemsStatus,
       problemStatus,
       selectedProblemId,
