@@ -1,40 +1,211 @@
-.tableWrap {
-  overflow: auto;
-  border: 1px solid var(--arena-border);
-  border-radius: 22px;
-  background: var(--arena-surface);
-  box-shadow: var(--arena-shadow);
+.container {
+  width: 100%;
+}
+
+.tableCard {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.tableScroll {
+  overflow-x: auto;
 }
 
 .table {
   width: 100%;
-  border-collapse: collapse;
-}
-
-.table th,
-.table td {
-  padding: 16px 18px;
-  text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .table th {
-  color: var(--arena-muted);
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(30, 41, 59, 0.3);
 }
 
-.table tbody tr:hover {
-  background: rgba(108, 146, 255, 0.08);
+.row {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.empty {
-  padding: 24px;
-  color: var(--arena-muted);
-  border: 1px solid var(--arena-border);
-  border-radius: 22px;
-  background: var(--arena-surface);
-  box-shadow: var(--arena-shadow);
+.row:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.row:last-child .statCell,
+.row:last-child .rankCell,
+.row:last-child .userCell {
+  border-bottom: none;
+}
+
+.statCell,
+.rankCell,
+.userCell {
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.rankBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+}
+
+.rank1 {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #000;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+}
+
+.rank2 {
+  background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+  color: #000;
+  box-shadow: 0 0 15px rgba(148, 163, 184, 0.3);
+}
+
+.rank3 {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(146, 64, 14, 0.3);
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.userNameGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.username {
+  font-weight: 600;
+  color: #f1f5f9;
+  font-size: 0.95rem;
+}
+
+.displayName {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.ratingBadge {
+  display: inline-flex;
+  padding: 4px 10px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: #60a5fa;
+  font-size: 0.85rem;
+}
+
+.solvedCount {
+  font-weight: 600;
+  color: #10b981;
+}
+
+.mutedText {
+  color: #475569;
+}
+
+.fastestTime {
+  color: #8b5cf6;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Empty & Error States */
+.emptyCard, .errorCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 32px;
+  background: rgba(30, 41, 59, 0.3);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  text-align: center;
+}
+
+.emptyCard h3 {
+  margin-top: 24px;
+  color: #f1f5f9;
+  font-size: 1.25rem;
+}
+
+.emptyCard p, .errorCard p {
+  margin-top: 8px;
+  color: #64748b;
+  max-width: 320px;
+}
+
+.errorIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(ef, 68, 68, 0.1);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.emptyIllustration {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.innerCircle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  background: #3b14f6;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+.pulseRing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  background: rgba(59, 130, 246, 0.2);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
 }

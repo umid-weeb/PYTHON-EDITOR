@@ -441,13 +441,34 @@ POSTGRES_BOOTSTRAP_SQL = [
     );
     """,
     """
-    INSERT INTO user_stats (user_id)
-    SELECT id FROM users
+    ALTER TABLE user_stats ALTER COLUMN solved_count SET DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ALTER COLUMN easy_solved SET DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ALTER COLUMN medium_solved SET DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ALTER COLUMN hard_solved SET DEFAULT 0;
+    """,
+    """
+    ALTER TABLE user_stats ALTER COLUMN rating SET DEFAULT 1200;
+    """,
+    """
+    ALTER TABLE user_ratings ALTER COLUMN rating SET DEFAULT 1200;
+    """,
+    """
+    ALTER TABLE user_ratings ALTER COLUMN max_rating SET DEFAULT 1200;
+    """,
+    """
+    INSERT INTO user_stats (user_id, solved_count, easy_solved, medium_solved, hard_solved, rating)
+    SELECT id, 0, 0, 0, 0, 1200 FROM users
     ON CONFLICT (user_id) DO NOTHING;
     """,
     """
-    INSERT INTO user_ratings (user_id)
-    SELECT id FROM users
+    INSERT INTO user_ratings (user_id, rating, max_rating)
+    SELECT id, 1200, 1200 FROM users
     ON CONFLICT (user_id) DO NOTHING;
     """,
 ]
