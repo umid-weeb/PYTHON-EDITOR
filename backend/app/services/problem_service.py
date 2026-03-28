@@ -192,15 +192,21 @@ class ProblemService:
 
         with SessionLocal() as db:
             # Get acceptance rates from submissions (this is still correct)
+            # Use lower() on verdict to be case-insensitive ("Accepted" vs "accepted")
             acceptance_rates = {
                 str(row.problem_id): int(round((int(row.accepted or 0) / int(row.total or 0)) * 100))
                 if int(row.total or 0)
-                else None
+                else 0
                 for row in (
                     db.query(
                         Submission.problem_id,
                         func.count(Submission.id).label("total"),
-                        func.sum(case((func.lower(Submission.verdict) == "accepted", 1), else_=0)).label("accepted"),
+                        func.sum(
+                            case(
+                                (func.lower(func.coalesce(Submission.verdict, "")) == "accepted", 1),
+                                else_=0
+                            )
+                        ).label("accepted"),
                     )
                     .filter(
                         Submission.problem_id.isnot(None),

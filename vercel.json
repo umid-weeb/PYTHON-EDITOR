@@ -28,13 +28,6 @@
   },
   {
     "source": "/zone/(.*)",
-    "has": [
-      {
-        "type": "header",
-        "key": "accept",
-        "value": ".*text/html.*"
-      }
-    ],
     "destination": "/zone/index.html"
   }
 ]

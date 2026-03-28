@@ -22,8 +22,16 @@ function buildInitials(username?: string | null) {
 
 function resolveSrc(candidate?: string | null) {
   if (!candidate) return "";
+  if (candidate.startsWith("http://") || candidate.startsWith("https://") || candidate.startsWith("data:")) {
+    return candidate;
+  }
+  
+  // Ensure we have a leading slash for relative paths
+  const path = candidate.startsWith("/") ? candidate : `/${candidate}`;
+  
   try {
-    return new URL(candidate, API_BASE_URL).toString();
+    // API_BASE_URL is imported from apiClient.js
+    return `${API_BASE_URL}${path}`;
   } catch {
     return candidate;
   }

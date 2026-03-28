@@ -181,13 +181,14 @@ class SubmissionTrackingRepository:
 
         first_solve = False
         if row.mode == "submit" and normalized_verdict.lower() == "accepted":
-            difficulty = db.query(Problem.difficulty).filter(Problem.id == row.problem_id).scalar()
-            first_solve = self.record_first_solve(
+            # Enforcement: normalize to capitalized 'Accepted' for database consistency
+            row.verdict = "Accepted"
+            first_solve = self.record_solved_problem_safe(
                 db,
                 user_id=int(row.user_id),
                 problem_id=str(row.problem_id),
-                difficulty=str(difficulty or ""),
                 solved_at=row.created_at,
+                created_by="finalize_submission"
             )
 
         db.flush()

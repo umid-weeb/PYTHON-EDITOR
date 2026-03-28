@@ -211,23 +211,34 @@ export function ArenaProvider({ children }) {
         clearPendingSubmission();
         const formatted = buildResultState(payload, "submit");
         setResult(formatted);
+        
         const normalizedVerdict = String(payload?.verdict || "").trim().toLowerCase();
         const normalizedStatus = String(payload?.status || "").trim().toLowerCase();
         const accepted = normalizedVerdict === "accepted";
         const attempted = accepted || normalizedStatus === "completed";
 
-        if (selectedProblemId) {
+        // Update the list of problems in state to reflect the new solved/attempted status
+        if (selectedProblemId || submissionProblemKey) {
+          const targetKey = selectedProblemId || submissionProblemKey;
           setProblems((current) =>
-            current.map((problem) =>
-              (problem.id || problem.slug) === selectedProblemId
-                ? {
-                    ...problem,
-                    is_attempted: problem.is_attempted || attempted,
-                    is_solved: problem.is_solved || accepted,
-                  }
-                : problem
-            )
+            current.map((problem) => {
+              const matches = 
+                problem.id === targetKey || 
+                problem.slug === targetKey ||
+                (problem.id && problem.id === selectedProblem?.id) ||
+                (problem.slug && problem.slug === selectedProblem?.slug);
+                
+              if (matches) {
+                return {
+                  ...problem,
+                  is_attempted: problem.is_attempted || attempted,
+                  is_solved: problem.is_solved || accepted,
+                };
+              }
+              return problem;
+            })
           );
+          
           setSelectedProblem((current) =>
             current
               ? {
