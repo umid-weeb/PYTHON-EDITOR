@@ -20,7 +20,7 @@ def _db_ping() -> dict:
     }
 
 
-@router.get("/health")
+@router.get("/health", methods=["GET", "HEAD"])
 async def health(
     service: ProblemService = Depends(get_problem_service),
 ) -> dict:

@@ -158,6 +158,10 @@ def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
         db.commit()
 
     existing_problems = {problem.slug: problem for problem in db.query(Problem).all()}
+    
+    # Optimize by getting all problem IDs that HAVE test cases in one query
+    problems_with_tests = {pid for (pid,) in db.query(TestCase.problem_id).distinct().all()}
+    
     inserted_count = 0
     skipped_count = 0
 
@@ -175,9 +179,8 @@ def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
             existing_problem.function_name = problem_seed.function_name
             existing_problem.tags_json = json.dumps(problem_seed.tags, ensure_ascii=False)
             
-            # CRITICAL: Check if test cases are missing (common error in previous builds)
-            test_case_count = db.query(TestCase).filter(TestCase.problem_id == existing_problem.id).count()
-            if test_case_count == 0:
+            # CRITICAL: Check if test cases are missing
+            if existing_problem.id not in problems_with_tests:
                 logger.info("Seeding missing test cases for existing problem: %s", problem_seed.slug)
                 for test_case in problem_seed.test_cases:
                     db.add(
