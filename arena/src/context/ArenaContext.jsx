@@ -36,6 +36,8 @@ export function ArenaProvider({ children }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [activeCaseIndex, setActiveCaseIndex] = useState(0);
+  const [runCooldown, setRunCooldown] = useState(0);
+  const [submitCooldown, setSubmitCooldown] = useState(0);
   const cacheRef = useRef(new Map());
 
   const { token } = useAuth();
@@ -45,6 +47,14 @@ export function ArenaProvider({ children }) {
       setShowAuthModal(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRunCooldown((c) => (c > 0 ? c - 1 : 0));
+      setSubmitCooldown((c) => (c > 0 ? c - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
 
   const getSubmissionProblemKey = useCallback(
@@ -143,8 +153,19 @@ export function ArenaProvider({ children }) {
       return null;
     }
 
+    if (runCooldown > 0) {
+      setResult({
+        tone: "warning",
+        chip: "Kutib turing",
+        summary: `Iltimos, qayta sinash uchun ${runCooldown} soniya kuting.`,
+        details: [],
+      });
+      return null;
+    }
+
     persistDraft();
     setIsRunning(true);
+    setRunCooldown(10);
     setResult({
       tone: "info",
       chip: "Ishlayapti",
@@ -172,7 +193,7 @@ export function ArenaProvider({ children }) {
     } finally {
       setIsRunning(false);
     }
-  }, [code, getSubmissionProblemKey, language, persistDraft]);
+  }, [code, getSubmissionProblemKey, language, persistDraft, runCooldown]);
 
   const submitCode = useCallback(
     async (token) => {
@@ -188,6 +209,16 @@ export function ArenaProvider({ children }) {
         return null;
       }
 
+      if (submitCooldown > 0) {
+        setResult({
+          tone: "warning",
+          chip: "Kutib turing",
+          summary: `Iltimos, qayta yuborish uchun ${submitCooldown} soniya kuting.`,
+          details: [],
+        });
+        return null;
+      }
+
       if (!token) {
         setPendingSubmission(submissionProblemKey);
         setShowAuthModal(true);
@@ -196,6 +227,7 @@ export function ArenaProvider({ children }) {
 
       persistDraft();
       setIsSubmitting(true);
+      setSubmitCooldown(15);
       setResult({
         tone: "info",
         chip: "Yuborilmoqda",
@@ -323,6 +355,8 @@ export function ArenaProvider({ children }) {
       selectProblem,
       runCode,
       submitCode,
+      runCooldown,
+      submitCooldown,
       persistDraft,
       dismissAuthModal: () => setShowAuthModal(false),
       openAuthModal: () => setShowAuthModal(true),
@@ -335,6 +369,13 @@ export function ArenaProvider({ children }) {
       filteredProblems,
       isRunning,
       isSubmitting,
+      clearPendingSubmission,
+      code,
+      difficulty,
+      filteredProblems,
+      getSubmissionProblemKey,
+      isRunning,
+      isSubmitting,
       language,
       loadProblems,
       persistDraft,
@@ -343,13 +384,18 @@ export function ArenaProvider({ children }) {
       problemsStatus,
       result,
       runCode,
+      runCooldown,
       search,
       selectProblem,
-      selectedProblem,
+      selectedProblem?.id,
+      selectedProblem?.slug,
       selectedProblemId,
+      setDifficulty,
       setLanguage,
+      setSearch,
       showAuthModal,
       submitCode,
+      submitCooldown,
     ]
   );
 

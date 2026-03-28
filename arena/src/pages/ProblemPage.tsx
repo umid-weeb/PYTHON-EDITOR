@@ -38,6 +38,8 @@ export default function ProblemPage() {
     selectProblem,
     runCode,
     submitCode,
+    runCooldown,
+    submitCooldown,
     siblings,
     dismissAuthModal,
   } = useArena();
@@ -148,10 +150,12 @@ export default function ProblemPage() {
                 isRunning={isRunning}
                 isSubmitting={isSubmitting}
                 language={language}
-                onChange={setCode}
+                runCooldown={runCooldown}
+                submitCooldown={submitCooldown}
+                onCodeChange={setCode}
                 onLanguageChange={setLanguage}
-                onRun={() => runCode().catch(() => {})}
-                onSubmit={() => submitCode(token).catch(() => {})}
+                onRun={runCode}
+                onSubmit={submitCode}
               />
             </div>
 

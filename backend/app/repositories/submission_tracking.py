@@ -215,7 +215,9 @@ class SubmissionTrackingRepository:
         4. Includes debugging information
         """
         # Get problem difficulty for stats
-        difficulty = db.query(Problem.difficulty).filter(Problem.id == problem_id).scalar()
+        difficulty = db.query(Problem.difficulty).filter(Problem.id == problem_id).first()
+        if difficulty and isinstance(difficulty, tuple):
+            difficulty = difficulty[0]
         
         # Use INSERT ... ON CONFLICT DO NOTHING for idempotency
         insert_stmt = (

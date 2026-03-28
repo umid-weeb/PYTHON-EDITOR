@@ -135,7 +135,7 @@ export const arenaApi = {
     return request(`/api/submission/${submissionId}`, { token });
   },
   async pollSubmission(submissionId, token) {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
       const payload = await arenaApi.getSubmission(submissionId, token).catch(() => null);
       if (!payload) {
         await delay(700);
