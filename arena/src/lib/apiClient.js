@@ -234,6 +234,20 @@ export const userApi = {
   },
 };
 
+export const contestApi = {
+  async list() {
+    const data = await request("/api/contests");
+    return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+  },
+  async get(id) {
+    return request(`/api/contests/${encodeURIComponent(id)}`);
+  },
+  async getLeaderboard(id) {
+    const data = await request(`/api/contests/${encodeURIComponent(id)}/leaderboard`);
+    return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+  },
+};
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

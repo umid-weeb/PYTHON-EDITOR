@@ -12,6 +12,8 @@ from uuid import NAMESPACE_URL, uuid5
 from sqlalchemy.orm import Session
 
 from app.models.problem import Problem, TestCase
+from app.models.contest import Contest, ContestProblem
+from datetime import datetime, timedelta, timezone
 
 
 VISIBLE_CASE_COUNT = 3
@@ -97,12 +99,54 @@ def ensure_problem_catalog_seeded(db: Session) -> SeedSummary:
         logger.info("Syncing problem catalog text and metadata...")
         summary = seed_problem_catalog(db, force=False)
         logger.info("%s problems ready.", summary.total_count)
-        return summary
-
-    logger.info("Seeding problems...")
-    summary = seed_problem_catalog(db, force=False)
-    logger.info("%s problems ready.", summary.total_count)
+        # Fall through to the common seeding logic below
+    else:
+        logger.info("Seeding problems...")
+        summary = seed_problem_catalog(db, force=False)
+        logger.info("%s problems ready.", summary.total_count)
+    
+    # Always ensure at least one sample contest exists
+    ensure_sample_contest_seeded(db)
+    
     return summary
+
+
+def ensure_sample_contest_seeded(db: Session) -> None:
+    """Ensure at least one sample contest exists in the database for demonstration."""
+    existing = db.query(Contest).first()
+    if existing:
+        return
+
+    logger.info("Seeding sample contest...")
+    try:
+        # Create a sample contest starting now and ending in 7 days
+        now = datetime.now(timezone.utc)
+        contest = Contest(
+            id="sample-arena-contest",
+            title="Pyzone Arena - Haftalik Musobaqa #1",
+            description="Bu Pyzone Arena platformasidagi ilk namunaviy musobaqa. Ishtirok eting va o'z bilimingizni sinab ko'ring!",
+            starts_at=now - timedelta(days=1), # Started yesterday
+            ends_at=now + timedelta(days=6),   # Ends in 6 days
+            is_rated=True
+        )
+        db.add(contest)
+        db.flush()
+
+        # Attach 3 easy/medium problems from the catalog
+        problems = db.query(Problem).limit(3).all()
+        for i, problem in enumerate(problems):
+            db.add(ContestProblem(
+                contest_id=contest.id,
+                problem_id=problem.id,
+                order_num=i + 1,
+                points=100 if problem.difficulty == "easy" else 200
+            ))
+        
+        db.commit()
+        logger.info("Sample contest seeded successfully.")
+    except Exception as e:
+        db.rollback()
+        logger.warning("Failed to seed sample contest: %s", e)
 
 
 def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:

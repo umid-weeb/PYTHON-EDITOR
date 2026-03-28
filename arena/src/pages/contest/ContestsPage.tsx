@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
-import { contestService, type ContestListItem } from "../../services/contestService";
+import { contestApi } from "../../lib/apiClient.js";
+import type { ContestListItem } from "../../services/contestService";
 
 function formatDateRange(startsAt: string | null, endsAt: string | null) {
   const startLabel = startsAt ? new Date(startsAt).toLocaleString() : "--";
@@ -31,7 +32,7 @@ export default function ContestsPage() {
     async function load() {
       setStatus("loading");
       try {
-        const data = await contestService.list();
+        const data = await contestApi.list();
         if (!cancelled) {
           setItems(data || []);
           setStatus("ready");

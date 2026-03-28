@@ -1,6 +1,5 @@
-import { API_BASE_URL } from "../lib/apiClient.js";
 
-type ContestStatus = "upcoming" | "running" | "finished";
+export type ContestStatus = "upcoming" | "running" | "finished";
 
 export type ContestListItem = {
   id: string;
@@ -34,29 +33,5 @@ export type ContestLeaderboardRow = {
   penalty_minutes: number;
 };
 
-async function requestJson(path: string) {
-  const res = await fetch(`${API_BASE_URL}${path}`);
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) {
-    const message = data?.detail || data?.message || `HTTP ${res.status}`;
-    const err: any = new Error(message);
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-}
-
-export const contestService = {
-  list(): Promise<ContestListItem[]> {
-    return requestJson("/api/contests").then((d) => d?.items || []);
-  },
-  get(id: string): Promise<ContestDetail> {
-    return requestJson(`/api/contests/${encodeURIComponent(id)}`);
-  },
-  leaderboard(id: string): Promise<ContestLeaderboardRow[]> {
-    return requestJson(`/api/contests/${encodeURIComponent(id)}/leaderboard`).then((d) => d?.items || []);
-  },
-};
-
+// Deprecated in favor of contestApi in apiClient.js
+export const contestService = null as any;

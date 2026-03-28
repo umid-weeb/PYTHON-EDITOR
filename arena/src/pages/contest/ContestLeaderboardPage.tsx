@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
-import { contestService, type ContestDetail, type ContestLeaderboardRow } from "../../services/contestService";
+import { contestApi } from "../../lib/apiClient.js";
+import type { ContestDetail, ContestLeaderboardRow } from "../../services/contestService";
 
 export default function ContestLeaderboardPage() {
   const { id = "" } = useParams();
@@ -14,7 +15,10 @@ export default function ContestLeaderboardPage() {
     async function load() {
       setStatus("loading");
       try {
-        const [contestPayload, leaderboard] = await Promise.all([contestService.get(id), contestService.leaderboard(id)]);
+        const [contestPayload, leaderboard] = await Promise.all([
+          contestApi.get(id),
+          contestApi.getLeaderboard(id),
+        ]);
         if (!cancelled) {
           setContest(contestPayload);
           setRows(leaderboard || []);
