@@ -278,9 +278,8 @@ def _tick():
         raise LoopIterationError("Vaqt chegarasi tugadi (1s). Cheksiz sikl bo'lishi mumkin.")
 
 class SafeExecutor:
-    def __init__(self, timeout=1.0, max_output=50000):
+    def __init__(self, timeout=1.0):
         self.timeout = timeout
-        self.max_output = max_output
         self.start_time = None
 
     def _serialize_error(self, error):
@@ -310,16 +309,6 @@ class SafeExecutor:
             if consumed >= len(inputs): raise AwaitingInput(str(prompt), consumed)
             val = inputs[consumed]; consumed += 1; return val
 
-        # Custom output handler with truncation to prevent browser freeze
-        def m_write(data):
-            if sys.stdout.tell() < self.max_output:
-                old_write(data)
-            elif sys.stdout.tell() == self.max_output:
-                old_write("\\n... [Natija juda ko'p bo'lganligi sababli qirqildi] ...")
-        
-        old_write = sys.stdout.write
-        sys.stdout.write = m_write
-
         try:
             tree = ast.parse(code, filename="<user_code>")
             LoopTransformer().visit(tree)
@@ -335,7 +324,6 @@ class SafeExecutor:
         except BaseException as e:
             return {"success": False, "error": self._serialize_error(e), "output": sys.stdout.getvalue().rstrip()}
         finally:
-            sys.stdout.write = old_write # Restore original write
             sys.stdout, sys.stderr = old_stdout, old_stderr
 
 _executor = SafeExecutor(timeout=1.0)
@@ -676,17 +664,26 @@ function showAutocompleteHints(cm) {
             const currentWord = token.string;
 
             const currentWordLower = currentWord.toLowerCase();
+            const priority = ["True", "False", "None"];
+
             const list = [...new Set([
                 ...PYTHON_KEYWORDS,
                 ...MATH_FUNCTIONS,
                 ...(CodeMirror.hint.anyword(editor).list || [])
             ])].filter(h => h.toLowerCase().startsWith(currentWordLower))
                .sort((a, b) => {
-                   // Prioritize exact case matches, then length
+                   // Priority check
+                   const aPri = priority.includes(a);
+                   const bPri = priority.includes(b);
+                   if (aPri && !bPri) return -1;
+                   if (!aPri && bPri) return 1;
+
+                   // Exact case match prioritize
                    const aStart = a.startsWith(currentWord);
                    const bStart = b.startsWith(currentWord);
                    if (aStart && !bStart) return -1;
                    if (!aStart && bStart) return 1;
+
                    return a.localeCompare(b);
                });
 
