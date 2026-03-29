@@ -1,0 +1,127 @@
+Found 13 duplicate titles
+
+Title: Palindromni tekshirish (harflar va raqamlar) (5 occurrences)
+  ID: 7daa7008-8117-58e4-8c4c-f75788fbc5f2, Slug: clean-palindrome-check-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 519
+  ID: 9ab876e6-de12-5e40-9f31-4a3d7b4fb5af, Slug: clean-palindrome-check-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 519
+  ID: ed0cb977-b7d0-59b4-8ba8-57267c6fbd6c, Slug: clean-palindrome-check-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 519
+  ID: 42bc21ab-f98a-5b4f-80d4-57977b5871df, Slug: clean-palindrome-check-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 519
+  ID: cfca3660-e38b-5d37-a2a1-feece8236e22, Slug: clean-palindrome-check-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 519
+
+Title: Qavslar muvozanati (10 occurrences)
+  ID: 6288bb4a-ef62-5f86-80cb-ae52b8be86c6, Slug: balanced-brackets-lite-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: 5a1d631b-724e-5ad1-9866-5a0d140484c7, Slug: balanced-brackets-lite-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: 8c0fe3b2-e745-52aa-bed0-c07c3c87ab56, Slug: balanced-brackets-lite-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: ee06ec16-bd0a-5953-bccf-f5e61df28387, Slug: balanced-brackets-lite-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: 00603fb0-53b3-504e-b6c5-64c08373455e, Slug: balanced-brackets-lite-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: 6d1b4a52-60f8-5b37-a7f3-564e3f4956e7, Slug: balanced-brackets-lite-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: 05def7cb-dc19-514a-983f-6903280c8b84, Slug: balanced-brackets-lite-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: efffe31d-9eaf-5d4c-b2ea-00ed15789bbb, Slug: balanced-brackets-lite-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: ec7ed68c-55c3-5bd5-b83d-99766ae008b8, Slug: balanced-brackets-lite-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+  ID: 96a60666-5f24-5772-a80e-145cc05cb9da, Slug: balanced-brackets-lite-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 453
+
+Title: Yig'ilgan yomg'ir suvi (10 occurrences)
+  ID: d8bd19ae-63e3-5ba5-a633-ea16c6191d27, Slug: trapped-rain-collector-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: 5aeb50d3-4664-51d8-a437-b1f74a1b7f42, Slug: trapped-rain-collector-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: feacfe81-a5a3-59dc-a76b-2008438edc29, Slug: trapped-rain-collector-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: 31378951-0694-5e7c-8ba4-57b572eafed4, Slug: trapped-rain-collector-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: 1055065b-d8e9-5b5f-9393-2931994abd45, Slug: trapped-rain-collector-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: 2cb0b714-118f-59f8-bf6d-f4f5f7363d28, Slug: trapped-rain-collector-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: bbfb0ff3-f1cc-5c54-9946-705cae704b79, Slug: trapped-rain-collector-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: 6a86ba18-2c4f-56c0-a6e3-8ea1bb1eae53, Slug: trapped-rain-collector-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: 83acfed5-d978-5f0c-87b4-d7a795803f6e, Slug: trapped-rain-collector-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+  ID: e9c6232c-7602-5270-9079-215f065bb15c, Slug: trapped-rain-collector-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 489
+
+Title: Tahrirlash masofasi (10 occurrences)
+  ID: 0abff628-89f7-5b64-916a-967c9bb1372a, Slug: edit-distance-grid-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: c29c6514-853a-59cc-94b9-2143fbb4d387, Slug: edit-distance-grid-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: 4846b974-fae9-5a12-946b-b83c01737476, Slug: edit-distance-grid-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: 1ef28b1d-bb44-53a2-8681-a7cb2530c525, Slug: edit-distance-grid-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: bd6de264-c10a-5b17-a7aa-4dd223774e99, Slug: edit-distance-grid-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: 49f2595a-7bc8-577a-85c7-cdb3e39ae6fe, Slug: edit-distance-grid-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: b330370e-a533-5579-a960-bfceba9053ee, Slug: edit-distance-grid-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: fe27a41a-3c91-5a3f-8590-7d0bcb5a6509, Slug: edit-distance-grid-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: 6b2f68d7-6a39-514e-98be-cb7f7a66339c, Slug: edit-distance-grid-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+  ID: 43ff7ddc-76b0-52bf-b0fc-309a242b4a69, Slug: edit-distance-grid-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 488
+
+Title: Zinaga chiqish usullari (3 qadamgacha) (5 occurrences)
+  ID: 38fc9840-e7c8-56ee-8b94-97aa7f4bc380, Slug: climbing-ways-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: cb805077-7119-54de-9689-7c115d14f17e, Slug: climbing-ways-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: 534b3187-f328-54aa-a453-9e6ad96d97d2, Slug: climbing-ways-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: 1b002a2a-71ff-5b96-9773-d159d13338bc, Slug: climbing-ways-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: 2b83d06e-64dd-5893-9497-97486a331e99, Slug: climbing-ways-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+
+Title: Ikki son yig'indisi (10 occurrences)
+  ID: ef8eb847-f474-5d16-8526-263dd881290d, Slug: pair-sum-indices-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: 460800fd-6f43-5336-917a-5bbc401f151f, Slug: pair-sum-indices-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: 06e49f10-b166-50fb-9d53-92e68772796f, Slug: pair-sum-indices-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: 6d927ca0-33d8-5aab-88bc-1b3dcad926b9, Slug: pair-sum-indices-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: 4ed52d03-2c22-50f3-819d-fa0a750852d4, Slug: pair-sum-indices-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: 3e8ad2fb-b6d8-53df-9af8-911b929c54eb, Slug: pair-sum-indices-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: e0ba9d50-4754-523c-99ec-7d9e1b0197ab, Slug: pair-sum-indices-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: def21a1f-81be-5e97-a9b8-a4608c0b4e27, Slug: pair-sum-indices-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: b6c00567-b5ab-57af-ac00-922fec703027, Slug: pair-sum-indices-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+  ID: af6bcd48-3dd4-5ac4-8b45-723896a689c2, Slug: pair-sum-indices-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 574
+
+Title: Takrorlarsiz saralash (o'sish tartibida) (5 occurrences)
+  ID: 0d2ce64c-f663-5c27-9dd2-f2d613b8aeb0, Slug: distinct-sort-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 513
+  ID: 1cdcd15e-5d24-5190-aa36-215a1d33e9e6, Slug: distinct-sort-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 513
+  ID: ef03b7d4-11bc-5575-8d61-acf97c86998d, Slug: distinct-sort-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 513
+  ID: a9a89df4-1bcd-55ef-aba5-df743cf8539a, Slug: distinct-sort-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 513
+  ID: 3a7219fb-1b4f-5c19-a7bd-5e7d3901cb47, Slug: distinct-sort-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 513
+
+Title: Palindromni tekshirish (faqat harflar) (5 occurrences)
+  ID: 62aecc57-6cce-5f94-8647-163ca837fcbf, Slug: clean-palindrome-check-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 501
+  ID: 968f5430-70ea-51eb-a834-6508bf7bb9f5, Slug: clean-palindrome-check-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 501
+  ID: 5bdbbd5d-b55e-5187-b5a1-105aacac9450, Slug: clean-palindrome-check-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 501
+  ID: af9f27a3-6a20-5144-81f6-12aeb7036b22, Slug: clean-palindrome-check-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 501
+  ID: 9f1105d1-2928-5cd0-a8c7-cf4817b9b0f7, Slug: clean-palindrome-check-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 501
+
+Title: Birinchi mos indeks (10 occurrences)
+  ID: b132de3f-e479-5473-bcd8-41721e89fecd, Slug: lower-bound-search-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 731c53c5-c17e-559e-b752-25a0742815cd, Slug: lower-bound-search-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 871cb948-b6c0-5d50-bdac-2ee2f4d02d0f, Slug: lower-bound-search-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 4a2f2610-d95b-51c8-b618-15be35995c12, Slug: lower-bound-search-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 59dedc97-73d2-59e7-9d3f-83c340d35fa4, Slug: lower-bound-search-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 62751f62-e0fa-5749-9115-8c6632bff1e9, Slug: lower-bound-search-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: d1e5399a-bfb5-500e-93fe-7f79bef0e55a, Slug: lower-bound-search-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 52dba88a-def9-54ad-8053-fffd7dbb34ff, Slug: lower-bound-search-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 35c04953-409d-5be5-add5-f20d30c78158, Slug: lower-bound-search-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+  ID: 8bdfba72-82bd-5a57-a172-00bb9f3f43df, Slug: lower-bound-search-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 515
+
+Title: Takrorlarsiz saralash (kamayish tartibida) (5 occurrences)
+  ID: 0a736698-5198-58d3-83ce-0566f7d0e24b, Slug: distinct-sort-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 517
+  ID: bef80048-efa7-5218-bafb-9a11cb7d63fd, Slug: distinct-sort-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 517
+  ID: 2c6c0499-838f-5018-a77e-15ec19a5a1b8, Slug: distinct-sort-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 517
+  ID: 11a0b832-1884-5c53-9add-0fdbbb6d38d8, Slug: distinct-sort-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 517
+  ID: 85f052a6-ceb7-5815-9a97-f242e6d34374, Slug: distinct-sort-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 517
+
+Title: Takrorlanmas eng uzun qism (10 occurrences)
+  ID: 5405bb3f-d598-5526-8b13-ea0915376bde, Slug: longest-unique-window-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: 2596866c-1924-55e5-b1ad-b83d6ea7cfed, Slug: longest-unique-window-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: 5377cb81-c8d3-5871-b2fa-5d40966d98b7, Slug: longest-unique-window-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: 556e261d-09bc-5e80-b4c3-2c90b0ba3aa3, Slug: longest-unique-window-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: 1f260231-0fa8-50a0-afec-c52ff03e014c, Slug: longest-unique-window-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: afce7a8a-5914-5bcc-8d5e-e6c0b0f6a8bb, Slug: longest-unique-window-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: b046a1d2-0d25-5d06-a552-c00dbe5f8088, Slug: longest-unique-window-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: 55d03258-9a06-5d89-a289-70042c5348c9, Slug: longest-unique-window-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: 1dc5611b-c8e3-585a-9aab-c68402daa6b4, Slug: longest-unique-window-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+  ID: 995a1265-5e35-58f3-84cf-916f59a64276, Slug: longest-unique-window-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 465
+
+Title: Zinaga chiqish usullari (2 qadamgacha) (5 occurrences)
+  ID: bfc5875f-16b5-5171-bee4-84915942f6f8, Slug: climbing-ways-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: ed76727a-dc7d-5b31-8ff1-b683048e9177, Slug: climbing-ways-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: d898dcea-e441-5926-b49e-cb8202db8b7c, Slug: climbing-ways-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: bb7e9e7b-a8f1-5ee1-af67-13436e442c90, Slug: climbing-ways-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+  ID: 42508096-f67a-54a4-afaa-72e46ff98a3b, Slug: climbing-ways-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 561
+
+Title: Eng ko'p uchraydigan son (10 occurrences)
+  ID: 7802f393-a51f-5ba6-b609-f0f67df53045, Slug: frequency-leader-06, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: 3f0f398e-6d29-5db3-851c-16430ff3e736, Slug: frequency-leader-07, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: d468b887-fcf3-5cef-ba35-12c9451cd516, Slug: frequency-leader-08, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: 5547e7cd-7172-5729-9d77-13dc5bb27d9c, Slug: frequency-leader-01, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: 18cfb334-870f-5806-b76b-43ff53b80316, Slug: frequency-leader-02, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: c9b01902-5946-5d1a-80b8-cde048049968, Slug: frequency-leader-03, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: d19559a7-a4ca-5209-bc60-b3b376ef5e71, Slug: frequency-leader-04, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: ed482b86-3a7f-5641-b834-ff1cc28bc3b8, Slug: frequency-leader-05, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: 48ec2109-146a-55bc-8fb3-12d016153a06, Slug: frequency-leader-09, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492
+  ID: b60a2ad5-ee14-5e44-8b14-cdf26761503c, Slug: frequency-leader-10, Created: 2026-03-15 14:44:09.654693+00:00, DescLen: 492

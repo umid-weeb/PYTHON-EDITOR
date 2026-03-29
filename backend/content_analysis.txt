@@ -1,0 +1,91 @@
+Analyzing problems with title: Qavslar muvozanati
+
+ID: 6288bb4a-ef62-5f86-80cb-ae52b8be86c6, Slug: balanced-brackets-lite-06
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: 5a1d631b-724e-5ad1-9866-5a0d140484c7, Slug: balanced-brackets-lite-07
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: 8c0fe3b2-e745-52aa-bed0-c07c3c87ab56, Slug: balanced-brackets-lite-01
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: ee06ec16-bd0a-5953-bccf-f5e61df28387, Slug: balanced-brackets-lite-02
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: 00603fb0-53b3-504e-b6c5-64c08373455e, Slug: balanced-brackets-lite-03
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: 6d1b4a52-60f8-5b37-a7f3-564e3f4956e7, Slug: balanced-brackets-lite-04
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: 05def7cb-dc19-514a-983f-6903280c8b84, Slug: balanced-brackets-lite-05
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: efffe31d-9eaf-5d4c-b2ea-00ed15789bbb, Slug: balanced-brackets-lite-08
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: ec7ed68c-55c3-5bd5-b83d-99766ae008b8, Slug: balanced-brackets-lite-09
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
+
+ID: 96a60666-5f24-5772-a80e-145cc05cb9da, Slug: balanced-brackets-lite-10
+Description (first 100 chars): ## Qavslar muvozanati
+
+Agar har bir ochilgan qavs to'g'ri tartibda yopilgan bo'lsa, rost qaytaring.
+...
+Number of test cases: 6
+  TC Input: "()[]{}", Expected: true
+  TC Input: "([{}])abc", Expected: true
