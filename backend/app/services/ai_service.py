@@ -12,7 +12,8 @@ class AIService:
         self.api_key = settings.ai_api_key
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            # Use gemini-1.5-flash-latest for better compatibility with v1beta endpoints
+            self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
         else:
             self.model = None
 
