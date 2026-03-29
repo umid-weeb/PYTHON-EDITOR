@@ -138,7 +138,7 @@ def ensure_sample_contest_seeded(db: Session) -> None:
             db.add(ContestProblem(
                 contest_id=contest.id,
                 problem_id=problem.id,
-                order_num=i + 1,
+                sort_order=i + 1,
                 points=100 if problem.difficulty == "easy" else 200
             ))
         

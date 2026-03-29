@@ -89,6 +89,11 @@ def format_user_error(exc):
             clean_f = traceback.FrameSummary("solution.py", f.lineno, f.name, line=f.line)
             clean_tb.append(clean_f)
             
+    # If we have no frames from the user's file, it might be a system/injection error
+    # In that case, we show the full traceback to help debug
+    if not clean_tb and tb:
+        return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)).strip()
+
     lines = traceback.format_list(clean_tb)
     if lines:
         lines.insert(0, "Traceback (most recent call last):\\n")
@@ -116,8 +121,16 @@ try:
     spec = importlib.util.spec_from_file_location("submission", submission_path)
     module = importlib.util.module_from_spec(spec)
     
-    # Inject security tick into module's global namespace
+    # Inject security tick into both module dict AND builtins
+    # This ensures it is accessible even in deep nested scopes or classes
     module.__dict__['__arena_tick__'] = security_monitor.tick
+    
+    # Also inject into the module's __builtins__ if it exists
+    if "__builtins__" in module.__dict__:
+        if isinstance(module.__dict__["__builtins__"], dict):
+            module.__dict__["__builtins__"]["__arena_tick__"] = security_monitor.tick
+        else:
+            setattr(module.__dict__["__builtins__"], "__arena_tick__", security_monitor.tick)
     
     # Execute the instrumented code in module's dict
     exec(code_obj, module.__dict__)

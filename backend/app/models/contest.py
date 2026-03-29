@@ -17,7 +17,7 @@ class ContestProblem(Base):
     contest_id = Column(String(64), ForeignKey("contests.id", ondelete="CASCADE"), primary_key=True)
     problem_id = Column(String, nullable=False, primary_key=True) # Problem slug or ID
     points = Column(Integer, default=100)
-    order_num = Column(Integer, nullable=False)
+    sort_order = Column(Integer, nullable=False)
 
 class ContestRegistration(Base):
     __tablename__ = "contest_registrations"

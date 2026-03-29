@@ -142,8 +142,9 @@ app.mount("/uploads", StaticFiles(directory=uploads_root), name="uploads")
 @app.get("/")
 async def root() -> dict[str, str]:
     return {
-        "name": settings.app_name,
-        "status": "ok",
-        "api_prefix": settings.api_prefix,
-        "catalog_ready": catalog_ready.is_set(),
+        "name": "PyZone Arena API",
+        "version": "1.0.0",
+        "status": "healthy",
+        "catalog_ready": str(catalog_ready.is_set()),
+        "migrations_complete": str(migrations_complete)
     }
