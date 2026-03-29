@@ -65,12 +65,13 @@ class TemplateDefinition:
     build_constraints: Callable[[int], list[str]]
     build_starter_code: Callable[[int], str]
     build_test_cases: Callable[[int], list[TestCaseSeed]]
+    variations: int = 10
 
 
 def build_problem_catalog() -> list[ProblemSeed]:
     catalog: list[ProblemSeed] = []
     for template in _templates():
-        for variation_index in range(10):
+        for variation_index in range(template.variations):
             slug = f"{template.slug_prefix}-{variation_index + 1:02d}"
             catalog.append(
                 ProblemSeed(
@@ -580,6 +581,7 @@ def _templates() -> list[TemplateDefinition]:
                 lambda rng, _: ([rng.randint(-20, 20) for _ in range(rng.randint(6, 12))],),
                 seed_prefix=300 + index,
             ),
+            variations=2,
         ),
         TemplateDefinition(
             slug_prefix="balanced-brackets-lite",
@@ -620,6 +622,7 @@ def _templates() -> list[TemplateDefinition]:
                 ),
                 seed_prefix=400 + index,
             ),
+            variations=1,
         ),
         TemplateDefinition(
             slug_prefix="clean-palindrome-check",
@@ -663,6 +666,7 @@ def _templates() -> list[TemplateDefinition]:
                 ),
                 seed_prefix=500 + index,
             ),
+            variations=2,
         ),
         TemplateDefinition(
             slug_prefix="pair-sum-indices",
@@ -695,6 +699,7 @@ def _templates() -> list[TemplateDefinition]:
                 lambda rng, case_index: _pair_sum_args(rng, case_index),
                 seed_prefix=600 + index,
             ),
+            variations=1,
         ),
         TemplateDefinition(
             slug_prefix="lower-bound-search",
@@ -727,6 +732,7 @@ def _templates() -> list[TemplateDefinition]:
                 lambda rng, case_index: _lower_bound_args(rng, case_index),
                 seed_prefix=700 + index,
             ),
+            variations=1,
         ),
         TemplateDefinition(
             slug_prefix="frequency-leader",
@@ -759,6 +765,7 @@ def _templates() -> list[TemplateDefinition]:
                 lambda rng, _: ([rng.randint(0, 8) for _ in range(rng.randint(8, 16))],),
                 seed_prefix=800 + index,
             ),
+            variations=1,
         ),
         TemplateDefinition(
             slug_prefix="climbing-ways",
@@ -791,6 +798,7 @@ def _templates() -> list[TemplateDefinition]:
                 lambda rng, case_index: ((case_index + 3 + rng.randint(0, 6)),),
                 seed_prefix=900 + index,
             ),
+            variations=2,
         ),
         TemplateDefinition(
             slug_prefix="longest-unique-window",
@@ -831,6 +839,7 @@ def _templates() -> list[TemplateDefinition]:
                 ),
                 seed_prefix=1000 + index,
             ),
+            variations=1,
         ),
         TemplateDefinition(
             slug_prefix="edit-distance-grid",
@@ -863,6 +872,7 @@ def _templates() -> list[TemplateDefinition]:
                 lambda rng, case_index: _edit_distance_args(rng, case_index),
                 seed_prefix=1100 + index,
             ),
+            variations=1,
         ),
         TemplateDefinition(
             slug_prefix="trapped-rain-collector",
@@ -901,5 +911,6 @@ def _templates() -> list[TemplateDefinition]:
                 ),
                 seed_prefix=1200 + index,
             ),
+            variations=1,
         ),
     ]
