@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -31,19 +33,56 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # DB schema migrations (fast — DDL only)
     Base.metadata.create_all(bind=engine)
     run_startup_migrations(engine)
-    # Run once more after bootstrap alters/creates auxiliary tables.
     Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        ensure_problem_catalog_seeded(db)
-        engagement_service.ensure_upcoming_daily_challenges(db)
-        db.commit()
+
+    # Start submission recovery loop
     submission_service = get_submission_service()
     submission_service.start_recovery_loop()
+
+    # Run the heavy catalog seed in a background thread so the health
+    # check endpoint is reachable immediately and Render doesn't mark
+    # the service as DOWN during startup.
+    def _background_sync() -> None:
+        try:
+            logger.info("Background catalog sync starting...")
+            with SessionLocal() as db:
+                ensure_problem_catalog_seeded(db)
+                engagement_service.ensure_upcoming_daily_challenges(db)
+                db.commit()
+            logger.info("Background catalog sync completed.")
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Background catalog sync failed: %s", exc)
+
+    threading.Thread(target=_background_sync, daemon=True, name="catalog-sync").start()
+
+    # Self-ping keep-alive: prevent Render free tier from sleeping.
+    # Render spins down services after 15 min of no traffic.
+    # We ping our own /health every 10 minutes to stay awake.
+    def _keep_alive() -> None:
+        import time
+        import urllib.request
+        # Wait for the server to fully start before first ping
+        time.sleep(30)
+        public_url = getattr(settings, "public_url", None) or "https://python-editor-b87c.onrender.com"
+        ping_url = f"{public_url.rstrip('/')}/health"
+        while True:
+            try:
+                urllib.request.urlopen(ping_url, timeout=10)  # noqa: S310
+                logger.debug("Keep-alive ping sent to %s", ping_url)
+            except Exception:
+                pass
+            time.sleep(600)  # 10 minutes
+
+    threading.Thread(target=_keep_alive, daemon=True, name="keep-alive").start()
+
     try:
         yield
     finally:

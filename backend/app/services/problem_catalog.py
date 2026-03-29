@@ -179,18 +179,31 @@ def seed_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
             existing_problem.function_name = problem_seed.function_name
             existing_problem.tags_json = json.dumps(problem_seed.tags, ensure_ascii=False)
             
-            # Always refresh test cases to ensure expected outputs are correct
-            db.query(TestCase).filter(TestCase.problem_id == existing_problem.id).delete()
-            for test_case in problem_seed.test_cases:
-                db.add(
-                    TestCase(
-                        problem_id=existing_problem.id,
-                        input=test_case.input,
-                        expected_output=test_case.expected_output,
-                        is_hidden=test_case.is_hidden,
-                        sort_order=test_case.sort_order,
+            # Smart refresh: only update test cases if they have changed.
+            # This avoids 840 DB writes on every restart for unchanged data.
+            existing_cases = (
+                db.query(TestCase.expected_output)
+                .filter(TestCase.problem_id == existing_problem.id)
+                .order_by(TestCase.sort_order)
+                .all()
+            )
+            seed_outputs = [tc.expected_output for tc in problem_seed.test_cases]
+            existing_outputs = [row[0] for row in existing_cases]
+
+            if existing_outputs != seed_outputs:
+                # Content has changed — refresh
+                db.query(TestCase).filter(TestCase.problem_id == existing_problem.id).delete()
+                for test_case in problem_seed.test_cases:
+                    db.add(
+                        TestCase(
+                            problem_id=existing_problem.id,
+                            input=test_case.input,
+                            expected_output=test_case.expected_output,
+                            is_hidden=test_case.is_hidden,
+                            sort_order=test_case.sort_order,
+                        )
                     )
-                )
+
             
             skipped_count += 1
             continue
