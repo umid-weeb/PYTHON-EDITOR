@@ -27,12 +27,25 @@ const MATH_FUNCTIONS = [
 ];
 
 const PYTHON_KEYWORDS = [
+    // Keywords
     "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue",
     "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in",
     "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
+    
+    // Built-in functions
     "print", "input", "len", "range", "list", "dict", "set", "int", "str", "float", "bool", "type",
+    "abs", "all", "any", "ascii", "bin", "breakpoint", "bytearray", "bytes", "callable", "chr",
+    "classmethod", "compile", "complex", "delattr", "dir", "divmod", "enumerate", "eval", "exec",
+    "filter", "format", "frozenset", "getattr", "globals", "hasattr", "hash", "help", "hex", "id",
+    "isinstance", "issubclass", "iter", "locals", "map", "max", "memoryview", "min", "next",
+    "object", "oct", "open", "ord", "pow", "property", "repr", "reversed", "round", "setattr",
+    "slice", "sorted", "staticmethod", "sum", "super", "tuple", "vars", "zip", "__import__",
+    
+    // Common methods and attributes
     "append", "extend", "insert", "remove", "pop", "clear", "index", "count", "sort", "reverse", "copy",
-    "get", "items", "keys", "values", "update", "add", "discard", "union", "intersection", "difference"
+    "get", "items", "keys", "values", "update", "add", "discard", "union", "intersection", "difference",
+    "split", "join", "strip", "lstrip", "rstrip", "replace", "find", "startswith", "endswith", "lower", "upper",
+    "format", "count", "index", "isalnum", "isalpha", "isdecimal", "isdigit", "isidentifier", "islower", "isnumeric", "isprintable", "isspace", "istitle", "isupper"
 ];
 
 const EDITOR_FONT_FAMILIES = {
@@ -419,6 +432,8 @@ function setupEditor() {
         lineNumbers: true,
         indentUnit: 4,
         smartIndent: true,
+        indentWithTabs: false,
+        lineWrapping: true,
         matchBrackets: true,
         autoCloseBrackets: true,
         styleActiveLine: true,
@@ -427,13 +442,20 @@ function setupEditor() {
         extraKeys: {
             "Ctrl-Enter": runCode,
             "F5": runCode,
+            "Enter": "newlineAndIndent",
             "Ctrl-S": saveCode,
             "Ctrl-Shift-F": formatEditorCode,
             "Tab": (cm) => {
+                if (cm.state.completionActive) return CodeMirror.Pass;
                 if (cm.somethingSelected()) cm.indentSelection("add");
                 else cm.replaceSelection("    ");
             },
             "Shift-Tab": (cm) => cm.indentSelection("subtract")
+        },
+        hintOptions: {
+            completeSingle: false,
+            alignWithWord: true,
+            closeOnUnfocus: true
         }
     });
 
@@ -634,11 +656,13 @@ function onEditorInputRead(cm, change) {
     const token = cm.getTokenAt(cur);
     const char = change.text[0];
 
-    // Neuvor: symbols or very short input shouldn't trigger
-    if (!/^[a-zA-Z_0-9]$/.test(char) && char !== ".") return;
-    if (token.string.length < 2 && char !== ".") return;
-
-    showAutocompleteHints(cm);
+    // Trigger on any alphabetical character or dot
+    if (!/^[a-zA-Z_.]$/.test(char)) return;
+    
+    // Trigger instantly if we have a valid starting char
+    if (token.string.trim().length > 0 || char === ".") {
+        showAutocompleteHints(cm);
+    }
 }
 
 function showAutocompleteHints(cm) {
