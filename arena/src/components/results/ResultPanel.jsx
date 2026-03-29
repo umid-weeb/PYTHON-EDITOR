@@ -61,6 +61,23 @@ export default function ResultPanel({ result, busy = false }) {
     );
   }
 
+  // Full-screen error fallback: If we are not busy, have no details, and are not in a known idle state,
+  // it means something went wrong (e.g. backend crash or network error).
+  if (!busy && !hasDetails && !isIdle && result?.tone === "danger") {
+    return (
+      <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-8">
+        <div className="max-w-[380px] flex flex-col gap-4 text-center">
+          <div className="text-[20px] font-black tracking-tight text-[var(--error)]">
+            {result.chip || "Xatolik"}
+          </div>
+          <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] whitespace-pre-wrap leading-relaxed shadow-inner">
+            {result.summary || "Bajarishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Full-screen spinner: run started but no result yet
   if (busy && !hasDetails) {
     return (

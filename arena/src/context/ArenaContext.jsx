@@ -144,7 +144,6 @@ export function ArenaProvider({ children }) {
       return null;
     }
 
-    // Agar hali ishlayotgan bo'lsa, qayta bosmaslik
     if (isRunning) return null;
 
     persistDraft();
@@ -158,21 +157,31 @@ export function ArenaProvider({ children }) {
 
     try {
       const submission = await arenaApi.runSolution(submissionProblemKey, code, language);
-      const payload = submission?.submission_id
+      if (!submission) {
+        throw new Error("Serverdan javob kelmadi.");
+      }
+
+      const payload = submission.submission_id
         ? await arenaApi.pollSubmission(submission.submission_id)
         : submission;
+
+      if (!payload) {
+        throw new Error("Natijani yuklab bo'lmadi.");
+      }
+
       const formatted = buildResultState(payload, "run");
       setResult(formatted);
       return formatted;
     } catch (error) {
       console.error("Run solution failed:", error);
-      setResult({
+      const errorState = {
         tone: "danger",
         chip: "Xato",
-        summary: error.message || "Bajarish muvaffaqiyatsiz tugadi",
+        summary: error.message || "Kodni bajarishda kutilmagan xatolik yuz berdi.",
         details: [],
-      });
-      return null;
+      };
+      setResult(errorState);
+      return errorState;
     } finally {
       setIsRunning(false);
     }
@@ -192,7 +201,6 @@ export function ArenaProvider({ children }) {
         return null;
       }
 
-      // Agar hali yuborilayotgan bo'lsa, qayta bosmaslik
       if (isSubmitting) return null;
 
       if (!token) {
@@ -212,9 +220,18 @@ export function ArenaProvider({ children }) {
 
       try {
         const submission = await arenaApi.submitSolution(submissionProblemKey, code, language);
-        const payload = submission?.submission_id
+        if (!submission) {
+          throw new Error("Serverdan javob kelmadi.");
+        }
+
+        const payload = submission.submission_id
           ? await arenaApi.pollSubmission(submission.submission_id, token)
           : submission;
+
+        if (!payload) {
+          throw new Error("Natijani yuklab bo'lmadi.");
+        }
+
         clearPendingSubmission();
         const formatted = buildResultState(payload, "submit");
         setResult(formatted);
@@ -259,18 +276,19 @@ export function ArenaProvider({ children }) {
         return formatted;
       } catch (error) {
         console.error("Submit solution failed:", error);
-        setResult({
+        const errorState = {
           tone: "danger",
           chip: "Xato",
-          summary: error.message || "Bajarish muvaffaqiyatsiz tugadi",
+          summary: error.message || "Yuborishda kutilmagan xatolik yuz berdi.",
           details: [],
-        });
-        return null;
+        };
+        setResult(errorState);
+        return errorState;
       } finally {
         setIsSubmitting(false);
       }
     },
-    [code, getSubmissionProblemKey, isSubmitting, language, persistDraft]
+    [code, getSubmissionProblemKey, isSubmitting, language, persistDraft, selectedProblem?.id, selectedProblem?.slug, selectedProblemId]
   );
 
   const filteredProblems = useMemo(

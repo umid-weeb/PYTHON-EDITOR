@@ -74,7 +74,6 @@ def get_settings() -> Settings:
     submissions_db_path = data_dir / "submissions.sqlite3"
 
     data_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir.mkdir(parents=True, exist_ok=True)
     hidden_test_root.mkdir(parents=True, exist_ok=True)
 
     cors_raw = os.getenv("ARENA_CORS_ALLOW_ORIGINS", "")

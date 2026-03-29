@@ -214,11 +214,8 @@ class SubmissionTrackingRepository:
         3. Returns True if a new solve was recorded, False if already solved
         4. Includes debugging information
         """
-        # Get problem difficulty for stats
-        difficulty = db.query(Problem.difficulty).filter(Problem.id == problem_id).first()
-        if difficulty and isinstance(difficulty, tuple):
-            difficulty = difficulty[0]
-        
+        # Get problem difficulty for stats - use scalar() to avoid Row object
+        difficulty = db.query(Problem.difficulty).filter(Problem.id == problem_id).scalar()
         # Use INSERT ... ON CONFLICT DO NOTHING for idempotency
         insert_stmt = (
             self._insert_builder(db, SolvedProblem)
@@ -298,20 +295,18 @@ class SubmissionTrackingRepository:
         return inserted
 
     def _seed_rating(self, db: Session, user_id: int) -> int:
-        latest_history = (
+        val = (
             db.query(RatingHistory.rating_after)
             .filter(RatingHistory.user_id == user_id)
             .order_by(RatingHistory.created_at.desc(), RatingHistory.id.desc())
-            .first()
+            .scalar()
         )
-        if latest_history is not None:
-            # SQLAlchemy first() returns a Row if using query(Model.attr), we need the first value
-            val = latest_history[0] if isinstance(latest_history, tuple) else latest_history
-            return int(val) if val is not None else 1200
+        if val is not None:
+            return int(val)
 
-        legacy_rating = db.query(UserRating.rating).filter(UserRating.user_id == user_id).first()
+        legacy_rating = db.query(UserRating.rating).filter(UserRating.user_id == user_id).scalar()
         if legacy_rating is not None:
-            return int(legacy_rating[0] if isinstance(legacy_rating, tuple) else legacy_rating)
+            return int(legacy_rating)
 
         return 1200
 
@@ -449,7 +444,7 @@ class SubmissionTrackingRepository:
             .limit(limit)
             .all()
         )
-        return [int(submission_id) for (submission_id,) in rows]
+        return [int(sid) for (sid,) in rows]
 
     def get_problem_stats(self, db: Session, problem_id: str) -> dict[str, Any]:
         solved_count = int(
