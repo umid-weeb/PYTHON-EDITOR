@@ -214,8 +214,9 @@ class SubmissionTrackingRepository:
         3. Returns True if a new solve was recorded, False if already solved
         4. Includes debugging information
         """
-        # Get problem difficulty for stats - use scalar() to avoid Row object
-        difficulty = db.query(Problem.difficulty).filter(Problem.id == problem_id).scalar()
+        # Get problem difficulty for stats - use first() to safely handle duplicates
+        row = db.query(Problem.difficulty).filter(Problem.id == problem_id).first()
+        difficulty = row[0] if row else None
         # Use INSERT ... ON CONFLICT DO NOTHING for idempotency
         insert_stmt = (
             self._insert_builder(db, SolvedProblem)
@@ -295,18 +296,19 @@ class SubmissionTrackingRepository:
         return inserted
 
     def _seed_rating(self, db: Session, user_id: int) -> int:
-        val = (
+        # Use first() instead of scalar() to be resilient to duplicates
+        row = (
             db.query(RatingHistory.rating_after)
             .filter(RatingHistory.user_id == user_id)
             .order_by(RatingHistory.created_at.desc(), RatingHistory.id.desc())
-            .scalar()
+            .first()
         )
-        if val is not None:
-            return int(val)
+        if row is not None:
+            return int(row[0])
 
-        legacy_rating = db.query(UserRating.rating).filter(UserRating.user_id == user_id).scalar()
-        if legacy_rating is not None:
-            return int(legacy_rating)
+        legacy_row = db.query(UserRating.rating).filter(UserRating.user_id == user_id).first()
+        if legacy_row is not None:
+            return int(legacy_row[0])
 
         return 1200
 

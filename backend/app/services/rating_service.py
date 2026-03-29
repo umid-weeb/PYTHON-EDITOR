@@ -27,12 +27,6 @@ def _difficulty_delta(difficulty: str | None) -> int:
 
 
 class RatingService:
-    """
-    Production note:
-    A real CF-style system is contest-based. For Arena's continuous practice,
-    this uses a conservative "first AC per problem gives delta" model.
-    """
-
     def get_or_create(self, db: Session, user_id: int) -> UserStats:
         row = db.query(UserStats).filter(UserStats.user_id == user_id).first()
         if row:
@@ -63,7 +57,9 @@ class RatingService:
         if exists:
             return
 
-        difficulty = db.query(Problem.difficulty).filter(Problem.id == problem_id).scalar()
+        # Use first() to safely handle potential duplicate problem IDs
+        prob_row = db.query(Problem.difficulty).filter(Problem.id == problem_id).first()
+        difficulty = prob_row[0] if prob_row else None
         delta = _difficulty_delta(difficulty)
 
         rating_row = self.get_or_create(db, user_id)
@@ -99,4 +95,3 @@ class RatingService:
 
 
 rating_service = RatingService()
-

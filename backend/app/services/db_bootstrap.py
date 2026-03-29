@@ -513,7 +513,22 @@ def run_startup_migrations(engine: Engine) -> None:
         logger.info("Skipping Supabase/PostgreSQL bootstrap migrations for dialect=%s", engine.dialect.name)
         return
 
-    with engine.begin() as connection:
-        for statement in POSTGRES_BOOTSTRAP_SQL:
-            connection.execute(text(statement))
-    logger.info("Supabase bootstrap migrations applied successfully.")
+    # Execute each statement in its own transaction so one failure doesn't block others
+    # and we don't crash the whole app on a timeout.
+    with engine.connect() as connection:
+        for i, statement in enumerate(POSTGRES_BOOTSTRAP_SQL):
+            stmt_trimmed = statement.strip()
+            if not stmt_trimmed:
+                continue
+            
+            try:
+                # Use a targeted transaction for this one statement
+                with connection.begin():
+                    connection.execute(text(statement))
+            except Exception as e:
+                # Log as warning - don't crash the app for bootstrap modifications
+                # Often these are 'already exists' or 'timeout' on heavy tables.
+                first_line = stmt_trimmed.split('\n')[0][:50]
+                logger.warning(f"Bootstrap migration [{i}] failed ({first_line}...): {e}")
+
+    logger.info("Supabase bootstrap migrations process completed (checked all steps).")
