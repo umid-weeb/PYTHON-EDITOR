@@ -19,5 +19,6 @@ coverage/
 .data/
 backend/.data/
 backend/.cache/
+backend/.tmp_tests/
 __pycache__/
 *.pyc

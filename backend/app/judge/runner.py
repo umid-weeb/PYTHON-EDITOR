@@ -514,11 +514,15 @@ class JudgeRunner:
             execution_result["passed"] = False
             return execution_result
 
+        # "actual" = raw Python value from harness (bool, int, list, …)
+        # "actual_output" = already-stringified display value (set by _invoke_runner)
         actual_value = execution_result.get("actual")
+        actual_output_str = execution_result.get("actual_output") or stringify_value(actual_value)
+
         passed = compare_expected_to_actual(testcase.get("expected_output", ""), actual_value)
         if passed:
             execution_result["passed"] = True
-            execution_result["actual_output"] = None if actual_value is None else stringify_value(actual_value)
+            execution_result["actual_output"] = actual_output_str
             return execution_result
 
         return {
@@ -526,7 +530,8 @@ class JudgeRunner:
             "passed": False,
             "runtime_ms": execution_result.get("runtime_ms", 0),
             "memory_kb": execution_result.get("memory_kb", 0),
-            "actual_output": None if actual_value is None else stringify_value(actual_value),
+            "actual_output": actual_output_str,
             "error": None,
         }
+
 
