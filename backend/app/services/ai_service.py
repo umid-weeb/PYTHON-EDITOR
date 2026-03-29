@@ -10,15 +10,15 @@ class AIService:
     def __init__(self):
         settings = get_settings()
         self.api_key = settings.ai_api_key
+        self.model_names = ['gemini-2.0-flash', 'gemini-1.5-flash']
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            # Use gemini-1.5-flash-latest for better compatibility with v1beta endpoints
-            self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            self.model = None
         else:
             self.model = None
 
     async def review_code(self, code: str, problem_title: str, language: str) -> Dict[str, Any]:
-        if not self.model:
+        if not self.api_key:
             return {
                 "overall_score": 0,
                 "time_complexity": {"detected": "N/A", "optimal": "N/A", "suggestion": "AI API Key not configured."},
@@ -45,27 +45,31 @@ class AIService:
         JSON ONLY. No markdown blocks.
         """
 
-        try:
-            response = self.model.generate_content(prompt)
-            text = response.text.strip()
-            # Clean up potential markdown blocks if AI ignored "JSON ONLY"
-            if text.startswith("```json"):
-                text = text.split("```json")[1].split("```")[0].strip()
-            elif text.startswith("```"):
-                text = text.split("```")[1].split("```")[0].strip()
-            
-            return json.loads(text)
-        except Exception as e:
-            logger.error(f"AI Review failed: {e}")
-            return {
-                "overall_score": 0,
-                "error": str(e),
-                "time_complexity": {"detected": "Error", "optimal": "N/A", "suggestion": "Failed to generate review."},
-                "space_complexity": {"detected": "Error", "suggestion": ""},
-                "edge_cases": [f"Technical error: {str(e)}"],
-                "code_style": [],
-                "alternative": ""
-            }
+        for model_name in self.model_names:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                text = response.text.strip()
+                # Clean up potential markdown blocks if AI ignored "JSON ONLY"
+                if text.startswith("```json"):
+                    text = text.split("```json")[1].split("```")[0].strip()
+                elif text.startswith("```"):
+                    text = text.split("```")[1].split("```")[0].strip()
+                
+                return json.loads(text)
+            except Exception as e:
+                logger.warning(f"AI Review failed with model {model_name}: {e}")
+                continue
+
+        return {
+            "overall_score": 0,
+            "error": "All models failed",
+            "time_complexity": {"detected": "Error", "optimal": "N/A", "suggestion": "Failed to generate review."},
+            "space_complexity": {"detected": "Error", "suggestion": ""},
+            "edge_cases": ["Technical error: All AI models failed."],
+            "code_style": [],
+            "alternative": ""
+        }
 
 ai_service = AIService()
 
