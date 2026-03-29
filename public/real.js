@@ -675,12 +675,20 @@ function showAutocompleteHints(cm) {
             const line = cur.line;
             const currentWord = token.string;
 
-            // Collect all hints
+            const currentWordLower = currentWord.toLowerCase();
             const list = [...new Set([
                 ...PYTHON_KEYWORDS,
                 ...MATH_FUNCTIONS,
                 ...(CodeMirror.hint.anyword(editor).list || [])
-            ])].filter(h => h.startsWith(currentWord)).sort();
+            ])].filter(h => h.toLowerCase().startsWith(currentWordLower))
+               .sort((a, b) => {
+                   // Prioritize exact case matches, then length
+                   const aStart = a.startsWith(currentWord);
+                   const bStart = b.startsWith(currentWord);
+                   if (aStart && !bStart) return -1;
+                   if (!aStart && bStart) return 1;
+                   return a.localeCompare(b);
+               });
 
             return {
                 list: list,
