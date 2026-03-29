@@ -39,6 +39,29 @@ export default function ResultPanel({ result, busy = false }) {
 
   const activeCase = details.find((d) => d.id === activeCaseId) || details[0];
 
+  // True idle: the initial state before the user has run anything.
+  // We detect this by tone=info AND the chip being a known idle label.
+  const IDLE_CHIPS = new Set(["Ma'lumot", "Tayyor", "Natija"]);
+  const isIdle =
+    !busy &&
+    !hasDetails &&
+    (result?.tone === "info" || !result?.tone) &&
+    (!result?.chip || IDLE_CHIPS.has(result.chip));
+
+  if (isIdle) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-8 text-center">
+        <div className="max-w-[300px] flex flex-col gap-2">
+            <div className="text-[15px] font-bold text-[var(--text-primary)]">Hozircha natija yo'q</div>
+            <div className="text-[13px] text-[var(--text-muted)]">
+                Natijani ko'rish uchun "Sinash" yoki "Yuborish" tugmasini bosing.
+            </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full-screen spinner: run started but no result yet
   if (busy && !hasDetails) {
     return (
       <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-8">
@@ -52,20 +75,8 @@ export default function ResultPanel({ result, busy = false }) {
     );
   }
 
-  if (!result || (!hasDetails && !busy)) {
-    return (
-      <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-8 text-center">
-        <div className="max-w-[300px] flex flex-col gap-2">
-            <div className="text-[15px] font-bold text-[var(--text-primary)]">Hozircha natija yo'q</div>
-            <div className="text-[13px] text-[var(--text-muted)]">
-                Natijani ko'rish uchun "Sinash" yoki "Yuborish" tugmasini bosing.
-            </div>
-        </div>
-      </div>
-    );
-  }
-
   const isAccepted = result.tone === "success" || String(result.status).toLowerCase().includes("accepted");
+
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-[var(--bg-surface)]">
@@ -94,14 +105,23 @@ export default function ResultPanel({ result, busy = false }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto px-6 py-4">
-        {/* Main Status / Summary */}
-        {!hasDetails && result.tone !== "success" && result.summary ? (
-             <div className="flex flex-col animate-in fade-in slide-in-from-top-1">
-                <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] whitespace-pre-wrap leading-relaxed shadow-inner">
-                    {result.summary}
-                </div>
-             </div>
-        ) : null}
+        {/* Spinner while running with existing partial result */}
+      {busy && <div className="flex shrink-0 items-center justify-center gap-2 border-b border-[color:var(--border)] px-6 py-2 text-[13px] text-[var(--text-muted)]"><Spinner /> Tekshirilmoqda...</div>}
+
+      {/* Non-detail result (backend error, network failure, etc) */}
+      {!hasDetails && !busy && result?.summary ? (
+        <div className="flex h-full items-center justify-center bg-[var(--bg-surface)] p-8">
+          <div className="max-w-[380px] flex flex-col gap-3 text-center">
+            <div className={`text-[20px] font-black tracking-tight ${result.tone === "success" ? "text-[var(--success)]" : result.tone === "warning" ? "text-[var(--warning,#f59e0b)]" : "text-[var(--error)]"}`}>
+              {result.chip}
+            </div>
+            <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] whitespace-pre-wrap leading-relaxed shadow-inner">
+              {result.summary}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
 
         {hasDetails && (
           <div className="flex flex-col gap-6">

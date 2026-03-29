@@ -35,6 +35,12 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Global flag – set to True once the catalog seed has finished.
+# Checked by the runner so it can return a friendly "please wait" error
+# instead of a confusing "testcase not found" when a user hits Run
+# before the background sync has completed.
+catalog_ready = threading.Event()
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -60,6 +66,9 @@ async def lifespan(_: FastAPI):
             logger.info("Background catalog sync completed.")
         except Exception as exc:  # pragma: no cover
             logger.warning("Background catalog sync failed: %s", exc)
+        finally:
+            # Always mark ready so the flag eventually unblocks even on error
+            catalog_ready.set()
 
     threading.Thread(target=_background_sync, daemon=True, name="catalog-sync").start()
 
@@ -136,4 +145,5 @@ async def root() -> dict[str, str]:
         "name": settings.app_name,
         "status": "ok",
         "api_prefix": settings.api_prefix,
+        "catalog_ready": catalog_ready.is_set(),
     }

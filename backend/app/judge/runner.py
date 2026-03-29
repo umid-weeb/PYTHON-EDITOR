@@ -152,15 +152,29 @@ class JudgeRunner:
         selected = visible[:4] if mode == "run" else visible + hidden
 
         if not selected:
+            # Try to give a meaningful error: if the catalog sync hasn't
+            # finished yet, tell the user to wait a moment.
+            try:
+                from app.main import catalog_ready  # noqa: PLC0415
+                warming_up = not catalog_ready.is_set()
+            except Exception:
+                warming_up = False
+
+            error_msg = (
+                "Server hali ishga tushmoqda, bir daqiqa kuting va qayta urining."
+                if warming_up
+                else "Bu masala uchun test topilmadi. Iltimos, sahifani yangilab ko'ring."
+            )
             return {
                 "verdict": "Runtime Error",
                 "runtime_ms": 0,
                 "memory_kb": 0,
                 "passed_count": 0,
                 "total_count": 0,
-                "error_text": "Masala uchun testcase topilmadi.",
+                "error_text": error_msg,
                 "case_results": [],
             }
+
 
         case_results: list[dict[str, Any]] = []
         verdict = "Accepted"

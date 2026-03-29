@@ -39,12 +39,19 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
     return (result as any)?.submissionId || (result as any)?.id || null;
   }, [result]);
 
-  // Auto-switch to result tab when busy or when results arrive
+  // Auto-switch to result tab as soon as run/submit starts
   useEffect(() => {
-    if (busy || (result && result.details && result.details.length > 0)) {
-        setActive("result");
+    if (busy) {
+      setActive("result");
     }
-  }, [busy, result]);
+  }, [busy]);
+
+  // Also switch when results actually arrive
+  useEffect(() => {
+    if (result && result.details && result.details.length > 0) {
+      setActive("result");
+    }
+  }, [result]);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col border-t border-[color:var(--border)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
