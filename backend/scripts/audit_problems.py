@@ -1,25 +1,62 @@
+import sys
 import os
-import sqlalchemy
-from sqlalchemy import create_engine, text
+from datetime import datetime, timezone
 
-# Supabase URL from .env
-DB_URL = "postgresql://postgres.fnqqvmpoovczxavkqyem:ibroximjon1105@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
+# Add backend to path for imports
+sys.path.append(os.path.join(os.getcwd(), 'backend'))
 
-def main():
-    engine = create_engine(DB_URL)
-    with engine.connect() as conn:
-        print("Checking problems...")
-        # Check for problems with missing function_name or starter_code
-        result = conn.execute(text("SELECT id, title, slug, function_name FROM problems")).fetchall()
+try:
+    from app.database import SessionLocal
+    from app.models.problem import Problem, TestCase
+    from sqlalchemy import func
+except ImportError as e:
+    print(f"[X] Import error: {e}")
+    sys.exit(1)
+
+def audit_problems():
+    print("--- PyZone Arena: 120+ Problem Bank Audit ---")
+    db = SessionLocal()
+    try:
+        # 1. Count Total Problems
+        total = db.query(Problem).count()
+        print(f"[*] Total Problems in DB: {total}")
+
+        # 2. Check for Duplicate Slugs
+        slug_counts = db.query(Problem.slug, func.count(Problem.id)).group_by(Problem.slug).having(func.count(Problem.id) > 1).all()
+        if slug_counts:
+            print(f"[!] WARNING: Found {len(slug_counts)} duplicate slugs:")
+            for slug, count in slug_counts:
+                print(f"    - '{slug}': {count} entries")
+        else:
+            print("[✓] No duplicate slugs found.")
+
+        # 3. Check for Problems without Test Cases
+        probs = db.query(Problem).all()
+        no_tests = []
+        for p in probs:
+            tc_count = db.query(TestCase).filter(TestCase.problem_id == p.id).count()
+            if tc_count == 0:
+                no_tests.append(f"{p.slug} (ID: {p.id})")
         
-        for row in result:
-            pid, title, slug, func_name = row
-            if not func_name:
-                print(f"Fixing function_name for problem: {title}")
-                conn.execute(text("UPDATE problems SET function_name = 'solve' WHERE id = :id"), {"id": pid})
-            
-        conn.commit()
-    print("Audit complete.")
+        if no_tests:
+            print(f"[!] WARNING: {len(no_tests)} problems have ZERO test cases:")
+            for info in no_tests[:10]: # Limit output
+                print(f"    - {info}")
+            if len(no_tests) > 10:
+                print(f"    ... and {len(no_tests)-10} more")
+        else:
+            print("[✓] All problems have at least one test case.")
+
+        print("\n--- Summary ---")
+        if slug_counts or no_tests:
+            print("[!] Please address the warnings above to ensure all problems work reliably.")
+        else:
+            print("[✓] Your 120+ problem bank appears to be healthy!")
+
+    except Exception as e:
+        print(f"[X] Audit failed: {e}")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
-    main()
+    audit_problems()

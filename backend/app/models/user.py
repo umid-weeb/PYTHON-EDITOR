@@ -42,10 +42,39 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    stats = relationship(
+    
+    # Stats relationship - change uselist to True to prevent MultipleResultsFound crash if DB has duplicates
+    stats_list = relationship(
         "UserStats",
         back_populates="user",
-        uselist=False,
+        viewonly=True,
+    )
+    
+    @property
+    def stats(self):
+        """Resiliently return the first stats record if multiple exist."""
+        if not self.stats_list:
+            return None
+        return self.stats_list[0]
+
+    # Rating relationship - change uselist to True to prevent MultipleResultsFound crash
+    rating_rows = relationship(
+        "UserRating",
+        back_populates="user",
+        viewonly=True,
+    )
+    
+    @property
+    def rating_row(self):
+        """Resiliently return the first rating record if multiple exist."""
+        if not self.rating_rows:
+            return None
+        return self.rating_rows[0]
+
+    # Explicitly map the rating history list
+    rating_history_list = relationship(
+        "RatingHistory",
+        back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )

@@ -14,7 +14,8 @@ class UserRating(Base):
     max_rating = Column(Integer, nullable=False, default=1200)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    user = relationship("User", backref="rating_row")
+    # Rating relationship - avoid backref to prevent MultipleResultsFound crash
+    user = relationship("User", back_populates="rating_rows")
 
 
 class RatingHistory(Base):
@@ -28,7 +29,8 @@ class RatingHistory(Base):
     submission_id = Column(String(64), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    user = relationship("User", backref="rating_history")
+    # Use back_populates for explicit relationship mapping
+    user = relationship("User", back_populates="rating_history_list")
 
     __table_args__ = (
         UniqueConstraint("user_id", "submission_id", name="uq_rating_history_user_submission"),

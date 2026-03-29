@@ -72,5 +72,5 @@ class UserStats(Base):
         Index("idx_user_stats_user_id", "user_id"),
     )
 
-    # Relationship
-    user = relationship("User", back_populates="stats")
+    # Relationship - point to the list relationship in the User model
+    user = relationship("User", back_populates="stats_list")
