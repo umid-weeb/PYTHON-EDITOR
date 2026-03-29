@@ -124,7 +124,7 @@ app.add_middleware(
 
 app.include_router(problem_router, prefix=settings.api_prefix)
 app.include_router(submission_router, prefix=settings.api_prefix)
-app.include_router(ai_router, prefix=settings.api_prefix)
+app.include_router(ai_router, prefix=f"{settings.api_prefix}/ai")
 app.include_router(contest_router, prefix=settings.api_prefix)
 app.include_router(contest_ws_router)
 app.include_router(engagement_router, prefix=settings.api_prefix)
