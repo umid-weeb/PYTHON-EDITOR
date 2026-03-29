@@ -15,6 +15,7 @@ from app.judge.judge0_client import Judge0Client, get_judge0_settings
 
 
 HARNESS_CODE = """\
+import ast
 import contextlib
 import importlib.util
 import io
@@ -25,15 +26,65 @@ import time
 import traceback
 import tracemalloc
 
+# Constants for security and stability
+# Max 1 million loop iterations or 2 seconds total per test case
+MAX_TICKS = 1_000_000
+MAX_TIME_SECONDS = 2.0
+
 # Ensure UTF-8 output even on Windows
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+# --- Security & Instrumentation ---
+class LoopTimeoutError(Exception):
+    pass
+
+class ArenaSecurity:
+    def __init__(self, time_limit=MAX_TIME_SECONDS, tick_limit=MAX_TICKS):
+        self.start_time = time.perf_counter()
+        self.ticks = 0
+        self.time_limit = time_limit
+        self.tick_limit = tick_limit
+
+    def tick(self):
+        self.ticks += 1
+        if self.ticks % 1000 == 0:  # Check time every 1000 iterations to reduce overhead
+            if (time.perf_counter() - self.start_time) > self.time_limit:
+                raise LoopTimeoutError(f"Time Limit Exceeded: {self.time_limit}s")
+        
+        if self.ticks > self.tick_limit:
+            raise LoopTimeoutError("Infinite Loop Detected: Max iterations exceeded")
+
+class LoopInstrumenter(ast.NodeTransformer):
+    """Parses AST and injects __arena_security__.tick() into every loop."""
+    def visit_While(self, node):
+        self.generic_visit(node)
+        tick_call = ast.Expr(ast.Call(
+            func=ast.Name(id='__arena_tick__', ctx=ast.Load()),
+            args=[], keywords=[]
+        ))
+        node.body.insert(0, tick_call)
+        return node
+
+    def visit_For(self, node):
+        self.generic_visit(node)
+        tick_call = ast.Expr(ast.Call(
+            func=ast.Name(id='__arena_tick__', ctx=ast.Load()),
+            args=[], keywords=[]
+        ))
+        node.body.insert(0, tick_call)
+        return node
+
+security_monitor = ArenaSecurity()
+
 def format_user_error(exc):
+    if isinstance(exc, LoopTimeoutError):
+        return str(exc)
+        
     tb = traceback.extract_tb(exc.__traceback__)
     clean_tb = []
     for f in tb:
-        if "submission.py" in f.filename:
+        if "solution.py" in f.filename or "submission.py" in f.filename:
             # Hide the absolute temp path, show only 'solution.py'
             clean_f = traceback.FrameSummary("solution.py", f.lineno, f.name, line=f.line)
             clean_tb.append(clean_f)
@@ -48,16 +99,44 @@ workspace = pathlib.Path(__file__).resolve().parent
 payload = json.loads((workspace / "payload.json").read_text(encoding="utf-8"))
 submission_path = workspace / "submission.py"
 
-spec = importlib.util.spec_from_file_location("submission", submission_path)
-module = importlib.util.module_from_spec(spec)
-
+# --- Instrumentation & Execution ---
 try:
-    spec.loader.exec_module(module)
+    source = submission_path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename="solution.py")
+    
+    # Rewrite loops
+    transformer = LoopInstrumenter()
+    transformed_tree = transformer.visit(tree)
+    ast.fix_missing_locations(transformed_tree)
+    
+    # Compile
+    code_obj = compile(transformed_tree, filename="solution.py", mode="exec")
+    
+    # Create module
+    spec = importlib.util.spec_from_file_location("submission", submission_path)
+    module = importlib.util.module_from_spec(spec)
+    
+    # Inject security tick into module's global namespace
+    module.__dict__['__arena_tick__'] = security_monitor.tick
+    
+    # Execute the instrumented code in module's dict
+    exec(code_obj, module.__dict__)
+    
 except SyntaxError as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Compilation Error",
         "error": format_user_error(exc),
+        "runtime_ms": 0,
+        "memory_kb": 0
+    }, ensure_ascii=False))
+    print("<<<JSON_END>>>")
+    raise SystemExit(0)
+except LoopTimeoutError as exc:
+    print("<<<JSON_START>>>")
+    print(json.dumps({
+        "verdict": "Time Limit Exceeded",
+        "error": str(exc),
         "runtime_ms": 0,
         "memory_kb": 0
     }, ensure_ascii=False))
@@ -107,6 +186,17 @@ try:
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False, default=repr))
+    print("<<<JSON_END>>>")
+except LoopTimeoutError as exc:
+    runtime_ms = int((time.perf_counter() - started) * 1000)
+    current, peak = tracemalloc.get_traced_memory()
+    print("<<<JSON_START>>>")
+    print(json.dumps({
+        "verdict": "Time Limit Exceeded",
+        "error": str(exc),
+        "runtime_ms": runtime_ms,
+        "memory_kb": int(peak / 1024)
+    }, ensure_ascii=False))
     print("<<<JSON_END>>>")
 except MemoryError as exc:
     runtime_ms = int((time.perf_counter() - started) * 1000)
