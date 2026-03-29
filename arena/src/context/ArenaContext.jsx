@@ -36,8 +36,6 @@ export function ArenaProvider({ children }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [activeCaseIndex, setActiveCaseIndex] = useState(0);
-  const [runCooldown, setRunCooldown] = useState(0);
-  const [submitCooldown, setSubmitCooldown] = useState(0);
   const cacheRef = useRef(new Map());
 
   const { token } = useAuth();
@@ -47,14 +45,6 @@ export function ArenaProvider({ children }) {
       setShowAuthModal(false);
     }
   }, [token]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setRunCooldown((c) => (c > 0 ? c - 1 : 0));
-      setSubmitCooldown((c) => (c > 0 ? c - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
 
   const getSubmissionProblemKey = useCallback(
@@ -85,10 +75,6 @@ export function ArenaProvider({ children }) {
     if (!problemId) return null;
     setSelectedProblemId(problemId);
     writeLastProblem(problemId);
-
-    // Reset cooldowns when switching problems so the user can immediately test
-    setRunCooldown(0);
-    setSubmitCooldown(0);
 
     if (cacheRef.current.has(problemId)) {
       const cached = cacheRef.current.get(problemId);
@@ -158,19 +144,11 @@ export function ArenaProvider({ children }) {
       return null;
     }
 
-    if (runCooldown > 0) {
-      setResult({
-        tone: "warning",
-        chip: "Kutib turing",
-        summary: `Iltimos, qayta sinash uchun ${runCooldown} soniya kuting.`,
-        details: [],
-      });
-      return null;
-    }
+    // Agar hali ishlayotgan bo'lsa, qayta bosmaslik
+    if (isRunning) return null;
 
     persistDraft();
     setIsRunning(true);
-    setRunCooldown(10);
     setResult({
       tone: "info",
       chip: "Ishlayapti",
@@ -198,7 +176,7 @@ export function ArenaProvider({ children }) {
     } finally {
       setIsRunning(false);
     }
-  }, [code, getSubmissionProblemKey, language, persistDraft, runCooldown]);
+  }, [code, getSubmissionProblemKey, isRunning, language, persistDraft]);
 
   const submitCode = useCallback(
     async (token) => {
@@ -214,15 +192,8 @@ export function ArenaProvider({ children }) {
         return null;
       }
 
-      if (submitCooldown > 0) {
-        setResult({
-          tone: "warning",
-          chip: "Kutib turing",
-          summary: `Iltimos, qayta yuborish uchun ${submitCooldown} soniya kuting.`,
-          details: [],
-        });
-        return null;
-      }
+      // Agar hali yuborilayotgan bo'lsa, qayta bosmaslik
+      if (isSubmitting) return null;
 
       if (!token) {
         setPendingSubmission(submissionProblemKey);
@@ -232,7 +203,6 @@ export function ArenaProvider({ children }) {
 
       persistDraft();
       setIsSubmitting(true);
-      setSubmitCooldown(15);
       setResult({
         tone: "info",
         chip: "Yuborilmoqda",
@@ -300,7 +270,7 @@ export function ArenaProvider({ children }) {
         setIsSubmitting(false);
       }
     },
-    [code, getSubmissionProblemKey, language, persistDraft]
+    [code, getSubmissionProblemKey, isSubmitting, language, persistDraft]
   );
 
   const filteredProblems = useMemo(
@@ -360,8 +330,8 @@ export function ArenaProvider({ children }) {
       selectProblem,
       runCode,
       submitCode,
-      runCooldown,
-      submitCooldown,
+      runCooldown: 0,
+      submitCooldown: 0,
       persistDraft,
       dismissAuthModal: () => setShowAuthModal(false),
       openAuthModal: () => setShowAuthModal(true),
@@ -375,12 +345,7 @@ export function ArenaProvider({ children }) {
       isRunning,
       isSubmitting,
       clearPendingSubmission,
-      code,
-      difficulty,
-      filteredProblems,
       getSubmissionProblemKey,
-      isRunning,
-      isSubmitting,
       language,
       loadProblems,
       persistDraft,
@@ -389,7 +354,6 @@ export function ArenaProvider({ children }) {
       problemsStatus,
       result,
       runCode,
-      runCooldown,
       search,
       selectProblem,
       selectedProblem?.id,
@@ -400,7 +364,6 @@ export function ArenaProvider({ children }) {
       setSearch,
       showAuthModal,
       submitCode,
-      submitCooldown,
     ]
   );
 
