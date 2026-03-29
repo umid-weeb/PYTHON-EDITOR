@@ -262,11 +262,12 @@ class LoopTransformer(ast.NodeTransformer):
 
 def _tick():
     if time.time() - _executor.start_time > _executor.timeout:
-        raise LoopIterationError("Vaqt chegarasi tugadi (2s). Cheksiz sikl bo'lishi mumkin.")
+        raise LoopIterationError("Vaqt chegarasi tugadi (1s). Cheksiz sikl bo'lishi mumkin.")
 
 class SafeExecutor:
-    def __init__(self, timeout=2.0):
+    def __init__(self, timeout=1.0, max_output=50000):
         self.timeout = timeout
+        self.max_output = max_output
         self.start_time = None
 
     def _serialize_error(self, error):
@@ -296,13 +297,23 @@ class SafeExecutor:
             if consumed >= len(inputs): raise AwaitingInput(str(prompt), consumed)
             val = inputs[consumed]; consumed += 1; return val
 
+        # Custom output handler with truncation to prevent browser freeze
+        def m_write(data):
+            if sys.stdout.tell() < self.max_output:
+                old_write(data)
+            elif sys.stdout.tell() == self.max_output:
+                old_write("\\n... [Natija juda ko'p bo'lganligi sababli qirqildi] ...")
+        
+        old_write = sys.stdout.write
+        sys.stdout.write = m_write
+
         try:
             tree = ast.parse(code, filename="<user_code>")
             LoopTransformer().visit(tree)
             ast.fix_missing_locations(tree)
             compiled = compile(tree, filename="<user_code>", mode="exec")
             
-            self.start_time = time.time()
+            self.start_time = time.time() # Corrected time.now to time.time
             glbs = {"__builtins__": dict(vars(builtins), input=m_input), "__name__": "__main__", "_tick": _tick}
             exec(compiled, glbs)
             return {"success": True, "output": sys.stdout.getvalue().rstrip()}
@@ -311,9 +322,10 @@ class SafeExecutor:
         except BaseException as e:
             return {"success": False, "error": self._serialize_error(e), "output": sys.stdout.getvalue().rstrip()}
         finally:
+            sys.stdout.write = old_write # Restore original write
             sys.stdout, sys.stderr = old_stdout, old_stderr
 
-_executor = SafeExecutor(timeout=2.0)
+_executor = SafeExecutor(timeout=1.0)
 def safe_run(code, inputs=None): return _executor.execute(code, inputs)
 
 def auto_fix_code(code):
@@ -425,6 +437,7 @@ function setupEditor() {
         }
     });
 
+    editor.on("inputRead", onEditorInputRead);
     editor.on("cursorActivity", updateEditorStatus);
     editor.on("change", () => {
         updateEditorStatus();
@@ -611,6 +624,48 @@ function clearDebugState() {
     activeDebugSession = null;
     activeDebugSteps = [];
     activeDebugStepIndex = 0;
+}
+
+// --- AUTOCOMPLETE ---
+
+function onEditorInputRead(cm, change) {
+    if (change.origin !== "+input") return;
+    const cur = cm.getCursor();
+    const token = cm.getTokenAt(cur);
+    const char = change.text[0];
+
+    // Neuvor: symbols or very short input shouldn't trigger
+    if (!/^[a-zA-Z_0-9]$/.test(char) && char !== ".") return;
+    if (token.string.length < 2 && char !== ".") return;
+
+    showAutocompleteHints(cm);
+}
+
+function showAutocompleteHints(cm) {
+    cm.showHint({
+        hint: function(editor) {
+            const cur = editor.getCursor();
+            const token = editor.getTokenAt(cur);
+            const start = token.start;
+            const end = cur.ch;
+            const line = cur.line;
+            const currentWord = token.string;
+
+            // Collect all hints
+            const list = [...new Set([
+                ...PYTHON_KEYWORDS,
+                ...MATH_FUNCTIONS,
+                ...(CodeMirror.hint.anyword(editor).list || [])
+            ])].filter(h => h.startsWith(currentWord)).sort();
+
+            return {
+                list: list,
+                from: CodeMirror.Pos(line, start),
+                to: CodeMirror.Pos(line, end)
+            };
+        },
+        completeSingle: false
+    });
 }
 
 // --- INITIALIZE ---
