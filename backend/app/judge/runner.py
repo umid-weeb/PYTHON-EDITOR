@@ -56,7 +56,7 @@ class ArenaSecurity:
             raise LoopTimeoutError("Infinite Loop Detected: Max iterations exceeded")
 
 class LoopInstrumenter(ast.NodeTransformer):
-    """Parses AST and injects __arena_security__.tick() into every loop."""
+    '''Parses AST and injects __arena_tick__() into every loop.'''
     def visit_While(self, node):
         self.generic_visit(node)
         tick_call = ast.Expr(ast.Call(
