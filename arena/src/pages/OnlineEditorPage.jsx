@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "../providers/ThemeProvider.tsx";
+import TimeoutWarningModal from "../components/common/TimeoutWarningModal.tsx";
 
 const DEFAULT_CODE = `# Onlayn Python muharriri
 # Bu yerda kod yozishingiz va natijani ko'rishingiz mumkin
@@ -11,46 +12,6 @@ for i in range(5):
     print(f"Qadam: {i}")
 `;
 
-const PYTHON_HARNESS = `
-import sys
-import time
-import traceback
-import builtins
-from io import StringIO
-
-class LoopIterationError(Exception): pass
-
-def _tick():
-    if time.time() - _start_time > 2.0:
-        raise LoopIterationError("Vaqt chegarasi tugadi (2s). Cheksiz sikl bo'lishi mumkin.")
-
-_start_time = time.time()
-
-def safe_run(code):
-    global _start_time
-    _start_time = time.time()
-    
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    sys.stdout = sys.stderr = StringIO()
-    
-    try:
-        # In a real environmental, we would use AST to inject _tick() 
-        # but for this browser version we'll keep it simpler for now
-        glbs = {"__builtins__": builtins, "__name__": "__main__"}
-        exec(code, glbs)
-        return {"success": True, "output": sys.stdout.getvalue()}
-    except Exception as e:
-        return {
-            "success": False, 
-            "output": sys.stdout.getvalue(),
-            "error": traceback.format_exc()
-        }
-    finally:
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-`;
-
 export default function OnlineEditorPage() {
   const { theme } = useTheme();
   const [code, setCode] = useState(() => {
@@ -59,66 +20,77 @@ export default function OnlineEditorPage() {
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
-  const pyodideRef = useRef(null);
+  const [isTimeoutModalOpen, setIsTimeoutModalOpen] = useState(false);
+  
+  const workerRef = useRef(null);
+  const timeoutRef = useRef(null);
+
+  const initWorker = useCallback(() => {
+    if (workerRef.current) {
+      workerRef.current.terminate();
+    }
+    
+    // Create worker using Vite's worker import syntax
+    const worker = new Worker(new URL('../lib/pyodide.worker.js', import.meta.url));
+    
+    worker.onmessage = (e) => {
+      const { type, stdout, stderr, error } = e.data;
+      
+      if (type === "initialized") {
+        setIsLoading(false);
+      } else if (type === "success") {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setOutput(stdout || "Dastur muvaffaqiyatli yakunlandi.");
+        setIsRunning(false);
+      } else if (type === "error") {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setOutput(error);
+        setIsRunning(false);
+      } else if (type === "init_error") {
+        setIsLoading(false);
+        setOutput("Xatolik: Python muhitini yuklab bo'lmadi: " + error);
+      }
+    };
+
+    workerRef.current = worker;
+    worker.postMessage({ type: "init" });
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      if (!window.loadPyodide) {
-        setOutput("Xatolik: Pyodide scripti topilmadi. Sahifani yangilang.");
-        return;
-      }
-
-      try {
-        const py = await window.loadPyodide({
-          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/",
-        });
-        if (!mounted) return;
-        
-        await py.runPythonAsync(PYTHON_HARNESS);
-        pyodideRef.current = py;
-        setIsLoading(false);
-      } catch (err) {
-        if (mounted) {
-          setOutput("Xatolik: Python muhitini yuklab bo'lmadi: " + err.message);
-          setIsLoading(false);
-        }
-      }
-    }
-
-    init();
-    return () => { mounted = false; };
-  }, []);
+    initWorker();
+    return () => {
+      if (workerRef.current) workerRef.current.terminate();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [initWorker]);
 
   useEffect(() => {
     localStorage.setItem("pyzone-online-editor-code", code);
   }, [code]);
 
-  async function handleRun() {
-    if (!pyodideRef.current || isRunning) return;
+  const handleRun = (isExtended = false) => {
+    if (!workerRef.current || isRunning) return;
 
     setIsRunning(true);
+    setIsTimeoutModalOpen(false);
     setOutput("Ishga tushirilmoqda...\n");
 
-    try {
-      const wrappedCode = JSON.stringify(code);
-      const resultJson = await pyodideRef.current.runPythonAsync(
-        `import json; json.dumps(safe_run(${wrappedCode}))`
-      );
-      const result = JSON.parse(resultJson);
+    const timeLimit = isExtended ? 5000 : 2000;
 
-      if (result.success) {
-        setOutput(result.output || "Dastur muvaffaqiyatli yakunlandi (chiqish oqimi bo'sh).");
-      } else {
-        setOutput((result.output ? result.output + "\n" : "") + result.error);
+    // Send execution request to worker
+    workerRef.current.postMessage({ type: "run", code });
+
+    // Set timeout in main thread
+    timeoutRef.current = setTimeout(() => {
+      if (isRunning) {
+        setIsRunning(false);
+        setIsTimeoutModalOpen(true);
+        
+        // Terminate and restart worker to clear the hang
+        initWorker();
       }
-    } catch (err) {
-      setOutput("Bajarishda xatolik: " + err.message);
-    } finally {
-      setIsRunning(false);
-    }
-  }
+    }, timeLimit);
+  };
 
   function handleClear() {
     setOutput("");
@@ -140,11 +112,11 @@ export default function OnlineEditorPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleRun}
+            onClick={() => handleRun(false)}
             disabled={isLoading || isRunning}
             className="inline-flex h-[var(--h-btn-md)] items-center rounded-[var(--radius-xs)] bg-[var(--success)] px-4 text-[12px] font-bold text-white transition hover:brightness-110 disabled:opacity-50"
           >
-            {isRunning ? "Ishlayapti..." : "Ishga tushirish"}
+            {isRunning ? "Bajarilmoqda..." : "Ishga tushirish"}
           </button>
           <button
             onClick={handleClear}
@@ -190,6 +162,12 @@ export default function OnlineEditorPage() {
           </div>
         </div>
       </div>
+
+      <TimeoutWarningModal
+        isOpen={isTimeoutModalOpen}
+        onClose={() => setIsTimeoutModalOpen(false)}
+        onContinue={() => handleRun(true)}
+      />
     </div>
   );
 }
