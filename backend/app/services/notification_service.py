@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 import smtplib
 import ssl
@@ -18,6 +19,25 @@ class NotificationService:
 
     def __init__(self):
         self.eskiz_token: Optional[str] = None
+
+    @staticmethod
+    def _has_gmail_api_credentials() -> bool:
+        return bool(
+            settings.gmail_client_id
+            and settings.gmail_client_secret
+            and settings.gmail_refresh_token
+            and (settings.gmail_sender or settings.smtp_from or settings.smtp_user)
+        )
+
+    @staticmethod
+    def _build_email_message(recipient: str, subject: str, body: str, *, is_html: bool = False) -> MIMEMultipart:
+        from_address = settings.gmail_sender or settings.smtp_from or settings.smtp_user
+        msg = MIMEMultipart()
+        msg["From"] = from_address
+        msg["To"] = recipient
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "html" if is_html else "plain", "utf-8"))
+        return msg
 
     async def _get_eskiz_token(self) -> Optional[str]:
         """Authenticate with Eskiz.uz API and return token."""
@@ -70,11 +90,71 @@ class NotificationService:
         configured_provider = (settings.email_provider or "auto").strip().lower()
         if configured_provider and configured_provider != "auto":
             return configured_provider
+        if self._has_gmail_api_credentials():
+            return "gmail_api"
         if settings.resend_api_key:
             return "resend"
         if settings.smtp_host and settings.smtp_user and settings.smtp_password:
             return "smtp"
         return "none"
+
+    def _send_email_via_gmail_api(self, recipient: str, subject: str, body: str, is_html: bool = False) -> bool:
+        """Send email via Gmail API using OAuth refresh token over HTTPS."""
+        if not self._has_gmail_api_credentials():
+            logger.warning("Gmail API email not sent: OAuth credentials are missing")
+            return False
+
+        sender = settings.gmail_sender or settings.smtp_from or settings.smtp_user
+        if not sender:
+            logger.warning("Gmail API email not sent: sender address is missing")
+            return False
+
+        message = self._build_email_message(recipient, subject, body, is_html=is_html)
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+
+        try:
+            with httpx.Client(timeout=settings.email_timeout_seconds) as client:
+                token_response = client.post(
+                    settings.gmail_token_url,
+                    data={
+                        "client_id": settings.gmail_client_id,
+                        "client_secret": settings.gmail_client_secret,
+                        "refresh_token": settings.gmail_refresh_token,
+                        "grant_type": "refresh_token",
+                    },
+                )
+                if token_response.status_code != 200:
+                    logger.error(
+                        "Gmail API token exchange failed with status %s: %s",
+                        token_response.status_code,
+                        token_response.text[:500],
+                    )
+                    return False
+
+                access_token = token_response.json().get("access_token")
+                if not access_token:
+                    logger.error("Gmail API token exchange did not return an access token")
+                    return False
+
+                response = client.post(
+                    f"{settings.gmail_api_base_url.rstrip('/')}/gmail/v1/users/me/messages/send",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"raw": raw_message},
+                )
+
+            if response.status_code in {200, 202}:
+                return True
+            logger.error(
+                "Gmail API email sending failed with status %s: %s",
+                response.status_code,
+                response.text[:500],
+            )
+        except Exception as exc:
+            logger.error("Gmail API email sending failed: %s", exc)
+        return False
 
     def _send_email_via_resend(self, recipient: str, subject: str, body: str, is_html: bool = False) -> bool:
         """Send Email via Resend HTTP API over port 443."""
@@ -127,11 +207,7 @@ class NotificationService:
             return False
 
         try:
-            msg = MIMEMultipart()
-            msg["From"] = settings.smtp_from or settings.smtp_user
-            msg["To"] = recipient
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "html" if is_html else "plain"))
+            msg = self._build_email_message(recipient, subject, body, is_html=is_html)
 
             if settings.smtp_port == 465:
                 server_class = smtplib.SMTP_SSL
@@ -162,6 +238,8 @@ class NotificationService:
             return False
 
         provider = self.get_email_provider()
+        if provider == "gmail_api":
+            return self._send_email_via_gmail_api(recipient, subject, body, is_html=is_html)
         if provider == "resend":
             return self._send_email_via_resend(recipient, subject, body, is_html=is_html)
         if provider == "smtp":

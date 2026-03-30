@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import sys
 from types import SimpleNamespace
 
@@ -28,6 +29,12 @@ def _build_settings(**overrides):
         "auto_notify_enabled": True,
         "email_provider": "auto",
         "email_timeout_seconds": 12.5,
+        "gmail_client_id": "",
+        "gmail_client_secret": "",
+        "gmail_refresh_token": "",
+        "gmail_sender": "",
+        "gmail_token_url": "https://oauth2.googleapis.com/token",
+        "gmail_api_base_url": "https://gmail.googleapis.com",
         "resend_api_key": "re_test_123",
         "resend_api_base_url": "https://api.resend.com",
         "smtp_host": "smtp.gmail.com",
@@ -46,6 +53,9 @@ class _DummyResponse:
     def __init__(self, status_code: int, text: str = "ok") -> None:
         self.status_code = status_code
         self.text = text
+
+    def json(self):
+        return json.loads(self.text)
 
 
 def _make_engine():
@@ -123,6 +133,53 @@ def test_send_email_falls_back_to_smtp_when_resend_missing(monkeypatch) -> None:
 
     assert sent is True
     assert called["smtp"] is True
+
+
+def test_send_email_uses_gmail_api_when_oauth_is_configured(monkeypatch) -> None:
+    service = NotificationService()
+    calls: list[tuple[str, dict[str, object] | None, dict[str, object] | None]] = []
+
+    class DummyClient:
+        def __init__(self, timeout: float) -> None:
+            assert timeout == 12.5
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        def post(self, url: str, headers=None, json=None, data=None):
+            calls.append((url, headers, json or data))
+            if url == "https://oauth2.googleapis.com/token":
+                return _DummyResponse(200, '{"access_token":"ya29.test"}')
+            return _DummyResponse(200, "accepted")
+
+    monkeypatch.setattr(
+        notification_service_module,
+        "settings",
+        _build_settings(
+            email_provider="auto",
+            gmail_client_id="client-id",
+            gmail_client_secret="client-secret",
+            gmail_refresh_token="refresh-token",
+            gmail_sender="pyzonegroup@gmail.com",
+            resend_api_key="",
+        ),
+    )
+    monkeypatch.setattr(notification_service_module.httpx, "Client", DummyClient)
+
+    sent = service.send_email(
+        "solver@example.com",
+        "PyZone reset code",
+        "<b>1234</b>",
+        is_html=True,
+    )
+
+    assert sent is True
+    assert calls[0][0] == "https://oauth2.googleapis.com/token"
+    assert calls[1][0] == "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+    assert calls[1][1]["Authorization"] == "Bearer ya29.test"
 
 
 def test_request_password_reset_cleans_up_code_when_email_send_fails(monkeypatch) -> None:

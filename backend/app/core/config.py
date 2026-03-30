@@ -56,6 +56,12 @@ class Settings:
     smtp_from: str
     email_provider: str
     email_timeout_seconds: float
+    gmail_client_id: str
+    gmail_client_secret: str
+    gmail_refresh_token: str
+    gmail_sender: str
+    gmail_token_url: str
+    gmail_api_base_url: str
     resend_api_key: str
     resend_api_base_url: str
     eskiz_email: str
@@ -147,6 +153,12 @@ def get_settings() -> Settings:
         smtp_from=os.getenv("ARENA_SMTP_FROM", "noreply@pyzone.uz"),
         email_provider=os.getenv("ARENA_EMAIL_PROVIDER", "auto").strip().lower(),
         email_timeout_seconds=float(os.getenv("ARENA_EMAIL_TIMEOUT_SECONDS", "15")),
+        gmail_client_id=os.getenv("ARENA_GMAIL_CLIENT_ID", ""),
+        gmail_client_secret=os.getenv("ARENA_GMAIL_CLIENT_SECRET", ""),
+        gmail_refresh_token=os.getenv("ARENA_GMAIL_REFRESH_TOKEN", ""),
+        gmail_sender=os.getenv("ARENA_GMAIL_SENDER", ""),
+        gmail_token_url=os.getenv("ARENA_GMAIL_TOKEN_URL", "https://oauth2.googleapis.com/token"),
+        gmail_api_base_url=os.getenv("ARENA_GMAIL_API_BASE_URL", "https://gmail.googleapis.com"),
         resend_api_key=os.getenv("ARENA_RESEND_API_KEY", ""),
         resend_api_base_url=os.getenv("ARENA_RESEND_API_BASE_URL", "https://api.resend.com"),
         eskiz_email=os.getenv("ARENA_ESKIZ_EMAIL", ""),
