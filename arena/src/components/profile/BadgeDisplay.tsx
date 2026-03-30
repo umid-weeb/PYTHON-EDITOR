@@ -24,7 +24,7 @@ function BadgeIcon({ children, earned }: { children: React.ReactNode; earned: bo
       className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all ${
         earned
           ? "border-arena-primary/40 bg-arena-primary/20 text-arena-primaryStrong"
-          : "border-white/10 bg-white/5 text-arena-muted opacity-50 grayscale"
+          : "border-[var(--arena-border)] bg-[var(--arena-surface-soft)] text-arena-muted opacity-50 grayscale"
       }`}
     >
       {children}
@@ -191,7 +191,7 @@ export default function BadgeDisplay({
             <BadgeIcon earned={badge.earned}>{badge.icon}</BadgeIcon>
             {/* Tooltip */}
             <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100">
-              <div className="whitespace-nowrap rounded-lg border border-white/10 bg-[#0b1220] px-3 py-2 text-center shadow-lg">
+              <div className="whitespace-nowrap rounded-lg border border-[var(--arena-border-strong)] bg-[var(--arena-surface-strong)] px-3 py-2 text-center shadow-lg backdrop-blur-md">
                 <div className="text-xs font-medium text-arena-text">{badge.name}</div>
                 <div className="mt-0.5 text-[10px] text-arena-muted">{badge.description}</div>
                 {badge.progress !== undefined && badge.maxProgress !== undefined && !badge.earned && (
@@ -200,7 +200,7 @@ export default function BadgeDisplay({
                   </div>
                 )}
               </div>
-              <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[#0b1220]" />
+              <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--arena-surface-strong)]" />
             </div>
           </div>
         ))}

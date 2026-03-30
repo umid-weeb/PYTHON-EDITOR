@@ -12,8 +12,8 @@ function formatDateRange(startsAt: string | null, endsAt: string | null) {
 
 function statusClasses(status: ContestListItem["status"]) {
   if (status === "running") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-300";
-  if (status === "upcoming") return "border-sky-400/20 bg-sky-500/10 text-sky-300";
-  return "border-white/10 bg-white/5 text-arena-muted";
+  if (status === "upcoming") return "border-sky-400/20 bg-sky-500/10 text-sky-400";
+  return "border-[var(--arena-border)] bg-[var(--arena-surface-soft)] text-arena-muted";
 }
 
 export default function ContestsPage() {
@@ -50,11 +50,11 @@ export default function ContestsPage() {
   return (
     <DashboardShell eyebrow="Competition" title="Contests" subtitle="Timed rounds, curated problem sets, live scoreboard.">
       {status === "loading" ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Loading contests...</div>
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md shadow-[var(--arena-shadow)]">Loading contests...</div>
       ) : null}
 
       {status === "error" ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md shadow-[var(--arena-shadow)]">
           Could not load contests right now. Check the API deployment or try again in a moment.
         </div>
       ) : null}
@@ -63,15 +63,15 @@ export default function ContestsPage() {
         <div className="space-y-3">
           {items.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-5 backdrop-blur-md shadow-[var(--arena-shadow)]">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">Running</div>
                 <div className="mt-2 text-3xl font-bold text-arena-text">{summary.running}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-5 backdrop-blur-md shadow-[var(--arena-shadow)]">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">Upcoming</div>
                 <div className="mt-2 text-3xl font-bold text-arena-text">{summary.upcoming}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-5 backdrop-blur-md shadow-[var(--arena-shadow)]">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">Finished</div>
                 <div className="mt-2 text-3xl font-bold text-arena-text">{summary.finished}</div>
               </div>
@@ -79,7 +79,7 @@ export default function ContestsPage() {
           ) : null}
 
           {items.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">
+            <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md shadow-[var(--arena-shadow)]">
               No contests have been scheduled yet.
             </div>
           ) : null}
@@ -88,7 +88,7 @@ export default function ContestsPage() {
             <Link
               key={contest.id}
               to={`/contest/${encodeURIComponent(contest.id)}`}
-              className="block rounded-2xl border border-white/10 bg-white/5 p-6 transition hover:bg-white/10"
+              className="block rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 transition hover:bg-[var(--arena-surface-soft)] backdrop-blur-md shadow-[var(--arena-shadow)]"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>

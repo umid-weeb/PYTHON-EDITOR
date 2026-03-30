@@ -88,7 +88,7 @@ export default function ProfileSettingsPage() {
   return (
     <DashboardShell eyebrow="Profile" title="Settings" subtitle="Edit your handle, public profile, and security.">
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+        <section className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 backdrop-blur-md shadow-[var(--arena-shadow)]">
           <h2 className="text-sm font-semibold text-arena-text">Avatar</h2>
           <div className="mt-4 flex items-center gap-4">
             <Avatar username={user?.username} src={user?.avatar_url || user?.avatarUrl || null} size="lg" />
@@ -97,7 +97,7 @@ export default function ProfileSettingsPage() {
               <div className="mt-1 text-xs text-arena-muted">PNG/JPG/WEBP up to 2MB.</div>
               <div className="mt-3">
                 <input
-                  className="block w-full text-sm text-arena-muted file:mr-4 file:rounded-full file:border file:border-white/10 file:bg-[#0b1220] file:px-4 file:py-2 file:text-sm file:font-medium file:text-arena-text hover:file:bg-white/10"
+                  className="block w-full text-sm text-arena-muted file:mr-4 file:rounded-full file:border file:border-[var(--arena-border)] file:bg-[var(--arena-surface-soft)] file:px-4 file:py-2 file:text-sm file:font-medium file:text-arena-text hover:file:bg-[var(--arena-surface-strong)]"
                   type="file"
                   accept=".png,.jpg,.jpeg,.webp"
                   onChange={uploadAvatar}
@@ -108,12 +108,12 @@ export default function ProfileSettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
+        <section className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 backdrop-blur-md shadow-[var(--arena-shadow)]">
           <h2 className="text-sm font-semibold text-arena-text">Security</h2>
           <form className="mt-4 space-y-4" onSubmit={savePassword}>
             <Field label="Current password">
               <input
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0b1220] px-3 text-sm text-arena-text outline-none focus:border-white/20"
+                className="h-11 w-full rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 text-sm text-arena-text outline-none focus:border-[var(--arena-border-strong)]"
                 type="password"
                 value={passwordForm.current}
                 onChange={(e) => setPasswordForm((c) => ({ ...c, current: e.target.value }))}
@@ -121,7 +121,7 @@ export default function ProfileSettingsPage() {
             </Field>
             <Field label="New password" hint="Min 6 characters">
               <input
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0b1220] px-3 text-sm text-arena-text outline-none focus:border-white/20"
+                className="h-11 w-full rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 text-sm text-arena-text outline-none focus:border-[var(--arena-border-strong)]"
                 type="password"
                 value={passwordForm.next}
                 onChange={(e) => setPasswordForm((c) => ({ ...c, next: e.target.value }))}
@@ -129,7 +129,7 @@ export default function ProfileSettingsPage() {
             </Field>
             <Field label="Confirm new password">
               <input
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0b1220] px-3 text-sm text-arena-text outline-none focus:border-white/20"
+                className="h-11 w-full rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 text-sm text-arena-text outline-none focus:border-[var(--arena-border-strong)]"
                 type="password"
                 value={passwordForm.confirm}
                 onChange={(e) => setPasswordForm((c) => ({ ...c, confirm: e.target.value }))}
@@ -137,7 +137,7 @@ export default function ProfileSettingsPage() {
             </Field>
             <div className="flex items-center gap-3">
               <button
-                className="inline-flex h-11 items-center rounded-full border border-white/10 bg-[#0b1220] px-5 text-sm font-medium text-arena-text hover:bg-white/10"
+                className="inline-flex h-11 items-center rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-5 text-sm font-medium text-arena-text hover:bg-[var(--arena-surface-strong)]"
                 type="submit"
               >
                 Update password
@@ -147,12 +147,12 @@ export default function ProfileSettingsPage() {
           </form>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-6 lg:col-span-2">
+        <section className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 lg:col-span-2 backdrop-blur-md shadow-[var(--arena-shadow)]">
           <h2 className="text-sm font-semibold text-arena-text">Public profile</h2>
           <form className="mt-4 grid gap-4 lg:grid-cols-2" onSubmit={saveProfile}>
             <Field label="Username" hint="Public handle">
               <input
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0b1220] px-3 text-sm text-arena-text outline-none focus:border-white/20"
+                className="h-11 w-full rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 text-sm text-arena-text outline-none focus:border-[var(--arena-border-strong)]"
                 type="text"
                 value={profileForm.username}
                 onChange={(e) => setProfileForm((c) => ({ ...c, username: e.target.value }))}
@@ -160,7 +160,7 @@ export default function ProfileSettingsPage() {
             </Field>
             <Field label="Display name" hint="Optional">
               <input
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0b1220] px-3 text-sm text-arena-text outline-none focus:border-white/20"
+                className="h-11 w-full rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 text-sm text-arena-text outline-none focus:border-[var(--arena-border-strong)]"
                 type="text"
                 value={profileForm.display_name}
                 onChange={(e) => setProfileForm((c) => ({ ...c, display_name: e.target.value }))}
@@ -168,7 +168,7 @@ export default function ProfileSettingsPage() {
             </Field>
             <Field label="Country" hint="Optional">
               <input
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0b1220] px-3 text-sm text-arena-text outline-none focus:border-white/20"
+                className="h-11 w-full rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 text-sm text-arena-text outline-none focus:border-[var(--arena-border-strong)]"
                 type="text"
                 value={profileForm.country}
                 onChange={(e) => setProfileForm((c) => ({ ...c, country: e.target.value }))}
@@ -176,14 +176,14 @@ export default function ProfileSettingsPage() {
             </Field>
             <Field label="Bio" hint="Optional">
               <textarea
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#0b1220] px-3 py-2 text-sm text-arena-text outline-none focus:border-white/20"
+                className="min-h-[44px] w-full rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 py-2 text-sm text-arena-text outline-none focus:border-[var(--arena-border-strong)]"
                 value={profileForm.bio}
                 onChange={(e) => setProfileForm((c) => ({ ...c, bio: e.target.value }))}
               />
             </Field>
             <div className="flex items-center gap-3 lg:col-span-2">
               <button
-                className="inline-flex h-11 items-center rounded-full border border-white/10 bg-[#0b1220] px-5 text-sm font-medium text-arena-text hover:bg-white/10"
+                className="inline-flex h-11 items-center rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-5 text-sm font-medium text-arena-text hover:bg-[var(--arena-surface-strong)]"
                 type="submit"
               >
                 Save changes
@@ -196,4 +196,3 @@ export default function ProfileSettingsPage() {
     </DashboardShell>
   );
 }
-

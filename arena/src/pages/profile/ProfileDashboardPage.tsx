@@ -156,7 +156,7 @@ function buildBadgeSummary(profile: PublicProfile | null, bestStreak: number) {
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-white/5 py-3 last:border-b-0">
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--arena-border)]/30 py-3 last:border-b-0">
       <span className="text-sm text-arena-muted">{label}</span>
       <span className="text-sm font-medium text-arena-text">{value}</span>
     </div>
@@ -177,8 +177,8 @@ function FeedTabButton({
       className={cx(
         "rounded-xl border px-4 py-2 text-sm font-medium transition",
         active
-          ? "border-white/15 bg-white/10 text-arena-text"
-          : "border-white/10 bg-[#0b1220] text-arena-muted hover:bg-white/5 hover:text-arena-text",
+          ? "border-[var(--arena-border-strong)] bg-[var(--arena-surface-strong)] text-arena-text"
+          : "border-[var(--arena-border)] bg-[var(--arena-surface)] text-arena-muted hover:bg-[var(--arena-surface-soft)] hover:text-arena-text",
       )}
       type="button"
       onClick={onClick}
@@ -323,14 +323,14 @@ export default function ProfileDashboardPage() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-arena-text hover:bg-white/10"
+            className="inline-flex items-center rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface)] px-4 py-2 text-sm font-medium text-arena-text hover:bg-[var(--arena-surface-strong)]"
             to={`/profile/${encodeURIComponent(username)}/submissions`}
           >
             View submissions
           </Link>
           {isOwnProfile ? (
             <Link
-              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-arena-text hover:bg-white/10"
+              className="inline-flex items-center rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface)] px-4 py-2 text-sm font-medium text-arena-text hover:bg-[var(--arena-surface-strong)]"
               to="/profile/settings"
             >
               Edit profile
@@ -340,7 +340,7 @@ export default function ProfileDashboardPage() {
       }
     >
       {status === "loading" ? (
-        <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-12">
+        <div className="flex items-center justify-center rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-12 backdrop-blur-md">
           <div className="flex items-center gap-3 text-arena-muted">
             <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -356,13 +356,13 @@ export default function ProfileDashboardPage() {
       ) : null}
 
       {status === "error" ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Failed to load profile.</div>
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md">Failed to load profile.</div>
       ) : null}
 
       {status === "ready" && profile ? (
         <div className="space-y-6">
           <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-            <article className="rounded-3xl border border-white/10 bg-[#121826] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+            <article className="rounded-3xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 shadow-[var(--arena-shadow)] backdrop-blur-md">
               <div className="flex flex-col gap-5">
                 <div className="flex items-center gap-4">
                   <Avatar username={profile.username} src={profile.avatar_url || null} size="lg" />
@@ -375,7 +375,7 @@ export default function ProfileDashboardPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">
                     Community Stats
                   </div>
@@ -389,7 +389,7 @@ export default function ProfileDashboardPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">
                     Languages
                   </div>
@@ -398,7 +398,7 @@ export default function ProfileDashboardPage() {
                       languages.map(([language, count]) => (
                         <span
                           key={language}
-                          className="inline-flex items-center rounded-full border border-white/10 bg-[#0b1220] px-3 py-1 text-sm text-arena-text"
+                          className="inline-flex items-center rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface-strong)] px-3 py-1 text-sm text-arena-text"
                         >
                           {language} <span className="ml-2 text-arena-muted">{count}</span>
                         </span>
@@ -412,7 +412,7 @@ export default function ProfileDashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-3xl border border-white/10 bg-[#121826] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+            <article className="rounded-3xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 shadow-[var(--arena-shadow)] backdrop-blur-md">
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_220px]">
                 <div className="flex items-center justify-center">
                   <CircularProgress data={problemTotals} size={230} />
@@ -440,7 +440,7 @@ export default function ProfileDashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-3xl border border-white/10 bg-[#121826] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+            <article className="rounded-3xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 shadow-[var(--arena-shadow)] backdrop-blur-md">
               <div className="flex h-full flex-col justify-between gap-5">
                 <div>
                   <div className="text-sm font-semibold uppercase tracking-[0.12em] text-arena-muted">Badges</div>
@@ -448,7 +448,7 @@ export default function ProfileDashboardPage() {
                   <div className="mt-2 text-sm text-arena-muted">Earned milestone badges</div>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">
                     Featured Badge
                   </div>
@@ -459,7 +459,7 @@ export default function ProfileDashboardPage() {
             </article>
           </section>
 
-          <section className="rounded-3xl border border-white/10 bg-[#121826] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <section className="rounded-3xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 shadow-[var(--arena-shadow)] backdrop-blur-md">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold text-arena-text">
@@ -470,13 +470,13 @@ export default function ProfileDashboardPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-arena-muted">
+                <span className="rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 py-1 text-arena-muted">
                   Total active days: <span className="font-medium text-arena-text">{activeDays}</span>
                 </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-arena-muted">
+                <span className="rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 py-1 text-arena-muted">
                   Max streak: <span className="font-medium text-arena-text">{bestStreak}</span>
                 </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-arena-muted">
+                <span className="rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-3 py-1 text-arena-muted">
                   Current: <span className="font-medium text-arena-text">{currentStreak}</span>
                 </span>
               </div>
@@ -484,7 +484,7 @@ export default function ProfileDashboardPage() {
             <ActivityHeatmap days={fullYearActivity} totalSubmissions={totalSubmissions} />
           </section>
 
-          <section className="rounded-3xl border border-white/10 bg-[#121826] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <section className="rounded-3xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 shadow-[var(--arena-shadow)] backdrop-blur-md">
             <BadgeDisplay
               solvedCount={solvedTotals.total}
               currentStreak={currentStreak}
@@ -495,7 +495,7 @@ export default function ProfileDashboardPage() {
             />
           </section>
 
-          <section className="rounded-3xl border border-white/10 bg-[#121826] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <section className="rounded-3xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 shadow-[var(--arena-shadow)] backdrop-blur-md">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <FeedTabButton active={feedTab === "recent-ac"} label="Recent AC" onClick={() => setFeedTab("recent-ac")} />
@@ -509,13 +509,13 @@ export default function ProfileDashboardPage() {
               </Link>
             </div>
 
-            <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-[#0b1220]">
+            <div className="divide-y divide-[var(--arena-border)]/30 overflow-hidden rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface-strong)]">
               {visibleSubmissions.slice(0, 10).map((submission, index) => {
                 const accepted = isAcceptedSubmission(submission);
                 return (
                   <div
                     key={`${submission.problem_id}-${index}`}
-                    className="flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-[var(--arena-surface-soft)] sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-arena-text">

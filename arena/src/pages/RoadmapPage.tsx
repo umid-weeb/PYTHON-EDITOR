@@ -250,7 +250,7 @@ function TopicCard({
             {solved}/{total}
           </span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--arena-surface-soft)]">
           <div
             className={`h-full transition-all duration-500 ${isCompleted ? "bg-emerald-400" : "bg-arena-primary"}`}
             style={{ width: `${percentage}%` }}
@@ -351,7 +351,7 @@ export default function RoadmapPage() {
       subtitle="Master algorithms and data structures with our structured learning path."
     >
       {/* Overall Progress */}
-      <section className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+      <section className="mb-8 rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 backdrop-blur-md shadow-[var(--arena-shadow)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-arena-text">Your Progress</h2>
@@ -397,7 +397,7 @@ export default function RoadmapPage() {
 
         {/* Overall progress bar */}
         <div className="mt-4">
-          <div className="h-2 overflow-hidden rounded-full bg-white/10">
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--arena-surface-soft)]">
             <div
               className="h-full bg-gradient-to-r from-arena-primary to-arena-primaryStrong transition-all duration-500"
               style={{ width: `${overallPercentage}%` }}
@@ -410,7 +410,7 @@ export default function RoadmapPage() {
       <section>
         <h2 className="mb-4 text-lg font-semibold text-arena-text">Topics</h2>
         {loading ? (
-          <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-12">
+          <div className="flex items-center justify-center rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-12 backdrop-blur-md shadow-[var(--arena-shadow)]">
             <div className="flex items-center gap-3 text-arena-muted">
               <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -434,10 +434,10 @@ export default function RoadmapPage() {
       </section>
 
       {/* Tips Section */}
-      <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+      <section className="mt-8 rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 backdrop-blur-md shadow-[var(--arena-shadow)]">
         <h2 className="mb-4 text-lg font-semibold text-arena-text">Study Tips</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-[#0b1220] p-4">
+          <div className="rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] p-4">
             <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -448,7 +448,7 @@ export default function RoadmapPage() {
               Begin with Arrays & Hashing, then move to Two Pointers and Sliding Window.
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-[#0b1220] p-4">
+          <div className="rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] p-4">
             <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -459,7 +459,7 @@ export default function RoadmapPage() {
               Solve at least one problem daily to build muscle memory for patterns.
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-[#0b1220] p-4">
+          <div className="rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] p-4">
             <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

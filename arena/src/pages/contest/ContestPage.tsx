@@ -12,8 +12,8 @@ function formatDateRange(startsAt: string | null, endsAt: string | null) {
 
 function statusClasses(status?: string | null) {
   if (status === "running") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-300";
-  if (status === "upcoming") return "border-sky-400/20 bg-sky-500/10 text-sky-300";
-  return "border-white/10 bg-white/5 text-arena-muted";
+  if (status === "upcoming") return "border-sky-400/20 bg-sky-500/10 text-sky-400";
+  return "border-[var(--arena-border)] bg-[var(--arena-surface-soft)] text-arena-muted";
 }
 
 function buildSubtitle(contest: ContestDetail | null) {
@@ -54,7 +54,7 @@ export default function ContestPage() {
       subtitle={buildSubtitle(contest)}
       actions={
         <Link
-          className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-arena-text hover:bg-white/10"
+          className="inline-flex items-center rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-4 py-2 text-sm font-medium text-arena-text hover:bg-[var(--arena-surface-strong)]"
           to={`/contest/${encodeURIComponent(id)}/leaderboard`}
         >
           Open leaderboard
@@ -62,17 +62,17 @@ export default function ContestPage() {
       }
     >
       {status === "loading" ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Loading contest...</div>
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md shadow-[var(--arena-shadow)]">Loading contest...</div>
       ) : null}
 
       {status === "error" ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Contest not found.</div>
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md shadow-[var(--arena-shadow)]">Contest not found.</div>
       ) : null}
 
       {status === "ready" && contest ? (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-5 backdrop-blur-md shadow-[var(--arena-shadow)]">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">Status</div>
               <div className="mt-3">
                 <span
@@ -86,25 +86,25 @@ export default function ContestPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-5 backdrop-blur-md shadow-[var(--arena-shadow)]">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">Schedule</div>
               <div className="mt-3 text-sm text-arena-text">{formatDateRange(contest.starts_at, contest.ends_at)}</div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-5 backdrop-blur-md shadow-[var(--arena-shadow)]">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-arena-muted">Problems</div>
               <div className="mt-3 text-3xl font-bold text-arena-text">{contest.problems.length}</div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 backdrop-blur-md shadow-[var(--arena-shadow)]">
             <div className="text-sm font-semibold text-arena-text">Overview</div>
             <div className="mt-3 text-sm text-arena-text/90">
               {contest.description || "This contest is live in the Arena schedule. Problem order, timings, and leaderboard below use real contest data."}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 backdrop-blur-md shadow-[var(--arena-shadow)]">
             <div className="text-sm font-semibold text-arena-text">Problems</div>
             <div className="mt-3 space-y-2">
               {contest.problems.length === 0 ? (
@@ -114,7 +114,7 @@ export default function ContestPage() {
               {contest.problems.map((problem) => (
                 <Link
                   key={problem.problem_slug}
-                  className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0b1220] px-4 py-3 hover:bg-white/10"
+                  className="flex items-center justify-between rounded-xl border border-[var(--arena-border)] bg-[var(--arena-surface-soft)] px-4 py-3 hover:bg-[var(--arena-surface-strong)]"
                   to={`/problems/${encodeURIComponent(problem.problem_slug)}?contest=${encodeURIComponent(id)}`}
                 >
                   <div className="text-sm font-medium text-arena-text">{problem.title || problem.problem_slug}</div>

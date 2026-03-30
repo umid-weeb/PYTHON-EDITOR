@@ -53,21 +53,29 @@ export default function UserSubmissionsPage() {
 
   const body = useMemo(() => {
     if (status === "loading") {
-      return <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Loading submissions...</div>;
+      return (
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md">
+          Loading submissions...
+        </div>
+      );
     }
     if (status === "error") {
-      return <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">Failed to load submissions.</div>;
+      return (
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md">
+          Failed to load submissions.
+        </div>
+      );
     }
     if (rows.length === 0) {
       return (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-arena-muted">
+        <div className="rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-6 text-arena-muted backdrop-blur-md">
           {isOwn ? "No submissions yet." : "This user has no recorded submissions yet."}
         </div>
       );
     }
 
     return (
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0b1220] shadow-2xl">
+      <div className="overflow-hidden rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] shadow-2xl backdrop-blur-md">
         <div className="overflow-x-auto">
           <table className="min-w-[840px] w-full border-separate border-spacing-0">
             <thead>
@@ -85,13 +93,13 @@ export default function UserSubmissionsPage() {
                 const normalizedVerdict = resolveSubmissionOutcome(submission);
                 const verdict = String(submission.verdict || submission.status || "--");
                 const tone = normalizedVerdict.includes("accepted")
-                  ? "text-emerald-300"
+                  ? "text-[var(--arena-success)]"
                   : normalizedVerdict.includes("wrong") || normalizedVerdict.includes("error")
-                    ? "text-rose-300"
+                    ? "text-[var(--arena-danger)]"
                     : "text-arena-muted";
 
                 return (
-                  <tr key={`${submission.problem_id}-${index}`} className="border-t border-white/5">
+                  <tr key={`${submission.problem_id}-${index}`} className="border-t border-[var(--arena-border)]/30">
                     <td className="px-4 py-3">
                       {submission.problem_slug ? (
                         <Link
