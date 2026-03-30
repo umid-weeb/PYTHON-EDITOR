@@ -70,6 +70,9 @@ export default function ResultPanel({ result, busy = false }) {
           <div className="text-[20px] font-black tracking-tight text-[var(--error)]">
             {result.chip || "Xatolik"}
           </div>
+          {result.stdout && (
+            <CodeBlock label="Stdout" value={result.stdout} />
+          )}
           <div className="rounded-[var(--radius-sm)] border border-[color:var(--error)]/30 bg-[var(--error)]/5 p-4 font-mono text-[13px] text-[var(--error)] whitespace-pre-wrap leading-relaxed shadow-inner">
             {result.summary || "Bajarishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."}
           </div>

@@ -4,6 +4,7 @@ import UserMenu from "../UserMenu.tsx";
 import ThemeToggle from "../ui/ThemeToggle.tsx";
 
 const NAV_ITEMS = [
+  { to: "/online-editor", label: "Editor" },
   { to: "/problems", label: "Problems" },
   { to: "/roadmap", label: "Roadmap" },
   { to: "/contest", label: "Contest" },
@@ -16,7 +17,9 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   const username = user?.username || "";
-  const showBackToEditor = location.pathname.startsWith("/problems/") && location.pathname !== "/problems";
+  
+  // Show exit button when deep in the Arena
+  const showExitToMain = location.pathname.startsWith("/problems/") || location.pathname === "/online-editor";
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + "/");
 
@@ -25,7 +28,7 @@ export default function Navbar() {
       <div className="mx-auto flex h-[var(--h-navbar)] w-full max-w-[1400px] items-center gap-3 px-4 md:px-5">
         <Link
           className="flex shrink-0 items-center text-[15px] font-bold tracking-[-0.02em] text-[var(--text-primary)]"
-          to="/problems"
+          to="/"
         >
           Pyzone<span className="text-[var(--accent)]">Arena</span>
         </Link>
@@ -65,15 +68,14 @@ export default function Navbar() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
-          {showBackToEditor ? (
-            <button
+          {showExitToMain ? (
+            <a
+              href="/"
               className="inline-flex h-[var(--h-btn-md)] items-center gap-2 rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 text-[12px] font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
-              type="button"
-              onClick={() => navigate("/")}
             >
               <span aria-hidden="true" className="text-[14px] leading-none">←</span>
-              <span>Back to Editor</span>
-            </button>
+              <span>Asosiy Muharrir</span>
+            </a>
           ) : null}
           <ThemeToggle />
           <UserMenu

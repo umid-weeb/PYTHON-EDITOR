@@ -24,6 +24,7 @@ export default function App() {
     <AppFrame>
       <Routes>
         <Route path="/" element={<ArenaPage />} />
+        <Route path="/online-editor" element={<OnlineEditorPage />} />
         <Route path="/problems" element={<ProblemsPage />} />
         <Route path="/problems/:slug" element={<ProblemPage />} />
         <Route path="/roadmap" element={<RoadmapPage />} />

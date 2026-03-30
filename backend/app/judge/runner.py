@@ -191,11 +191,11 @@ try:
         result = target(*payload.get("args", []))
     runtime_ms = int((time.perf_counter() - started) * 1000)
     current, peak = tracemalloc.get_traced_memory()
-    actual = result if result is not None else stdout_buffer.getvalue().strip()
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Accepted",
-        "actual": actual,
+        "actual": result,
+        "stdout": stdout_buffer.getvalue(),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False, default=repr))
@@ -206,6 +206,7 @@ except LoopTimeoutError as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Time Limit Exceeded",
+        "stdout": stdout_buffer.getvalue(),
         "error": str(exc),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
@@ -217,6 +218,7 @@ except MemoryError as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Memory Limit Exceeded",
+        "stdout": stdout_buffer.getvalue(),
         "error": format_user_error(exc),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
@@ -228,6 +230,7 @@ except Exception as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
         "verdict": "Runtime Error",
+        "stdout": stdout_buffer.getvalue(),
         "error": format_user_error(exc),
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
@@ -301,6 +304,7 @@ class JudgeRunner:
                 "input": None if is_hidden else testcase.get("input"),
                 "expected_output": None if is_hidden else testcase.get("expected_output"),
                 "actual_output": execution.get("actual_output"),
+                "stdout": execution.get("stdout"),
                 "hidden": is_hidden,
                 "error": execution.get("error"),
             }
@@ -606,6 +610,11 @@ class JudgeRunner:
         
         actual_val = payload.get("actual")
         payload["actual_output"] = None if actual_val is None else stringify_value(actual_val)
+        
+        # Standardize stdout: ensure it's a string, strip only trailing whitespace
+        stdout_val = payload.get("stdout")
+        payload["stdout"] = str(stdout_val).rstrip() if stdout_val is not None else None
+        
         return payload
 
     def _evaluate_case_result(
