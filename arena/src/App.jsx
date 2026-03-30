@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AppFrame from "./components/layout/AppFrame.jsx";
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import ArenaPage from "./pages/ArenaPage.jsx";
+import OnlineEditorPage from "./pages/OnlineEditorPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
