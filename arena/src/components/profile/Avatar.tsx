@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { API_BASE_URL } from "../../lib/apiClient.js";
 
 type Props = {
@@ -38,9 +38,12 @@ function resolveSrc(candidate?: string | null) {
 }
 
 export default function Avatar({ username, src, size = "md", className }: Props) {
+  const [hasError, setHasError] = useState(false);
   const initials = useMemo(() => buildInitials(username), [username]);
   const finalSrc = useMemo(() => resolveSrc(src), [src]);
   const dim = size === "sm" ? "h-9 w-9" : size === "lg" ? "h-20 w-20" : "h-12 w-12";
+
+  const showImage = finalSrc && !hasError;
 
   return (
     <div
@@ -51,9 +54,16 @@ export default function Avatar({ username, src, size = "md", className }: Props)
         className
       )}
     >
-      {finalSrc ? <img alt={`${username || "User"} avatar`} className="h-full w-full object-cover" src={finalSrc} /> : null}
-      {!finalSrc ? <span className="text-sm font-semibold tracking-[0.08em]">{initials}</span> : null}
+      {showImage ? (
+        <img
+          alt={`${username || "User"} avatar`}
+          className="h-full w-full object-cover"
+          src={finalSrc}
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <span className="text-sm font-semibold tracking-[0.08em]">{initials}</span>
+      )}
     </div>
   );
 }
-

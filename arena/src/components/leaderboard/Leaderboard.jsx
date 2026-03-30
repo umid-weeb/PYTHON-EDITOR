@@ -55,7 +55,7 @@ export default function Leaderboard({ entries = [], error }) {
                       <div className={styles.userInfo}>
                         <Avatar 
                           username={entry.username} 
-                          url={entry.avatar_url} 
+                          src={entry.avatar_url} 
                           size="sm" 
                           className={styles.userAvatar}
                         />
