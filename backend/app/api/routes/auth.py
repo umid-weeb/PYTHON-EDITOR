@@ -500,7 +500,11 @@ def request_password_reset(payload: ResetRequest, db: Session = Depends(get_db))
         <p style="font-size: 12px; color: #64748b; text-align: center;">Agar siz ushbu so'rovni yubormagan bo'lsangiz, xatga e'tibor bermang.</p>
     </div>
     """
-    notification_service.send_email(email, subject, body, is_html=True)
+    
+    sent = notification_service.send_email(email, subject, body, is_html=True)
+    if not sent:
+        logger.error(f"Failed to send reset code to {email}")
+        raise HTTPException(status_code=500, detail="E-mail yuborishda xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.")
 
     return {"message": "Tasdiqlash kodi yuborildi."}
 

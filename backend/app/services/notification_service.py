@@ -71,7 +71,8 @@ class NotificationService:
 
         try:
             msg = MIMEMultipart()
-            msg["From"] = settings.smtp_from
+            # Gmail SMTP requires From to match the logged-in user or a verified alias
+            msg["From"] = settings.smtp_user
             msg["To"] = recipient
             msg["Subject"] = subject
 
