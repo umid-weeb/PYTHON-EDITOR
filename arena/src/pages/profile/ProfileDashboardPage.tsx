@@ -418,20 +418,20 @@ export default function ProfileDashboardPage() {
                   <CircularProgress data={problemTotals} size={230} />
                 </div>
                 <div className="space-y-3">
-                  <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
-                    <div className="text-sm font-semibold text-emerald-300">Easy</div>
+                  <div className="rounded-2xl border border-[var(--arena-success)]/20 bg-[var(--arena-success)]/10 px-4 py-3">
+                    <div className="text-sm font-semibold text-[var(--arena-success)]">Easy</div>
                     <div className="mt-1 text-xl font-bold text-arena-text">
                       {problemTotals.easy.solved}/{problemTotals.easy.total}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3">
-                    <div className="text-sm font-semibold text-amber-300">Medium</div>
+                  <div className="rounded-2xl border border-[var(--arena-warning)]/20 bg-[var(--arena-warning)]/10 px-4 py-3">
+                    <div className="text-sm font-semibold text-[var(--arena-warning)]">Medium</div>
                     <div className="mt-1 text-xl font-bold text-arena-text">
                       {problemTotals.medium.solved}/{problemTotals.medium.total}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3">
-                    <div className="text-sm font-semibold text-rose-300">Hard</div>
+                  <div className="rounded-2xl border border-[var(--arena-danger)]/20 bg-[var(--arena-danger)]/10 px-4 py-3">
+                    <div className="text-sm font-semibold text-[var(--arena-danger)]">Hard</div>
                     <div className="mt-1 text-xl font-bold text-arena-text">
                       {problemTotals.hard.solved}/{problemTotals.hard.total}
                     </div>
@@ -532,7 +532,9 @@ export default function ProfileDashboardPage() {
                     <div
                       className={cx(
                         "inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold",
-                        accepted ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300",
+                        accepted 
+                          ? "bg-[var(--arena-success)]/10 text-[var(--arena-success)] border border-[var(--arena-success)]/20" 
+                          : "bg-[var(--arena-danger)]/10 text-[var(--arena-danger)] border border-[var(--arena-danger)]/20",
                       )}
                     >
                       {accepted ? "Accepted" : statValue(submission.verdict || submission.status, "Pending")}

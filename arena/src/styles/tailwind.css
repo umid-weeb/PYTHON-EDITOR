@@ -132,46 +132,46 @@
 
   [data-theme="light"] {
     color-scheme: light;
-    --bg-base: #f1f5f9;
-    --bg-surface: rgba(255, 255, 255, 0.72);
-    --bg-elevated: rgba(255, 255, 255, 0.85);
-    --bg-overlay: rgba(255, 255, 255, 0.95);
-    --bg-subtle: rgba(15, 23, 42, 0.05);
+    --bg-base: #f8fafc;
+    --bg-surface: rgba(255, 255, 255, 0.88);
+    --bg-elevated: rgba(255, 255, 255, 0.95);
+    --bg-overlay: rgba(255, 255, 255, 0.98);
+    --bg-subtle: rgba(15, 23, 42, 0.08);
     --bg-input: #ffffff;
 
-    --border: rgba(15, 23, 42, 0.08);
-    --border-strong: rgba(15, 23, 42, 0.12);
+    --border: rgba(15, 23, 42, 0.12);
+    --border-strong: rgba(15, 23, 42, 0.18);
     --border-focus: #4f46e5;
 
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
-    --text-disabled: #cbd5e1;
+    --text-primary: #020617;
+    --text-secondary: #334155;
+    --text-muted: #475569;
+    --text-disabled: #94a3b8;
 
     --accent: #4f46e5;
     --accent-hover: #3730a3;
     --accent-subtle: rgba(79, 70, 229, 0.08);
     --accent-border: rgba(79, 70, 229, 0.22);
 
-    --success: #16a34a;
-    --success-bg: rgba(22, 163, 74, 0.08);
-    --success-border: rgba(22, 163, 74, 0.18);
-    --warning: #d97706;
-    --warning-bg: rgba(217, 119, 6, 0.08);
-    --error: #dc2626;
-    --error-bg: rgba(220, 38, 38, 0.08);
+    --success: #166534;
+    --success-bg: rgba(22, 163, 74, 0.1);
+    --success-border: rgba(22, 163, 74, 0.2);
+    --warning: #92400e;
+    --warning-bg: rgba(217, 119, 6, 0.1);
+    --error: #991b1b;
+    --error-bg: rgba(220, 38, 38, 0.1);
 
-    --easy: #16a34a;
-    --easy-bg: rgba(22, 163, 74, 0.08);
-    --medium: #d97706;
-    --medium-bg: rgba(217, 119, 6, 0.08);
-    --hard: #dc2626;
-    --hard-bg: rgba(220, 38, 38, 0.08);
+    --easy: #166534;
+    --easy-bg: rgba(22, 163, 74, 0.1);
+    --medium: #92400e;
+    --medium-bg: rgba(217, 119, 6, 0.1);
+    --hard: #991b1b;
+    --hard-bg: rgba(220, 38, 38, 0.1);
 
     --page-background:
-      radial-gradient(circle at 10% 5%, rgba(79, 70, 229, 0.06), transparent 24%),
-      radial-gradient(circle at 85% 10%, rgba(14, 165, 233, 0.08), transparent 18%),
-      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      radial-gradient(circle at 10% 5%, rgba(79, 70, 229, 0.08), transparent 24%),
+      radial-gradient(circle at 85% 10%, rgba(14, 165, 233, 0.1), transparent 20%),
+      linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
 
     --arena-bg: var(--page-background);
     --arena-surface: var(--bg-surface);
@@ -186,7 +186,7 @@
     --arena-success: var(--success);
     --arena-warning: var(--warning);
     --arena-danger: var(--error);
-    --arena-shadow: 0 20px 50px rgba(0, 0, 0, 0.06);
+    --arena-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
     --arena-radius-lg: 24px;
     --arena-radius-md: 16px;
     --arena-radius-sm: 12px;

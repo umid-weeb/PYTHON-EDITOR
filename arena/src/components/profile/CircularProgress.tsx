@@ -105,9 +105,9 @@ export default function CircularProgress({ data, size = 180 }: CircularProgressP
         </svg>
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold tracking-tight text-arena-text">{totalSolved}</span>
-          <span className="text-sm text-arena-muted">/ {totalProblems}</span>
-          <span className="mt-1 text-xs text-arena-muted">Solved</span>
+          <span className="text-3xl font-bold tracking-tight text-[var(--arena-text)]">{totalSolved}</span>
+          <span className="text-sm text-[var(--arena-muted)]">/ {totalProblems}</span>
+          <span className="mt-1 text-xs text-[var(--arena-muted)] uppercase tracking-wider font-semibold">Solved</span>
         </div>
       </div>
 

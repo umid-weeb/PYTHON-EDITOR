@@ -66,7 +66,7 @@ export default function ActivityHeatmap({ days, totalSubmissions }: ActivityHeat
           {monthLabels.map((label, i) => (
             <span
               key={`${label.month}-${i}`}
-              className="absolute text-[10px]"
+              className="absolute text-[10px] text-[var(--arena-muted)]"
               style={{ left: `${(label.index / weeks.length) * 100}%` }}
             >
               {label.month}
@@ -78,7 +78,7 @@ export default function ActivityHeatmap({ days, totalSubmissions }: ActivityHeat
       {/* Heatmap grid */}
       <div className="flex gap-1">
         {/* Day labels */}
-        <div className="flex w-8 shrink-0 flex-col justify-around text-[10px] text-arena-muted">
+        <div className="flex w-8 shrink-0 flex-col justify-around text-[10px] text-[var(--arena-muted)]">
           <span>Mon</span>
           <span>Wed</span>
           <span>Fri</span>
@@ -96,9 +96,9 @@ export default function ActivityHeatmap({ days, totalSubmissions }: ActivityHeat
                   <div
                     key={day.date}
                     title={`${day.date}: ${day.count} submission${day.count !== 1 ? "s" : ""}`}
-                    className={`h-[11px] w-[11px] rounded-[2px] border border-white/5 transition-colors ${
+                    className={`h-[11px] w-[11px] rounded-[2px] border border-[var(--arena-border)] transition-colors ${
                       day.level === 0
-                        ? "bg-white/5"
+                        ? "bg-[var(--arena-surface-soft)]"
                         : day.level === 1
                           ? "bg-emerald-500/30"
                           : day.level === 2
@@ -116,15 +116,16 @@ export default function ActivityHeatmap({ days, totalSubmissions }: ActivityHeat
       </div>
 
       {/* Legend */}
-      <div className="mt-2 flex items-center justify-end gap-1 text-[10px] text-arena-muted">
+      <div className="mt-2 flex items-center justify-end gap-1 text-[10px] text-[var(--arena-muted)]">
         <span>Less</span>
-        <div className="h-[11px] w-[11px] rounded-[2px] bg-white/5" />
+        <div className="h-[11px] w-[11px] rounded-[2px] bg-[var(--arena-surface-soft)] border border-[var(--arena-border)]" />
         <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-500/30" />
         <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-500/50" />
         <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-500/70" />
         <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-400" />
         <span>More</span>
       </div>
+
     </div>
   );
 }
