@@ -49,6 +49,14 @@ class Settings:
     cors_allow_origins: list[str]
     jwt_secret: str
     ai_api_key: str
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    smtp_from: str
+    eskiz_email: str
+    eskiz_password: str
+    auto_notify_enabled: bool
 
     @property
     def github_enabled(self) -> bool:
@@ -128,5 +136,13 @@ def get_settings() -> Settings:
         log_level=os.getenv("ARENA_LOG_LEVEL", "INFO").upper(),
         jwt_secret=os.getenv("ARENA_JWT_SECRET", "dev-secret-change-me"),
         ai_api_key=os.getenv("ARENA_AI_API_KEY", ""),
+        smtp_host=os.getenv("ARENA_SMTP_HOST", "smtp.gmail.com"),
+        smtp_port=int(os.getenv("ARENA_SMTP_PORT", "587")),
+        smtp_user=os.getenv("ARENA_SMTP_USER", ""),
+        smtp_password=os.getenv("ARENA_SMTP_PASSWORD", ""),
+        smtp_from=os.getenv("ARENA_SMTP_FROM", "noreply@pyzone.uz"),
+        eskiz_email=os.getenv("ARENA_ESKIZ_EMAIL", ""),
+        eskiz_password=os.getenv("ARENA_ESKIZ_PASSWORD", ""),
+        auto_notify_enabled=_env_bool("ARENA_AUTO_NOTIFY_ENABLED", True),
         cors_allow_origins=cors_allow_origins,
     )

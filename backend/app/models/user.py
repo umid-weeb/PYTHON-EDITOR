@@ -27,6 +27,8 @@ class User(Base):
     last_solve_date = Column(Date, nullable=True)
     streak_freeze = Column(Integer, nullable=False, default=0, server_default="0")
     last_active = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    phone_number = Column(String(20), nullable=True)
+    last_notified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships for submission system
@@ -78,3 +80,14 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    code = Column(String(10), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

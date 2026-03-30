@@ -247,6 +247,40 @@ class EngagementSpecialist:
             
         return None
 
+    async def run_automated_notifications(self, db: Session):
+        """Scan all users and send automated motivational notifications."""
+        from app.services.notification_service import notification_service
+        
+        # 1. Base filter: notifications enabled + not notified in last 24h
+        now = datetime.now(timezone.utc)
+        day_ago = now - timedelta(hours=24)
+        
+        users = (
+            db.query(User)
+            .filter(User.notifications_enabled == True)
+            .filter((User.last_notified_at == None) | (User.last_notified_at < day_ago))
+            .limit(50)  # Safe batch size
+            .all()
+        )
+        
+        for user in users:
+            # Skip if they already solved today
+            today = _today_for_timezone(user.timezone)
+            if user.last_solve_date == today:
+                continue
+                
+            message = self.get_motivation_message(db, user)
+            if message:
+                # We skip the generic fallback to avoid boring the user
+                if "Bugun yangi script yozishga tayyormisiz?" in message:
+                    continue
+                    
+                sent = await notification_service.notify_user(user, message)
+                if sent:
+                    user.last_notified_at = now
+        
+        db.commit()
+
 
 engagement_service = EngagementService()
 engagement_specialist = EngagementSpecialist()

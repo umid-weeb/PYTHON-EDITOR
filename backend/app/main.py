@@ -92,6 +92,31 @@ async def lifespan(_: FastAPI):
 
     threading.Thread(target=_keep_alive, daemon=True, name="keep-alive").start()
 
+    def _automated_engagement_loop() -> None:
+        """Periodically run AI engagement scans and send notifications."""
+        import time
+        while True:
+            try:
+                # Wait 6 hours between scans
+                time.sleep(21600) 
+                
+                logger.info("Starting automated engagement scan...")
+                from app.services.engagement_service import engagement_specialist
+                
+                with SessionLocal() as db:
+                    # Run async notification method from synchronous thread
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(engagement_specialist.run_automated_notifications(db))
+                    loop.close()
+                    
+                logger.info("Automated engagement scan completed.")
+            except Exception as e:
+                logger.error(f"Engagement loop failed: {e}")
+                time.sleep(3600)  # Retry in 1 hour if failed
+
+    threading.Thread(target=_automated_engagement_loop, daemon=True, name="engagement-agent").start()
+
     try:
         yield
     finally:

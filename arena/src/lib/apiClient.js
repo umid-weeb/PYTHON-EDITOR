@@ -223,16 +223,22 @@ export const userApi = {
       body,
     });
   },
-  requestPasswordReset(phone) {
-    return request("/api/password/reset", {
+  requestPasswordReset(email) {
+    return request("/api/password/reset/request", {
       method: "POST",
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ email }),
     });
   },
-  verifyPasswordReset(phone, code) {
+  verifyPasswordReset(email, code) {
     return request("/api/password/reset/verify", {
       method: "POST",
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify({ email, code }),
+    });
+  },
+  confirmPasswordReset(email, code, new_password) {
+    return request("/api/password/reset/confirm", {
+      method: "POST",
+      body: JSON.stringify({ email, code, new_password }),
     });
   },
 };

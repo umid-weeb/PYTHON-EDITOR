@@ -53,6 +53,22 @@ POSTGRES_BOOTSTRAP_SQL = [
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMPTZ NOT NULL DEFAULT NOW();
     """,
     """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);
+    """,
+    """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_notified_at TIMESTAMPTZ;
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS password_resets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        code VARCHAR(10) NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
     CREATE TABLE IF NOT EXISTS users_backup AS
     SELECT * FROM users;
     """,

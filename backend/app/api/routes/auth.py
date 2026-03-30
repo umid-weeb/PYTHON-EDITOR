@@ -14,9 +14,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, PasswordReset
 from app.repositories.submission_tracking import submission_tracking_repository
 from app.services.user_stats_service import user_stats_service
+from app.services.notification_service import notification_service
+import random
 
 
 router = APIRouter(tags=["auth"])
@@ -389,8 +391,18 @@ class PasswordUpdateRequest(BaseModel):
 
 
 class ResetVerifyRequest(BaseModel):
-    phone: str | None = None
+    email: str
     code: str
+
+
+class ResetRequest(BaseModel):
+    email: str
+
+
+class ResetConfirmRequest(BaseModel):
+    email: str
+    code: str
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 
@@ -451,16 +463,92 @@ async def upload_avatar(avatar: UploadFile = File(...), user: User = Depends(get
     return {"message": "Avatar upload not available"}
 
 
-@router.post("/password/reset")
-def request_password_reset(user: User = Depends(get_current_user)):
-    # This would integrate with Telegram bot
-    # For now, just return success
-    return {"message": "Reset code sent to your Telegram"}
+@router.post("/password/reset/request")
+def request_password_reset(payload: ResetRequest, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # For security, we don't reveal if the user exists
+        return {"message": "Agar ushbu email tizimda mavjud bo'lsa, tasdiqlash kodi yuborildi."}
+
+    # Clean up old codes
+    db.query(PasswordReset).filter(PasswordReset.user_id == user.id).delete()
+
+    # Generate 4-digit code
+    code = "".join([str(random.randint(0, 9)) for _ in range(4)])
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=60)
+
+    reset_entry = PasswordReset(
+        user_id=user.id,
+        code=code,
+        expires_at=expires_at
+    )
+    db.add(reset_entry)
+    db.commit()
+
+    # Send Email
+    subject = "PyZone Arena: Parolni tiklash kodi"
+    body = f"""
+    <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #0f172a; color: #f8fafc;">
+        <h2 style="color: #10b981; text-align: center;">Parolni tiklash</h2>
+        <p style="font-size: 16px; text-align: center;">Sizning tasdiqlash kodingiz:</p>
+        <div style="background: #1e293b; padding: 15px; border-radius: 8px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 10px; color: #3b82f6; margin: 20px 0;">
+            {code}
+        </div>
+        <p style="font-size: 14px; color: #94a3b8; text-align: center;">Ushbu kod <b>60 soniya</b> davomida amal qiladi.</p>
+        <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
+        <p style="font-size: 12px; color: #64748b; text-align: center;">Agar siz ushbu so'rovni yubormagan bo'lsangiz, xatga e'tibor bermang.</p>
+    </div>
+    """
+    notification_service.send_email(email, subject, body, is_html=True)
+
+    return {"message": "Tasdiqlash kodi yuborildi."}
 
 
 @router.post("/password/reset/verify")
-def verify_password_reset(request: ResetVerifyRequest):
-    # Placeholder verification logic; integrate with Telegram bot or DB in production
-    if not request.code:
-        raise HTTPException(status_code=400, detail="Code is required")
-    return {"message": "Reset code verified"}
+def verify_password_reset(payload: ResetVerifyRequest, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+
+    reset_entry = db.query(PasswordReset).filter(
+        PasswordReset.user_id == user.id,
+        PasswordReset.code == payload.code
+    ).first()
+
+    if not reset_entry:
+        raise HTTPException(status_code=400, detail="Noto'g'ri kod")
+
+    if datetime.now(timezone.utc) > reset_entry.expires_at:
+        raise HTTPException(status_code=400, detail="Kodning amal qilish muddati tugagan")
+
+    reset_entry.is_verified = True
+    db.commit()
+    return {"message": "Kod tasdiqlandi", "success": True}
+
+
+@router.post("/password/reset/confirm")
+def confirm_password_reset(payload: ResetConfirmRequest, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+
+    reset_entry = db.query(PasswordReset).filter(
+        PasswordReset.user_id == user.id,
+        PasswordReset.code == payload.code,
+        PasswordReset.is_verified == True
+    ).first()
+
+    if not reset_entry:
+        raise HTTPException(status_code=400, detail="Yaroqli tasdiqlash seansi topilmadi")
+
+    # Update password
+    user.password_hash = get_password_hash(payload.new_password)
+    
+    # Delete the reset code after successful use
+    db.delete(reset_entry)
+    db.commit()
+
+    return {"message": "Parol muvaffaqiyatli yangilandi", "success": True}

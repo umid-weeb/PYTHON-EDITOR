@@ -59,6 +59,8 @@ class ProfilePayload(BaseModel):
     country: str | None = None
     display_name: str | None = Field(default=None, max_length=120)
     bio: str | None = Field(default=None, max_length=2000)
+    phone_number: str | None = Field(default=None, max_length=20)
+    notifications_enabled: bool | None = None
 
 
 class PasswordChangeRequest(BaseModel):
@@ -144,10 +146,15 @@ def update_profile(
 
     current_user.username = payload.username
     current_user.country = payload.country
+    
     if hasattr(current_user, "display_name"):
         current_user.display_name = payload.display_name
     if hasattr(current_user, "bio"):
         current_user.bio = payload.bio
+    if hasattr(current_user, "phone_number"):
+        current_user.phone_number = payload.phone_number
+    if payload.notifications_enabled is not None:
+        current_user.notifications_enabled = payload.notifications_enabled
 
     db.commit()
     db.refresh(current_user)
@@ -157,6 +164,8 @@ def update_profile(
         "country": current_user.country,
         "display_name": getattr(current_user, "display_name", None),
         "bio": getattr(current_user, "bio", None),
+        "phone_number": getattr(current_user, "phone_number", None),
+        "notifications_enabled": getattr(current_user, "notifications_enabled", True),
     }
 
 

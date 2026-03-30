@@ -6,7 +6,12 @@ import styles from "./SettingsPage.module.css";
 
 export default function SettingsPage() {
   const { refreshUser, user } = useAuth();
-  const [profileForm, setProfileForm] = useState({ username: "", country: "" });
+  const [profileForm, setProfileForm] = useState({ 
+    username: "", 
+    country: "", 
+    phone_number: "", 
+    notifications_enabled: true 
+  });
   const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
   const [resetForm, setResetForm] = useState({ phone: "", code: "" });
   const [status, setStatus] = useState({
@@ -21,21 +26,25 @@ export default function SettingsPage() {
     setProfileForm({
       username: user?.username || "",
       country: user?.country || "",
+      phone_number: user?.phone_number || "",
+      notifications_enabled: user?.notifications_enabled ?? true,
     });
   }, [user]);
 
   async function saveProfile(event) {
     event.preventDefault();
-    setStatus((current) => ({ ...current, profile: "Saving..." }));
+    setStatus((current) => ({ ...current, profile: "Saqlanmoqda..." }));
     try {
       await userApi.updateProfile({
         username: profileForm.username.trim(),
         country: profileForm.country.trim(),
+        phone_number: profileForm.phone_number.trim(),
+        notifications_enabled: profileForm.notifications_enabled,
       });
       await refreshUser();
-      setStatus((current) => ({ ...current, profile: "Saved" }));
+      setStatus((current) => ({ ...current, profile: "Saqlandi" }));
     } catch (error) {
-      setStatus((current) => ({ ...current, profile: error.message || "Save failed" }));
+      setStatus((current) => ({ ...current, profile: error.message || "Xatolik yuz berdi" }));
     }
   }
 
@@ -124,9 +133,26 @@ export default function SettingsPage() {
                 onChange={(event) => setProfileForm((current) => ({ ...current, country: event.target.value }))}
               />
             </label>
+            <label className={styles.field}>
+              <span>Telefon raqami</span>
+              <input
+                type="tel"
+                placeholder="+998..."
+                value={profileForm.phone_number}
+                onChange={(event) => setProfileForm((current) => ({ ...current, phone_number: event.target.value }))}
+              />
+            </label>
+            <label className={styles.checkboxField}>
+              <input
+                type="checkbox"
+                checked={profileForm.notifications_enabled}
+                onChange={(event) => setProfileForm((current) => ({ ...current, notifications_enabled: event.target.checked }))}
+              />
+              <span>Email va SMS orqali motivatsiya yuborish</span>
+            </label>
             <div className={styles.buttonRow}>
               <button className={styles.primary} type="submit">
-                Save
+                Saqlash
               </button>
               <span className={styles.status}>{status.profile}</span>
             </div>

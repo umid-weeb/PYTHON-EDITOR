@@ -21,3 +21,62 @@
   border-color: var(--arena-border-strong);
   box-shadow: 0 0 0 4px rgba(108, 146, 255, 0.1);
 }
+
+.forgotLink {
+  font-size: 14px;
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+  margin-top: -4px;
+  margin-bottom: 8px;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.forgotLink:hover {
+  text-decoration: underline;
+}
+
+.timer {
+  font-size: 14px;
+  color: var(--arena-muted);
+  text-align: center;
+  margin-top: 10px;
+}
+
+.resendBtn {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 5px;
+  text-decoration: underline;
+}
+
+.buttonRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.primary, .secondary {
+  flex: 1;
+  padding: 14px;
+  border-radius: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+
+.primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.secondary {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--arena-border);
+  color: var(--arena-text);
+}
