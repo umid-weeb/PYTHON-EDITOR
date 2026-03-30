@@ -169,4 +169,84 @@ class EngagementService:
         )
 
 
+class EngagementSpecialist:
+    """AI Engagement Specialist responsible for user re-engagement and motivation."""
+
+    def get_motivation_message(self, db: Session, user: User) -> str | None:
+        """Analyze user state and return the most relevant motivational message."""
+        
+        # Priority 1: Streak Maintain (Most urgent to keep zanjir)
+        if user.streak >= 2:
+            return self._msg_streak_maintain(user.display_name or user.username, user.streak)
+            
+        # Priority 2: Leaderboard Push (Competitive feel)
+        leaderboard_msg = self._check_leaderboard_push(db, user)
+        if leaderboard_msg:
+            return leaderboard_msg
+            
+        # Priority 3: New Hard Problem (Challenge for pros)
+        hard_problem_msg = self._check_new_hard_problem(db)
+        if hard_problem_msg:
+            return hard_problem_msg
+            
+        # Priority 4: Inactivity (Sog'inganini bildirish)
+        if user.last_active:
+            days_inactive = (datetime.now(timezone.utc) - user.last_active).days
+            if days_inactive >= 3:
+                return self._msg_inactive_3_days()
+                
+        # Default fallback
+        return f"Bugun yangi script yozishga tayyormisiz? 🚀 www.pyzone.uz"
+
+    def _msg_streak_maintain(self, name: str, n: int) -> str:
+        templates = [
+            f"{name}, 🔥 streak {n} kunda! Zanjirni uzma, bugungi masalani deploy qilish vaqti keldi! 🚀 www.pyzone.uz",
+            f"🔥 {n} kunlik streak! {name}, logic-ni o'chirib qo'yma, bugungi challenge kutmoqda! 🐍 www.pyzone.uz",
+        ]
+        return random.choice(templates)
+
+    def _msg_inactive_3_days(self) -> str:
+        templates = [
+            "3 kundan beri ko'rinmadingiz... Algoritmlar esdan chiqmasin, yangi masalalar kutmoqda! 💻 www.pyzone.uz",
+            "Sizsiz Pyzone-da bug ko'payib ketdi. 😉 Qayting va yangi scriptlarni yozishni davom ettiring! 🚀 www.pyzone.uz",
+        ]
+        return random.choice(templates)
+
+    def _check_leaderboard_push(self, db: Session, user: User) -> str | None:
+        from app.models.rating import UserRating
+        
+        # Simple logic: find users with slightly higher rating who might have overtaken
+        rating_row = user.rating_row
+        if not rating_row:
+            return None
+            
+        competitor = (
+            db.query(User)
+            .join(UserRating)
+            .filter(UserRating.rating > rating_row.rating)
+            .order_by(UserRating.rating.asc())
+            .first()
+        )
+        
+        if competitor:
+            comp_name = competitor.display_name or competitor.username
+            return f"{comp_name} sizdan o'zib ketdi! 😱 O'z o'rningizni qaytarib oling va TOP-10 talikka kiring! 🚀 www.pyzone.uz"
+        
+        return None
+
+    def _check_new_hard_problem(self, db: Session) -> str | None:
+        last_72h = datetime.now(timezone.utc) - timedelta(hours=72)
+        new_hard = (
+            db.query(Problem)
+            .filter(Problem.difficulty == "hard", Problem.created_at >= last_72h)
+            .first()
+        )
+        
+        if new_hard:
+            return "Yangi murakkab masala qo'shildi! 🧠 Haqiqiy Python ustalari uchun 'hard' challenge. Tayyormisiz? 💻 www.pyzone.uz"
+            
+        return None
+
+
 engagement_service = EngagementService()
+engagement_specialist = EngagementSpecialist()

@@ -4,6 +4,7 @@ import { API_BASE_URL, arenaApi, userApi } from "../lib/apiClient.js";
 import { formatProblemTitle, localizeDifficultyLabel, localizeTagLabel } from "../lib/problemPresentation.js";
 import { readStoredToken } from "../lib/storage.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import MotivationBanner from "../components/common/MotivationBanner.tsx";
 
 type Problem = {
   id: string;
@@ -429,6 +430,7 @@ export default function ProblemsPage() {
           streak={streak}
           onOpenDaily={() => navigate(`/problems/${dailyChallenge?.problem.slug}`)}
         />
+        <MotivationBanner />
 
         <div className="flex h-[44px] shrink-0 items-center justify-between gap-3 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/88 px-4">
           <div className="min-w-0 truncate text-[12px] text-[var(--text-secondary)]">

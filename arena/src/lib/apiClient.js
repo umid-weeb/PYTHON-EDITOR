@@ -191,6 +191,9 @@ export const userApi = {
   getMyStreak() {
     return request("/api/user/streak");
   },
+  getMotivation() {
+    return request("/api/motivation");
+  },
   getUserStatsById(userId) {
     return request(`/api/users/${encodeURIComponent(userId)}/stats`);
   },

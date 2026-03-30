@@ -137,3 +137,12 @@ def get_daily_challenge(db: Session = Depends(get_db)) -> dict:
             "difficulty": problem.difficulty,
         },
     }
+
+@router.get("/motivation")
+def get_motivation(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    from app.services.engagement_service import engagement_specialist
+    message = engagement_specialist.get_motivation_message(db, current_user)
+    return {"message": message}
