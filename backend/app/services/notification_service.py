@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -64,45 +66,134 @@ class NotificationService:
             logger.error(f"SMS sending failed: {e}")
             return False
 
-    def send_email(self, recipient: str, subject: str, body: str, is_html: bool = False) -> bool:
+    def get_email_provider(self) -> str:
+        configured_provider = (settings.email_provider or "auto").strip().lower()
+        if configured_provider and configured_provider != "auto":
+            return configured_provider
+        if settings.resend_api_key:
+            return "resend"
+        if settings.smtp_host and settings.smtp_user and settings.smtp_password:
+            return "smtp"
+        return "none"
+
+    def _send_email_via_resend(self, recipient: str, subject: str, body: str, is_html: bool = False) -> bool:
+        """Send Email via Resend HTTP API over port 443."""
+        if not settings.resend_api_key:
+            logger.warning("Resend email not sent: API key is missing")
+            return False
+
+        from_address = settings.smtp_from or settings.smtp_user
+        if not from_address:
+            logger.warning("Resend email not sent: sender address is missing")
+            return False
+
+        payload = {
+            "from": from_address,
+            "to": [recipient],
+            "subject": subject,
+        }
+        if is_html:
+            payload["html"] = body
+        else:
+            payload["text"] = body
+
+        endpoint = f"{settings.resend_api_base_url.rstrip('/')}/emails"
+
+        try:
+            with httpx.Client(timeout=settings.email_timeout_seconds) as client:
+                response = client.post(
+                    endpoint,
+                    headers={
+                        "Authorization": f"Bearer {settings.resend_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+            if response.status_code in {200, 201, 202}:
+                return True
+            logger.error(
+                "Resend email sending failed with status %s: %s",
+                response.status_code,
+                response.text[:500],
+            )
+        except Exception as exc:
+            logger.error("Resend email sending failed: %s", exc)
+        return False
+
+    def _send_email_via_smtp(self, recipient: str, subject: str, body: str, is_html: bool = False) -> bool:
         """Send Email via SMTP."""
-        if not settings.auto_notify_enabled or not recipient or not settings.smtp_password:
+        if not settings.smtp_password or not settings.smtp_user:
+            logger.warning("SMTP email not sent: SMTP credentials are missing")
             return False
 
         try:
             msg = MIMEMultipart()
-            # Gmail SMTP requires From to match the logged-in user or a verified alias
-            msg["From"] = settings.smtp_user
+            msg["From"] = settings.smtp_from or settings.smtp_user
             msg["To"] = recipient
             msg["Subject"] = subject
-
             msg.attach(MIMEText(body, "html" if is_html else "plain"))
 
-            msg.attach(MIMEText(body, "html" if is_html else "plain"))
-
-            # Determine if we should use SSL or TLS based on port
             if settings.smtp_port == 465:
-                # Port 465 uses direct SSL
                 server_class = smtplib.SMTP_SSL
             else:
-                # Port 587 or others use STARTTLS
                 server_class = smtplib.SMTP
 
-            with server_class(settings.smtp_host, settings.smtp_port, timeout=15) as server:
+            with server_class(settings.smtp_host, settings.smtp_port, timeout=settings.email_timeout_seconds) as server:
                 if settings.smtp_port != 465:
-                    server.starttls()
+                    tls_context = ssl.create_default_context()
+                    server.ehlo()
+                    server.starttls(context=tls_context)
+                    server.ehlo()
                 server.login(settings.smtp_user, settings.smtp_password)
                 server.send_message(msg)
             return True
+        except Exception as exc:
+            logger.error(
+                "SMTP email sending failed via %s:%s: %s",
+                settings.smtp_host,
+                settings.smtp_port,
+                exc,
+            )
+            return False
+
+    def send_email(self, recipient: str, subject: str, body: str, is_html: bool = False) -> bool:
+        """Send Email via the configured provider."""
+        if not settings.auto_notify_enabled or not recipient:
+            return False
+
+        provider = self.get_email_provider()
+        if provider == "resend":
+            return self._send_email_via_resend(recipient, subject, body, is_html=is_html)
+        if provider == "smtp":
+            return self._send_email_via_smtp(recipient, subject, body, is_html=is_html)
+
+        logger.warning("Email not sent: no supported provider is configured")
+        return False
+
+    async def send_email_async(self, recipient: str, subject: str, body: str, is_html: bool = False) -> bool:
+        """Send Email in a thread pool to avoid blocking async code."""
+        if not settings.auto_notify_enabled or not recipient:
+            return False
+
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(
+                None,
+                self.send_email,
+                recipient,
+                subject,
+                body,
+                is_html
+            )
         except Exception as e:
-            logger.error(f"Email sending failed: {e}")
+            logger.error(f"Async email sending failed: {e}")
             return False
 
     async def notify_user(self, user, message: str, subject: str = "PyZone Arena Motivatsiya"):
         """Send notification via available channels (respecting fallback priorities)."""
         success = False
         
-        # Priority 1: Email (Universal)
+        # Priority 1: Email (Universal) - use async version to avoid blocking
         if user.email:
             # We wrap the text in a simple HTML template for better premium feel
             html_body = f"""
@@ -113,7 +204,7 @@ class NotificationService:
                 <p style="font-size: 12px; color: #999;">Agar bildirishnomalarni o'chirmoqchi bo'lsangiz, profilingizga kiring.</p>
             </div>
             """
-            success = self.send_email(user.email, subject, html_body, is_html=True) or success
+            success = await self.send_email_async(user.email, subject, html_body, is_html=True) or success
 
         # Priority 2: SMS (If phone exists)
         if user.phone_number:

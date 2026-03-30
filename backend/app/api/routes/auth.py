@@ -26,6 +26,7 @@ router = APIRouter(tags=["auth"])
 SECRET_KEY = os.getenv("ARENA_JWT_SECRET", os.getenv("JWT_SECRET", "dev-secret-change-me"))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ARENA_JWT_EXPIRE_MINUTES", str(60 * 24 * 7)))  # default 7 days
+PASSWORD_RESET_CODE_TTL_SECONDS = int(os.getenv("ARENA_PASSWORD_RESET_CODE_TTL_SECONDS", "600"))
 security = HTTPBearer(auto_error=False)
 
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> User:
@@ -109,6 +110,16 @@ def ensure_unique_username(db: Session, base_username: str) -> str:
         candidate = f"{base_username[:42]}_{suffix}"
         suffix += 1
     return candidate[:50]
+
+
+def format_reset_ttl(total_seconds: int) -> str:
+    safe_seconds = max(int(total_seconds or 0), 0)
+    minutes, seconds = divmod(safe_seconds, 60)
+    if minutes and seconds:
+        return f"{minutes} daqiqa {seconds} soniya"
+    if minutes:
+        return f"{minutes} daqiqa"
+    return f"{seconds} soniya"
 
 
 class RegisterRequest(BaseModel):
@@ -476,7 +487,8 @@ def request_password_reset(payload: ResetRequest, db: Session = Depends(get_db))
 
     # Generate 4-digit code
     code = "".join([str(random.randint(0, 9)) for _ in range(4)])
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=60)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=PASSWORD_RESET_CODE_TTL_SECONDS)
+    ttl_label = format_reset_ttl(PASSWORD_RESET_CODE_TTL_SECONDS)
 
     reset_entry = PasswordReset(
         user_id=user.id,
@@ -495,7 +507,7 @@ def request_password_reset(payload: ResetRequest, db: Session = Depends(get_db))
         <div style="background: #1e293b; padding: 15px; border-radius: 8px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 10px; color: #3b82f6; margin: 20px 0;">
             {code}
         </div>
-        <p style="font-size: 14px; color: #94a3b8; text-align: center;">Ushbu kod <b>60 soniya</b> davomida amal qiladi.</p>
+        <p style="font-size: 14px; color: #94a3b8; text-align: center;">Ushbu kod <b>{ttl_label}</b> davomida amal qiladi.</p>
         <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
         <p style="font-size: 12px; color: #64748b; text-align: center;">Agar siz ushbu so'rovni yubormagan bo'lsangiz, xatga e'tibor bermang.</p>
     </div>
@@ -503,7 +515,17 @@ def request_password_reset(payload: ResetRequest, db: Session = Depends(get_db))
     
     sent = notification_service.send_email(email, subject, body, is_html=True)
     if not sent:
-        logger.error(f"Failed to send reset code to {email}")
+        try:
+            db.delete(reset_entry)
+            db.commit()
+        except Exception as cleanup_exc:
+            db.rollback()
+            logger.error("Failed to clean up password reset entry for %s: %s", email, cleanup_exc)
+        logger.error(
+            "Failed to send reset code to %s via provider %s",
+            email,
+            notification_service.get_email_provider(),
+        )
         raise HTTPException(status_code=500, detail="E-mail yuborishda xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.")
 
     return {"message": "Tasdiqlash kodi yuborildi."}

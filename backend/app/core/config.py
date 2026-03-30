@@ -54,6 +54,10 @@ class Settings:
     smtp_user: str
     smtp_password: str
     smtp_from: str
+    email_provider: str
+    email_timeout_seconds: float
+    resend_api_key: str
+    resend_api_base_url: str
     eskiz_email: str
     eskiz_password: str
     auto_notify_enabled: bool
@@ -141,6 +145,10 @@ def get_settings() -> Settings:
         smtp_user=os.getenv("ARENA_SMTP_USER", ""),
         smtp_password=os.getenv("ARENA_SMTP_PASSWORD", ""),
         smtp_from=os.getenv("ARENA_SMTP_FROM", "noreply@pyzone.uz"),
+        email_provider=os.getenv("ARENA_EMAIL_PROVIDER", "auto").strip().lower(),
+        email_timeout_seconds=float(os.getenv("ARENA_EMAIL_TIMEOUT_SECONDS", "15")),
+        resend_api_key=os.getenv("ARENA_RESEND_API_KEY", ""),
+        resend_api_base_url=os.getenv("ARENA_RESEND_API_BASE_URL", "https://api.resend.com"),
         eskiz_email=os.getenv("ARENA_ESKIZ_EMAIL", ""),
         eskiz_password=os.getenv("ARENA_ESKIZ_PASSWORD", ""),
         auto_notify_enabled=_env_bool("ARENA_AUTO_NOTIFY_ENABLED", True),
