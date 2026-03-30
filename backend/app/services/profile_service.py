@@ -31,6 +31,7 @@ class ProfileService:
         if user is None:
             raise ValueError("User not found")
 
+        user_stats_service.ensure_user_stats_fresh(db, user_id)
         # Get real-time stats from solved_problems table (source of truth)
         solved_stats = self._get_realtime_solved_stats(db, user_id)
         rating = rating_service.snapshot(db, user_id)
@@ -87,11 +88,14 @@ class ProfileService:
         }
 
     def get_leaderboard(self, db: Session, *, limit: int = 50) -> list[dict[str, Any]]:
+        user_stats_service.backfill_all(db)
         rows = submission_tracking_repository.get_leaderboard_rows(db, limit=limit)
         return [
             {
                 "user_id": int(row.user_id),
                 "username": row.username,
+                "display_name": getattr(row, "display_name", None),
+                "avatar_url": getattr(row, "avatar_url", None),
                 "rating": int(row.rating or 1200),
                 "solved": int(row.solved or 0),
                 "solved_count": int(row.solved or 0),

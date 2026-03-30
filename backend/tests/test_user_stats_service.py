@@ -14,6 +14,7 @@ from app.database import Base
 from app.models.problem import Problem
 from app.models.submission import SolvedProblem, Submission
 from app.models.user import User
+from app.services.profile_service import profile_service
 from app.services.user_stats_service import user_stats_service
 
 
@@ -135,3 +136,87 @@ def test_ensure_user_stats_fresh_backfills_from_accepted_submissions() -> None:
         assert solves[0].problem_id == problem.id
         assert snapshot.solved_count == 1
         assert snapshot.easy_solved == 1
+
+
+def test_leaderboard_rebuild_prefers_real_progress_and_efficiency() -> None:
+    engine = _make_engine()
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
+    Base.metadata.create_all(bind=engine)
+
+    with Session() as db:
+        leader = User(username="grinder", display_name="Grinder", password_hash="hashed")
+        challenger = User(username="finisher", display_name="Finisher", password_hash="hashed")
+        db.add_all([leader, challenger])
+        db.flush()
+
+        problems = [
+            _build_problem(problem_id=f"p{i}", slug=f"problem-{i}", difficulty="easy")
+            for i in range(1, 18)
+        ]
+        db.add_all(problems)
+        db.flush()
+
+        for index in range(1, 8):
+            db.add(
+                Submission(
+                    user_id=leader.id,
+                    problem_id=f"p{index}",
+                    code="print('ok')",
+                    language="python",
+                    mode="submit",
+                    status="completed",
+                    verdict="accepted",
+                    case_results_json="[]",
+                )
+            )
+
+        for _ in range(57):
+            db.add(
+                Submission(
+                    user_id=leader.id,
+                    problem_id="p1",
+                    code="print('wa')",
+                    language="python",
+                    mode="submit",
+                    status="completed",
+                    verdict="wrong_answer",
+                    case_results_json="[]",
+                )
+            )
+
+        for index in range(8, 18):
+            db.add(
+                Submission(
+                    user_id=challenger.id,
+                    problem_id=f"p{index}",
+                    code="print('ok')",
+                    language="python",
+                    mode="submit",
+                    status="completed",
+                    verdict="accepted",
+                    case_results_json="[]",
+                )
+            )
+
+        db.add(
+            Submission(
+                user_id=challenger.id,
+                problem_id="p8",
+                code="print('wa')",
+                language="python",
+                mode="submit",
+                status="completed",
+                verdict="wrong_answer",
+                case_results_json="[]",
+            )
+        )
+        db.commit()
+
+        leaderboard = profile_service.get_leaderboard(db, limit=10)
+
+        assert leaderboard[0]["username"] == "finisher"
+        assert leaderboard[0]["display_name"] == "Finisher"
+        assert leaderboard[0]["solved_count"] == 10
+        assert leaderboard[0]["rating"] > leaderboard[1]["rating"]
+        assert leaderboard[1]["username"] == "grinder"
+        assert leaderboard[1]["solved_count"] == 7

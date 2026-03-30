@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
 import { contestApi } from "../../lib/apiClient.js";
 import type { ContestDetail, ContestLeaderboardRow } from "../../services/contestService";
@@ -66,7 +66,11 @@ export default function ContestLeaderboardPage() {
                 {rows.map((row, index) => (
                   <tr key={`${row.username}-${index}`} className="border-t border-white/5">
                     <td className="px-4 py-3 text-arena-muted">{index + 1}</td>
-                    <td className="px-4 py-3 font-medium">{row.username}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <Link className="transition-colors hover:text-[var(--arena-primary)]" to={`/profile/${encodeURIComponent(row.username)}`}>
+                        {row.username}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-arena-muted">{row.solved}</td>
                     <td className="px-4 py-3 text-arena-muted">{row.penalty_minutes}</td>
                   </tr>

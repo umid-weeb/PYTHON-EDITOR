@@ -297,22 +297,13 @@ class SubmissionService:
 
             # CRITICAL FIX: Handle accepted submissions with proper transaction safety
             is_accepted = (submission.verdict or "").strip().lower() == "accepted"
-            first_solve = False
-            
+            first_solve = bool(finalized.first_solve)
             if is_accepted and submission.user_id is not None:
-                # Use the new safe function that handles idempotency and proper stats updates
-                first_solve = self.repository.record_solved_problem_safe(
-                    db,
-                    user_id=int(submission.user_id),
-                    problem_id=str(submission.problem_id),
-                    solved_at=submission.created_at,
-                    created_by="submission_service"
-                )
                 self.logger.info(
                     "submission.accepted user_id=%s problem_id=%s inserted=%s",
                     submission.user_id,
                     submission.problem_id,
-                    first_solve
+                    first_solve,
                 )
 
             self._sync_contest_submission(

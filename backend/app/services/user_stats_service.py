@@ -38,6 +38,7 @@ class UserStatsService:
     def backfill_all(self, db: Session) -> None:
         user_ids = [int(user_id) for (user_id,) in db.query(User.id).all()]
         for user_id in user_ids:
+            submission_tracking_repository.backfill_solved_problems_for_user(db, user_id)
             submission_tracking_repository.rebuild_user_stats(db, user_id)
         db.flush()
 

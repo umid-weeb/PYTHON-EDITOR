@@ -16,6 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app import models as _models  # noqa: F401
 from app.database import Base
 from app.models.problem import Problem, TestCase as ProblemTestCase
+from app.models.rating import RatingHistory
 from app.models.submission import SolvedProblem, Submission, UserStats
 from app.models.user import User
 import app.services.problem_service as problem_service_module
@@ -103,7 +104,7 @@ def test_recover_stale_submissions_completes_backlog_without_duplicate_solves(mo
     monkeypatch.setattr(
         service.judge,
         "run_submission",
-        lambda problem, code, mode: {
+        lambda problem, code, mode, is_extended=False: {
             "verdict": "Accepted",
             "runtime_ms": 12,
             "memory_kb": 128,
@@ -140,3 +141,63 @@ def test_recover_stale_submissions_completes_backlog_without_duplicate_solves(mo
     assert stats is not None
     assert stats.solved_count == 1
     assert stats.easy_solved == 1
+
+
+def test_finalize_success_runs_first_solve_side_effects_once(monkeypatch) -> None:
+    engine = _make_engine()
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
+    Base.metadata.create_all(bind=engine)
+    monkeypatch.setattr(submission_service_module, "SessionLocal", Session)
+    monkeypatch.setattr(problem_service_module, "SessionLocal", Session)
+    get_problem_service.cache_clear()
+
+    with Session() as db:
+        user = User(username="firstsolve", password_hash="hashed")
+        problem = _build_problem("problem-42")
+        db.add_all([user, problem])
+        db.flush()
+        db.add(
+            Submission(
+                user_id=user.id,
+                problem_id=problem.id,
+                code="class Solution:\n    def solve(self, nums, target):\n        return [0, 1]\n",
+                language="python",
+                mode="submit",
+                status="pending",
+                case_results_json="[]",
+            )
+        )
+        db.commit()
+        submission_id = 1
+        user_id = user.id
+
+    service = SubmissionService()
+    monkeypatch.setattr(service, "_sync_contest_submission", lambda *args, **kwargs: None)
+    monkeypatch.setattr(submission_service_module.engagement_service, "update_streak_for_accept", lambda *args, **kwargs: None)
+
+    result = service._finalize_success(
+        submission_id,
+        {
+            "verdict": "Accepted",
+            "runtime_ms": 12,
+            "memory_kb": 128,
+            "passed_count": 1,
+            "total_count": 1,
+            "error_text": None,
+            "case_results": [],
+        },
+    )
+
+    with Session() as db:
+        solves = db.query(SolvedProblem).filter(SolvedProblem.user_id == user_id).all()
+        stats = db.query(UserStats).filter(UserStats.user_id == user_id).first()
+        history = db.query(RatingHistory).filter(RatingHistory.user_id == user_id).all()
+
+    assert result is not None
+    assert result["first_solve"] is True
+    assert len(solves) == 1
+    assert stats is not None
+    assert stats.solved_count == 1
+    assert int(stats.rating or 1200) > 1200
+    assert len(history) == 1
+    assert history[0].submission_id == str(submission_id)

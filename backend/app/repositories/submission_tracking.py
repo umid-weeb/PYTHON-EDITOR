@@ -14,6 +14,7 @@ from app.models.problem import Problem
 from app.models.rating import RatingHistory, UserRating
 from app.models.submission import SolvedProblem, Submission, UserStats
 from app.models.user import User
+from app.services.rating_formula import BASE_RATING, calculate_rating_from_activity
 
 
 @dataclass(frozen=True)
@@ -347,7 +348,7 @@ class SubmissionTrackingRepository:
     def rebuild_user_stats(self, db: Session, user_id: int) -> UserStats:
         row = self.get_user_stats(db, user_id)
         if row is None:
-            row = UserStats(user_id=user_id, rating=self._seed_rating(db, user_id))
+            row = UserStats(user_id=user_id, rating=BASE_RATING)
             db.add(row)
             db.flush()
 
@@ -374,8 +375,13 @@ class SubmissionTrackingRepository:
         row.easy_solved = easy
         row.medium_solved = medium
         row.hard_solved = hard
-        if not row.rating:
-            row.rating = self._seed_rating(db, user_id)
+        total_submissions = self.count_user_submissions(db, user_id)
+        row.rating = calculate_rating_from_activity(
+            easy_solved=easy,
+            medium_solved=medium,
+            hard_solved=hard,
+            total_submissions=total_submissions,
+        )
         db.flush()
         return row
 
@@ -499,6 +505,8 @@ class SubmissionTrackingRepository:
             db.query(
                 User.id.label("user_id"),
                 User.username,
+                User.display_name,
+                User.avatar_url,
                 func.coalesce(UserStats.rating, 1200).label("rating"),
                 func.coalesce(solved_subquery.c.solved, UserStats.solved_count, 0).label("solved"),
                 submissions_subquery.c.submissions,
@@ -510,6 +518,7 @@ class SubmissionTrackingRepository:
             .order_by(
                 func.coalesce(UserStats.rating, 1200).desc(),
                 func.coalesce(solved_subquery.c.solved, UserStats.solved_count, 0).desc(),
+                func.coalesce(submissions_subquery.c.submissions, 0).asc(),
                 User.username.asc(),
             )
             .limit(limit)

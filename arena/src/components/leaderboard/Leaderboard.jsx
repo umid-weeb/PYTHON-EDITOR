@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import styles from "./Leaderboard.module.css";
 import Avatar from "../profile/Avatar";
 
@@ -52,20 +53,22 @@ export default function Leaderboard({ entries = [], error }) {
                       </span>
                     </td>
                     <td className={styles.userCell}>
-                      <div className={styles.userInfo}>
-                        <Avatar 
-                          username={entry.username} 
-                          src={entry.avatar_url} 
-                          size="sm" 
-                          className={styles.userAvatar}
-                        />
-                        <div className={styles.userNameGroup}>
-                          <span className={styles.username}>{entry.username}</span>
-                          {entry.display_name && (
-                            <span className={styles.displayName}>{entry.display_name}</span>
-                          )}
+                      <Link to={`/profile/${encodeURIComponent(entry.username)}`} className={styles.userLink}>
+                        <div className={styles.userInfo}>
+                          <Avatar
+                            username={entry.username}
+                            src={entry.avatar_url}
+                            size="sm"
+                            className={styles.userAvatar}
+                          />
+                          <div className={styles.userNameGroup}>
+                            <span className={styles.username}>{entry.username}</span>
+                            {entry.display_name && (
+                              <span className={styles.displayName}>{entry.display_name}</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      </Link>
                     </td>
                     <td className={styles.statCell}>
                       <div className={styles.ratingBadge}>

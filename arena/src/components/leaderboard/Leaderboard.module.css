@@ -93,6 +93,15 @@
   gap: 12px;
 }
 
+.userLink {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.userLink:hover .username {
+  color: var(--arena-primary);
+}
+
 .userNameGroup {
   display: flex;
   flex-direction: column;

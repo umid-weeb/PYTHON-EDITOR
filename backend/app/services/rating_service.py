@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.problem import Problem
 from app.models.rating import RatingHistory
 from app.models.submission import UserStats
+from app.services.rating_formula import BASE_RATING
 
 
 @dataclass(frozen=True)
@@ -16,22 +17,12 @@ class RatingSnapshot:
     max_rating: int
     global_rank: int | None
 
-
-def _difficulty_delta(difficulty: str | None) -> int:
-    d = (difficulty or "").strip().lower()
-    if d == "hard":
-        return 20
-    if d == "medium":
-        return 12
-    return 6
-
-
 class RatingService:
     def get_or_create(self, db: Session, user_id: int) -> UserStats:
         row = db.query(UserStats).filter(UserStats.user_id == user_id).first()
         if row:
             return row
-        row = UserStats(user_id=user_id, rating=1200)
+        row = UserStats(user_id=user_id, rating=BASE_RATING)
         db.add(row)
         db.flush()
         return row
@@ -60,17 +51,19 @@ class RatingService:
         # Use first() to safely handle potential duplicate problem IDs
         prob_row = db.query(Problem.difficulty).filter(Problem.id == problem_id).first()
         difficulty = prob_row[0] if prob_row else None
-        delta = _difficulty_delta(difficulty)
 
         rating_row = self.get_or_create(db, user_id)
-        base_rating = int(rating_row.rating or 1200)
-        rating_after = base_rating + int(delta)
-        rating_row.rating = rating_after
+        base_rating = int(rating_row.rating or BASE_RATING)
+
+        from app.repositories.submission_tracking import submission_tracking_repository
+
+        rating_row = submission_tracking_repository.rebuild_user_stats(db, user_id)
+        rating_after = int(rating_row.rating or BASE_RATING)
 
         db.add(
             RatingHistory(
                 user_id=user_id,
-                delta=delta,
+                delta=rating_after - base_rating,
                 rating_after=rating_after,
                 reason=f"first_ac:{difficulty or 'unknown'}",
                 submission_id=submission_id,
@@ -78,7 +71,10 @@ class RatingService:
         )
 
     def snapshot(self, db: Session, user_id: int) -> RatingSnapshot:
-        row = self.get_or_create(db, user_id)
+        from app.repositories.submission_tracking import submission_tracking_repository
+
+        submission_tracking_repository.backfill_solved_problems_for_user(db, user_id)
+        row = submission_tracking_repository.rebuild_user_stats(db, user_id)
         # Dense rank by rating desc.
         higher = db.query(func.count(UserStats.user_id)).filter(UserStats.rating > row.rating).scalar() or 0
         max_rating = (
@@ -88,8 +84,8 @@ class RatingService:
         )
         global_rank = int(higher) + 1
         return RatingSnapshot(
-            rating=int(row.rating or 1200),
-            max_rating=int(max_rating or row.rating or 1200),
+            rating=int(row.rating or BASE_RATING),
+            max_rating=max(int(max_rating or 0), int(row.rating or BASE_RATING), BASE_RATING),
             global_rank=global_rank,
         )
 
