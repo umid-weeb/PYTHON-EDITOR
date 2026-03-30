@@ -175,7 +175,7 @@ export function ArenaProvider({ children }) {
       }
 
       // Check for timeout to trigger modal
-      if (!isExtended && payload.verdict === "Time Limit Exceeded") {
+      if (!isExtended && payload.verdict === "TIME_LIMIT_EXCEEDED") {
         setPendingRetry({ type: 'run' });
         setIsTimeoutModalOpen(true);
       }
@@ -244,7 +244,7 @@ export function ArenaProvider({ children }) {
         }
 
         // Check for timeout to trigger modal
-        if (!isExtended && payload.verdict === "Time Limit Exceeded") {
+        if (!isExtended && payload.verdict === "TIME_LIMIT_EXCEEDED") {
           setPendingRetry({ type: 'submit', token });
           setIsTimeoutModalOpen(true);
         }

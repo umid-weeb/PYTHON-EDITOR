@@ -37,10 +37,10 @@ const TimeoutWarningModal: React.FC<TimeoutWarningModalProps> = ({ isOpen, onClo
             {/* Title & Description */}
             <div className="text-center space-y-3 mb-8">
               <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
-                Vaqt chegarasi tugadi
+                Siz cheksiz sikl ishlatgan bo‘lishingiz mumkin
               </h3>
               <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                Sizning kodingiz kutilganidan uzoqroq vaqt davomida ishlamoqda. Bu cheksiz sikl yoki juda katta hajmdagi xisob-kitoblar tufayli bo'lishi mumkin.
+                Kodingiz belgilangan vaqt ichida bajarilmadi. Bu cheksiz sikl yoki juda uzoq davom etuvchi amal bo'lishi mumkin.
               </p>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200/50 dark:border-amber-500/20 rounded-lg text-xs font-medium text-amber-700 dark:text-amber-400">
                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-2 fill-none stroke-current">
@@ -48,14 +48,14 @@ const TimeoutWarningModal: React.FC<TimeoutWarningModalProps> = ({ isOpen, onClo
                   <path d="M12 9v4" />
                   <path d="M12 17h.01" />
                 </svg>
-                Boshqaruvni o'zingizga oling
+                Vaqt chegarasini tekshiring
               </div>
             </div>
 
             {/* Question */}
             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl mb-8 border border-slate-200 dark:border-slate-700/50 text-center">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Kodni yana bir bor uzunroq vaqt (5s) bilan tekshirib ko'ramizmi?
+                Kodni qaytadan 5 soniyalik limit bilan ishga tushiramizmi?
               </span>
             </div>
 
@@ -68,7 +68,7 @@ const TimeoutWarningModal: React.FC<TimeoutWarningModalProps> = ({ isOpen, onClo
                 <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current stroke-3 transition-transform group-hover:scale-110">
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
-                Ha, davom etsin
+                Davom et
               </button>
               <button
                 onClick={onClose}
@@ -79,7 +79,7 @@ const TimeoutWarningModal: React.FC<TimeoutWarningModalProps> = ({ isOpen, onClo
                   <line x1="15" y1="9" x2="9" y2="15" />
                   <line x1="9" y1="9" x2="15" y2="15" />
                 </svg>
-                Yo'q, to'xtat
+                Bekor qilish
               </button>
             </div>
           </div>

@@ -57,12 +57,12 @@ class ArenaSecurity:
         
         # Check instruction limit
         if self.instructions > self.instruction_limit:
-            raise LoopTimeoutError(f"Cheksiz sikl aniqlandi: Maksimal itaratsiyadan oshib ketdi ({self.instruction_limit})")
+            raise LoopTimeoutError(f"Execution stopped: possible infinite loop (limit: {self.instruction_limit})")
             
         # Periodically check time to reduce overhead
         if self.instructions % 1000 == 0:
             if (time.perf_counter() - self.start_time) > self.time_limit:
-                raise LoopTimeoutError(f"Vaqt chegarasi tugadi: {self.time_limit}s")
+                raise LoopTimeoutError(f"Execution stopped: possible infinite loop (time: {self.time_limit}s)")
                 
         return self.trace
 
@@ -120,8 +120,9 @@ except SyntaxError as exc:
 except LoopTimeoutError as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
-        "verdict": "Time Limit Exceeded",
+        "verdict": "TIME_LIMIT_EXCEEDED",
         "error": str(exc),
+        "message": "Execution stopped: possible infinite loop",
         "runtime_ms": 0,
         "memory_kb": 0
     }, ensure_ascii=False))
@@ -167,9 +168,10 @@ except LoopTimeoutError as exc:
     current, peak = tracemalloc.get_traced_memory()
     print("<<<JSON_START>>>")
     print(json.dumps({
-        "verdict": "Time Limit Exceeded",
+        "verdict": "TIME_LIMIT_EXCEEDED",
         "stdout": stdout_buffer.getvalue(),
         "error": str(exc),
+        "message": "Execution stopped: possible infinite loop",
         "runtime_ms": runtime_ms,
         "memory_kb": int(peak / 1024)
     }, ensure_ascii=False))
@@ -515,12 +517,13 @@ class JudgeRunner:
             )
         except subprocess.TimeoutExpired:
             return {
-                "verdict": "Time Limit Exceeded",
+                "verdict": "TIME_LIMIT_EXCEEDED",
                 "passed": False,
                 "runtime_ms": int(timeout_seconds * 1000),
                 "memory_kb": 0,
                 "actual_output": "",
-                "error": "Execution timed out.",
+                "error": "Execution stopped: possible infinite loop",
+                "message": "Execution stopped: possible infinite loop",
             }
         except Exception as startup_error:
             # Catch fork/exec issues (e.g. OOM or permissions)
