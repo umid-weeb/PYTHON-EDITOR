@@ -190,6 +190,14 @@ export default function ResultPanel({ result, busy = false }) {
                         />
                     </>
                 )}
+
+                {activeCase.stdout && (
+                    <CodeBlock 
+                        label="Stdout (Harness)" 
+                        value={activeCase.stdout} 
+                        placeholder="Natija mavjud emas" 
+                    />
+                )}
                 
                 {/* Individual per-case metrics if available */}
                 {(activeCase.runtime || activeCase.memory) && (

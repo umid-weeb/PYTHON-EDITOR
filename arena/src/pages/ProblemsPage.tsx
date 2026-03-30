@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { API_BASE_URL, arenaApi, userApi } from "../lib/apiClient.js";
 import { formatProblemTitle, localizeDifficultyLabel, localizeTagLabel } from "../lib/problemPresentation.js";
 import { readStoredToken } from "../lib/storage.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 type Problem = {
   id: string;
@@ -188,6 +189,7 @@ function DailyStreakBar({
 export default function ProblemsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { token, user } = useAuth();
 
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -259,12 +261,12 @@ export default function ProblemsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const token = readStoredToken();
 
     async function loadEngagement() {
+      const tokenToUse = token || readStoredToken();
       const [challenge, streakPayload] = await Promise.all([
         arenaApi.getDailyChallenge().catch(() => null),
-        token ? userApi.getMyStreak().catch(() => null) : Promise.resolve(null),
+        tokenToUse ? userApi.getMyStreak(tokenToUse).catch(() => null) : Promise.resolve(null),
       ]);
 
       if (!cancelled) {
@@ -277,7 +279,7 @@ export default function ProblemsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [token, user]);
 
   const toggleTag = (tag: string) => {
     const nextTags = selectedTags.includes(tag)
