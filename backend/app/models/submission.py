@@ -24,6 +24,7 @@ class Submission(Base):
     total_count = Column(Integer, nullable=True)
     error_text = Column(Text, nullable=True)
     case_results_json = Column(Text, nullable=False, default="[]", server_default="[]")
+    is_extended = Column(Integer, nullable=False, default=0, server_default="0")  # 0 or 1
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

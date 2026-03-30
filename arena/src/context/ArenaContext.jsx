@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { arenaApi } from "../lib/apiClient.js";
 import { useAuth } from "./AuthContext.jsx";
 import { buildResultState } from "../lib/formatters.js";
+import TimeoutWarningModal from "../components/common/TimeoutWarningModal.tsx";
 import {
   clearPendingSubmission,
   readDraft,
@@ -36,6 +37,10 @@ export function ArenaProvider({ children }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [activeCaseIndex, setActiveCaseIndex] = useState(0);
+  
+  const [isTimeoutModalOpen, setIsTimeoutModalOpen] = useState(false);
+  const [pendingRetry, setPendingRetry] = useState(null); // { type: 'run' | 'submit', token?: string }
+  
   const cacheRef = useRef(new Map());
 
   const { token } = useAuth();
@@ -131,7 +136,7 @@ export function ArenaProvider({ children }) {
     writeLanguage(nextLanguage);
   }, []);
 
-  const runCode = useCallback(async () => {
+  const runCode = useCallback(async (isExtended = false) => {
     const submissionProblemKey = getSubmissionProblemKey();
 
     if (!submissionProblemKey) {
@@ -144,19 +149,19 @@ export function ArenaProvider({ children }) {
       return null;
     }
 
-    if (isRunning) return null;
+    if (isRunning && !isExtended) return null;
 
     persistDraft();
     setIsRunning(true);
     setResult({
       tone: "info",
       chip: "Ishlayapti",
-      summary: "Ko'rinadigan testlar ishga tushirilmoqda...",
+      summary: isExtended ? "Kodni uzaytirilgan vaqt bilan tekshirilmoqda..." : "Ko'rinadigan testlar ishga tushirilmoqda...",
       details: [],
     });
 
     try {
-      const submission = await arenaApi.runSolution(submissionProblemKey, code, language);
+      const submission = await arenaApi.runSolution(submissionProblemKey, code, language, isExtended);
       if (!submission) {
         throw new Error("Serverdan javob kelmadi.");
       }
@@ -167,6 +172,12 @@ export function ArenaProvider({ children }) {
 
       if (!payload) {
         throw new Error("Natijani yuklab bo'lmadi.");
+      }
+
+      // Check for timeout to trigger modal
+      if (!isExtended && payload.verdict === "Time Limit Exceeded") {
+        setPendingRetry({ type: 'run' });
+        setIsTimeoutModalOpen(true);
       }
 
       const formatted = buildResultState(payload, "run");
@@ -188,7 +199,7 @@ export function ArenaProvider({ children }) {
   }, [code, getSubmissionProblemKey, isRunning, language, persistDraft]);
 
   const submitCode = useCallback(
-    async (token) => {
+    async (token, isExtended = false) => {
       const submissionProblemKey = getSubmissionProblemKey();
 
       if (!submissionProblemKey) {
@@ -201,7 +212,7 @@ export function ArenaProvider({ children }) {
         return null;
       }
 
-      if (isSubmitting) return null;
+      if (isSubmitting && !isExtended) return null;
 
       if (!token) {
         setPendingSubmission(submissionProblemKey);
@@ -214,12 +225,12 @@ export function ArenaProvider({ children }) {
       setResult({
         tone: "info",
         chip: "Yuborilmoqda",
-        summary: "Yechimingiz yuborilmoqda...",
+        summary: isExtended ? "Yechimingiz uzaytirilgan vaqt bilan tekshirilmoqda..." : "Yechimingiz yuborilmoqda...",
         details: [],
       });
 
       try {
-        const submission = await arenaApi.submitSolution(submissionProblemKey, code, language);
+        const submission = await arenaApi.submitSolution(submissionProblemKey, code, language, isExtended);
         if (!submission) {
           throw new Error("Serverdan javob kelmadi.");
         }
@@ -230,6 +241,12 @@ export function ArenaProvider({ children }) {
 
         if (!payload) {
           throw new Error("Natijani yuklab bo'lmadi.");
+        }
+
+        // Check for timeout to trigger modal
+        if (!isExtended && payload.verdict === "Time Limit Exceeded") {
+          setPendingRetry({ type: 'submit', token });
+          setIsTimeoutModalOpen(true);
         }
 
         clearPendingSubmission();
@@ -290,6 +307,18 @@ export function ArenaProvider({ children }) {
     },
     [code, getSubmissionProblemKey, isSubmitting, language, persistDraft, selectedProblem?.id, selectedProblem?.slug, selectedProblemId]
   );
+
+  const handleContinueExecution = useCallback(() => {
+    setIsTimeoutModalOpen(false);
+    if (!pendingRetry) return;
+
+    if (pendingRetry.type === 'run') {
+      runCode(true);
+    } else if (pendingRetry.type === 'submit') {
+      submitCode(pendingRetry.token, true);
+    }
+    setPendingRetry(null);
+  }, [pendingRetry, runCode, submitCode]);
 
   const filteredProblems = useMemo(
     () =>
@@ -385,7 +414,19 @@ export function ArenaProvider({ children }) {
     ]
   );
 
-  return <ArenaContext.Provider value={value}>{children}</ArenaContext.Provider>;
+  return (
+    <ArenaContext.Provider value={value}>
+      {children}
+      <TimeoutWarningModal
+        isOpen={isTimeoutModalOpen}
+        onClose={() => {
+          setIsTimeoutModalOpen(false);
+          setPendingRetry(null);
+        }}
+        onContinue={handleContinueExecution}
+      />
+    </ArenaContext.Provider>
+  );
 }
 
 export function useArena() {

@@ -59,6 +59,7 @@ class SubmissionTrackingRepository:
         code: str,
         language: str,
         mode: str,
+        is_extended: bool = False,
     ) -> Submission:
         row = Submission(
             user_id=user_id,
@@ -66,6 +67,7 @@ class SubmissionTrackingRepository:
             code=code,
             language=language,
             mode=mode,
+            is_extended=1 if is_extended else 0,
             status="pending",
             case_results_json="[]",
         )

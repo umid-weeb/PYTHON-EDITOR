@@ -58,6 +58,7 @@ class SubmissionRequest(BaseModel):
     code: str
     language: Literal["python", "javascript", "cpp"] = "python"
     contest_id: str | None = None
+    is_extended: bool = False
 
 
 class SubmissionCreated(BaseModel):

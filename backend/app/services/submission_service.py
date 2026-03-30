@@ -60,6 +60,7 @@ class SubmissionService:
                 code=payload.code,
                 language=payload.language,
                 mode=mode,
+                is_extended=payload.is_extended,
             )
 
             if payload.contest_id and user_id is not None and mode == "submit":
@@ -153,11 +154,12 @@ class SubmissionService:
                 self._finalize_failure(int(submission_id), "System Error: Ushbu masala uchun testlar topilmadi. Iltimos, administratorga xabar bering.")
                 return
 
-            self.logger.info("submission.judge_running id=%s mode=%s cases=%s", submission_id, payload["mode"], len(all_cases))
+            self.logger.info("submission.judge_running id=%s mode=%s cases=%s extended=%s", submission_id, payload["mode"], len(all_cases), payload.get("is_extended", False))
             result = self.judge.run_submission(
                 problem=problem_bundle,
                 code=payload["code"],
                 mode=payload["mode"],
+                is_extended=payload.get("is_extended", False),
             )
 
             finalized = self._finalize_success(int(submission_id), result)
@@ -216,6 +218,7 @@ class SubmissionService:
                 "code": submission.code,
                 "language": submission.language,
                 "mode": submission.mode,
+                "is_extended": getattr(submission, "is_extended", False),
             }
             db.commit()
             return payload

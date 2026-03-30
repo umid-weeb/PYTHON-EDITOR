@@ -15,7 +15,6 @@ from app.judge.judge0_client import Judge0Client, get_judge0_settings
 
 
 HARNESS_CODE = """\
-import ast
 import contextlib
 import importlib.util
 import io
@@ -26,10 +25,14 @@ import time
 import traceback
 import tracemalloc
 
+workspace = pathlib.Path(__file__).resolve().parent
+payload = json.loads((workspace / "payload.json").read_text(encoding="utf-8"))
+submission_path = workspace / "submission.py"
+
 # Constants for security and stability
-# Max 1 million loop iterations or 2 seconds total per test case
-MAX_TICKS = 1_000_000
-MAX_TIME_SECONDS = 2.0
+# Defaults: 1 million instructions or 2 seconds
+MAX_INSTRUCTIONS = payload.get("instruction_limit", 1_000_000)
+MAX_TIME_SECONDS = float(payload.get("time_limit", 2.0))
 
 # Ensure UTF-8 output even on Windows
 if hasattr(sys.stdout, "reconfigure"):
@@ -40,40 +43,28 @@ class LoopTimeoutError(Exception):
     pass
 
 class ArenaSecurity:
-    def __init__(self, time_limit=MAX_TIME_SECONDS, tick_limit=MAX_TICKS):
+    def __init__(self, time_limit=MAX_TIME_SECONDS, instruction_limit=MAX_INSTRUCTIONS):
         self.start_time = time.perf_counter()
-        self.ticks = 0
+        self.instructions = 0
         self.time_limit = time_limit
-        self.tick_limit = tick_limit
+        self.instruction_limit = instruction_limit
 
-    def tick(self):
-        self.ticks += 1
-        if self.ticks % 1000 == 0:  # Check time every 1000 iterations to reduce overhead
-            if (time.perf_counter() - self.start_time) > self.time_limit:
-                raise LoopTimeoutError(f"Time Limit Exceeded: {self.time_limit}s")
+    def trace(self, frame, event, arg):
+        if event != "line":
+            return self.trace
+            
+        self.instructions += 1
         
-        if self.ticks > self.tick_limit:
-            raise LoopTimeoutError("Infinite Loop Detected: Max iterations exceeded")
-
-class LoopInstrumenter(ast.NodeTransformer):
-    '''Parses AST and injects __arena_tick__() into every loop.'''
-    def visit_While(self, node):
-        self.generic_visit(node)
-        tick_call = ast.Expr(ast.Call(
-            func=ast.Name(id='__arena_tick__', ctx=ast.Load()),
-            args=[], keywords=[]
-        ))
-        node.body.insert(0, tick_call)
-        return node
-
-    def visit_For(self, node):
-        self.generic_visit(node)
-        tick_call = ast.Expr(ast.Call(
-            func=ast.Name(id='__arena_tick__', ctx=ast.Load()),
-            args=[], keywords=[]
-        ))
-        node.body.insert(0, tick_call)
-        return node
+        # Check instruction limit
+        if self.instructions > self.instruction_limit:
+            raise LoopTimeoutError(f"Cheksiz sikl aniqlandi: Maksimal itaratsiyadan oshib ketdi ({self.instruction_limit})")
+            
+        # Periodically check time to reduce overhead
+        if self.instructions % 1000 == 0:
+            if (time.perf_counter() - self.start_time) > self.time_limit:
+                raise LoopTimeoutError(f"Vaqt chegarasi tugadi: {self.time_limit}s")
+                
+        return self.trace
 
 security_monitor = ArenaSecurity()
 
@@ -89,8 +80,6 @@ def format_user_error(exc):
             clean_f = traceback.FrameSummary("solution.py", f.lineno, f.name, line=f.line)
             clean_tb.append(clean_f)
             
-    # If we have no frames from the user's file, it might be a system/injection error
-    # In that case, we show the full traceback to help debug
     if not clean_tb and tb:
         return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)).strip()
 
@@ -100,41 +89,24 @@ def format_user_error(exc):
     lines.extend(traceback.format_exception_only(type(exc), exc))
     return "".join(lines).strip()
 
-workspace = pathlib.Path(__file__).resolve().parent
-payload = json.loads((workspace / "payload.json").read_text(encoding="utf-8"))
-submission_path = workspace / "submission.py"
-
-# --- Instrumentation & Execution ---
+# --- Execution ---
 try:
-    source = submission_path.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename="solution.py")
-    
-    # Rewrite loops
-    transformer = LoopInstrumenter()
-    transformed_tree = transformer.visit(tree)
-    ast.fix_missing_locations(transformed_tree)
-    
-    # Compile
-    code_obj = compile(transformed_tree, filename="solution.py", mode="exec")
-    
     # Create module
     spec = importlib.util.spec_from_file_location("submission", submission_path)
     module = importlib.util.module_from_spec(spec)
     
-    # Inject security tick into both module dict AND builtins
-    # This ensures it is accessible even in deep nested scopes or classes
-    module.__dict__['__arena_tick__'] = security_monitor.tick
+    # Execute the code with tracing
+    sys.settrace(security_monitor.trace)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.settrace(None)
     
-    # Also inject into the module's __builtins__ if it exists
-    if "__builtins__" in module.__dict__:
-        if isinstance(module.__dict__["__builtins__"], dict):
-            module.__dict__["__builtins__"]["__arena_tick__"] = security_monitor.tick
-        else:
-            setattr(module.__dict__["__builtins__"], "__arena_tick__", security_monitor.tick)
-    
-    # Execute the instrumented code in module's dict
-    exec(code_obj, module.__dict__)
-    
+    if hasattr(module, "Solution"):
+        target = getattr(module.Solution(), payload["function_name"])
+    else:
+        target = getattr(module, payload["function_name"])
+        
 except SyntaxError as exc:
     print("<<<JSON_START>>>")
     print(json.dumps({
@@ -166,29 +138,19 @@ except Exception as exc:
     print("<<<JSON_END>>>")
     raise SystemExit(0)
 
-try:
-    if hasattr(module, "Solution"):
-        target = getattr(module.Solution(), payload["function_name"])
-    else:
-        target = getattr(module, payload["function_name"])
-except AttributeError as exc:
-    print("<<<JSON_START>>>")
-    print(json.dumps({
-        "verdict": "Runtime Error",
-        "error": f"Function topilmadi: {payload['function_name']}",
-        "runtime_ms": 0,
-        "memory_kb": 0
-    }, ensure_ascii=False))
-    print("<<<JSON_END>>>")
-    raise SystemExit(0)
-
 stdout_buffer = io.StringIO()
 tracemalloc.start()
 started = time.perf_counter()
 
 try:
     with contextlib.redirect_stdout(stdout_buffer):
-        result = target(*payload.get("args", []))
+        # Run the target function with tracing
+        sys.settrace(security_monitor.trace)
+        try:
+            result = target(*payload.get("args", []))
+        finally:
+            sys.settrace(None)
+            
     runtime_ms = int((time.perf_counter() - started) * 1000)
     current, peak = tracemalloc.get_traced_memory()
     print("<<<JSON_START>>>")
@@ -241,6 +203,7 @@ finally:
 """
 
 
+
 class JudgeRunner:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -251,7 +214,8 @@ class JudgeRunner:
         self,
         problem: dict[str, Any],
         code: str,
-        mode: str,
+        mode: str = "run",
+        is_extended: bool = False,
     ) -> dict[str, Any]:
         visible = list(problem.get("visible_testcases", []))
         hidden = list(problem.get("hidden_testcases", []))
@@ -266,23 +230,27 @@ class JudgeRunner:
             except Exception:
                 warming_up = False
 
-            error_msg = (
-                "Server hali ishga tushmoqda, bir daqiqa kuting va qayta urining."
-                if warming_up
-                else "Bu masala uchun test topilmadi. Iltimos, sahifani yangilab ko'ring."
-            )
-            return {
-                "verdict": "Runtime Error",
-                "runtime_ms": 0,
-                "memory_kb": 0,
-                "passed_count": 0,
-                "total_count": 0,
-                "error_text": error_msg,
-                "case_results": [],
-            }
+            if warming_up:
+                return {
+                    "verdict": "Runtime Error",
+                    "runtime_ms": 0,
+                    "memory_kb": 0,
+                    "passed_count": 0,
+                    "total_count": 0,
+                    "error_text": "Server hali ishga tushmoqda, bir daqiqa kuting va qayta urining.",
+                    "case_results": [],
+                }
+                
+            # Create a default testcase if none are defined
+            selected = [
+                {
+                    "name": "Default Case",
+                    "input": "",
+                    "expected_output": "",
+                }
+            ]
 
-
-        case_results: list[dict[str, Any]] = []
+        case_results = []
         verdict = "Accepted"
         passed_count = 0
         runtime_total = 0
@@ -290,7 +258,7 @@ class JudgeRunner:
         error_text = None
 
         for testcase in selected:
-            execution = self._execute_case(problem, code, testcase)
+            execution = self._execute_case(problem, code, testcase, is_extended=is_extended)
             runtime_total += execution.get("runtime_ms", 0) or 0
             memory_peak = max(memory_peak, execution.get("memory_kb", 0) or 0)
 
@@ -334,6 +302,7 @@ class JudgeRunner:
         problem: dict[str, Any],
         code: str,
         testcase: dict[str, Any],
+        is_extended: bool = False,
     ) -> dict[str, Any]:
         # For now, only Python uses the local harness. Other languages are
         # routed through Judge0 when it is configured; otherwise we return a
@@ -449,6 +418,8 @@ class JudgeRunner:
                     {
                         "function_name": problem["function_name"],
                         "args": args,
+                        "time_limit": time_limit,
+                        "instruction_limit": instruction_limit,
                     },
                     ensure_ascii=False,
                 ),
@@ -459,6 +430,7 @@ class JudgeRunner:
                 workspace=workspace,
                 time_limit_seconds=problem.get("time_limit_seconds", 1.0),
                 memory_limit_mb=problem.get("memory_limit_mb", 256),
+                is_extended=is_extended,
             )
 
         return self._evaluate_case_result(
@@ -471,8 +443,14 @@ class JudgeRunner:
         workspace: Path,
         time_limit_seconds: float,
         memory_limit_mb: int,
+        is_extended: bool = False,
     ) -> dict[str, Any]:
-        timeout_seconds = max(1.0, float(time_limit_seconds) + 1.0)
+        # If extended, allow more time and instructions
+        instruction_limit = 5_000_000 if is_extended else 1_000_000
+        time_limit = 5.0 if is_extended else float(time_limit_seconds)
+        
+        # subprocess timeout should be slightly more than the harness limit
+        timeout_seconds = time_limit + 1.0
 
         # Better Python resolution: use sys.executable as primary, python3 as secondary.
         # This is more robust on various Linux/Container environments.

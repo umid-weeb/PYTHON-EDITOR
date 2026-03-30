@@ -119,16 +119,16 @@ export const arenaApi = {
       throw error;
     }
   },
-  runSolution(problemSlug, code, language) {
+  runSolution(problemSlug, code, language, isExtended = false) {
     return request("/api/run", {
       method: "POST",
-      body: JSON.stringify(buildSubmissionPayload(problemSlug, code, language)),
+      body: JSON.stringify(buildSubmissionPayload(problemSlug, code, language, isExtended)),
     });
   },
-  submitSolution(problemSlug, code, language) {
+  submitSolution(problemSlug, code, language, isExtended = false) {
     return request("/api/submit", {
       method: "POST",
-      body: JSON.stringify(buildSubmissionPayload(problemSlug, code, language)),
+      body: JSON.stringify(buildSubmissionPayload(problemSlug, code, language, isExtended)),
     });
   },
   getSubmission(submissionId, token) {
@@ -261,7 +261,7 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function buildSubmissionPayload(problemSlug, code, language) {
+function buildSubmissionPayload(problemSlug, code, language, isExtended = false) {
   const contestId = (() => {
     try {
       const params = new URLSearchParams(window.location.search || "");
@@ -276,5 +276,6 @@ function buildSubmissionPayload(problemSlug, code, language) {
     problemSlug,
     problem_id: problemSlug,
     contest_id: contestId || undefined,
+    is_extended: isExtended,
   };
 }
