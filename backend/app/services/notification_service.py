@@ -78,8 +78,19 @@ class NotificationService:
 
             msg.attach(MIMEText(body, "html" if is_html else "plain"))
 
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-                server.starttls()
+            msg.attach(MIMEText(body, "html" if is_html else "plain"))
+
+            # Determine if we should use SSL or TLS based on port
+            if settings.smtp_port == 465:
+                # Port 465 uses direct SSL
+                server_class = smtplib.SMTP_SSL
+            else:
+                # Port 587 or others use STARTTLS
+                server_class = smtplib.SMTP
+
+            with server_class(settings.smtp_host, settings.smtp_port, timeout=15) as server:
+                if settings.smtp_port != 465:
+                    server.starttls()
                 server.login(settings.smtp_user, settings.smtp_password)
                 server.send_message(msg)
             return True
