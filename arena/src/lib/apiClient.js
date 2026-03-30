@@ -102,6 +102,24 @@ export const authApi = {
       clearStoredToken();
     }
   },
+  requestPasswordReset(email) {
+    return request("/api/password/reset/request", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+  verifyPasswordReset(email, code) {
+    return request("/api/password/reset/verify", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    });
+  },
+  confirmPasswordReset(email, code, new_password) {
+    return request("/api/password/reset/confirm", {
+      method: "POST",
+      body: JSON.stringify({ email, code, new_password }),
+    });
+  },
 };
 
 export const arenaApi = {
@@ -221,24 +239,6 @@ export const userApi = {
     return request("/api/user/avatar", {
       method: "POST",
       body,
-    });
-  },
-  requestPasswordReset(email) {
-    return request("/api/password/reset/request", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
-  },
-  verifyPasswordReset(email, code) {
-    return request("/api/password/reset/verify", {
-      method: "POST",
-      body: JSON.stringify({ email, code }),
-    });
-  },
-  confirmPasswordReset(email, code, new_password) {
-    return request("/api/password/reset/confirm", {
-      method: "POST",
-      body: JSON.stringify({ email, code, new_password }),
     });
   },
 };
