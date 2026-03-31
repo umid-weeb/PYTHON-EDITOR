@@ -411,6 +411,10 @@ class JudgeRunner:
 
         args = parse_arguments(testcase.get("input", ""))
 
+        # Define limits before creating payload.json
+        instruction_limit = 5_000_000 if is_extended else 1_000_000
+        time_limit = 5.0 if is_extended else float(problem.get("time_limit_seconds", 2.0))
+
         with tempfile.TemporaryDirectory(prefix="arena-judge-") as temp_dir:
             workspace = Path(temp_dir)
             (workspace / "submission.py").write_text(code, encoding="utf-8")
@@ -430,7 +434,7 @@ class JudgeRunner:
 
             result = self._invoke_runner(
                 workspace=workspace,
-                time_limit_seconds=problem.get("time_limit_seconds", 1.0),
+                time_limit_seconds=time_limit,
                 memory_limit_mb=problem.get("memory_limit_mb", 256),
                 is_extended=is_extended,
             )
@@ -447,12 +451,12 @@ class JudgeRunner:
         memory_limit_mb: int,
         is_extended: bool = False,
     ) -> dict[str, Any]:
-        # If extended, allow more time and instructions
-        instruction_limit = 5_000_000 if is_extended else 1_000_000
-        time_limit = 5.0 if is_extended else float(time_limit_seconds)
+        # instruction_limit and time_limit are already available in payload.json 
+        # and passed as arguments here.
+        # time_limit_seconds is the final limit for this execution.
         
         # subprocess timeout should be slightly more than the harness limit
-        timeout_seconds = time_limit + 1.0
+        timeout_seconds = time_limit_seconds + 1.0
 
         # Better Python resolution: use sys.executable as primary, python3 as secondary.
         # This is more robust on various Linux/Container environments.
