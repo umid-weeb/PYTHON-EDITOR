@@ -13,10 +13,9 @@ class AIService:
         self.api_key = settings.ai_api_key
         self.openai_key = settings.openai_api_key
         self.model_names = [
-            'models/gemini-2.0-flash', 
-            'models/gemini-1.5-flash', 
-            'models/gemini-1.5-pro', 
-            'models/gemini-1.5-flash-8b'
+            'gemini-1.5-flash', 
+            'gemini-1.5-pro',
+            'gemini-2.0-flash-exp'
         ]
         
         # Simple in-memory cache for hints to save quota/cost
@@ -24,12 +23,12 @@ class AIService:
         self._hint_cache: Dict[str, str] = {}
         
         if self.api_key:
-            logger.info(f"Gemini initialized with API key ending in ...{self.api_key[-4:] if len(self.api_key) > 4 else '***'}")
+            logger.info(f"Gemini initialized")
             genai.configure(api_key=self.api_key)
         
         self.openai_client = None
         if self.openai_key:
-            logger.info(f"OpenAI initialized with API key ending in ...{self.openai_key[-4:] if len(self.openai_key) > 4 else '***'}")
+            logger.info(f"OpenAI initialized")
             self.openai_client = OpenAI(api_key=self.openai_key)
 
     def _get_cache_key(self, problem_title: str, language: str, code: str) -> str:
