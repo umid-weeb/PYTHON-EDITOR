@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User, PasswordReset
 from app.repositories.submission_tracking import submission_tracking_repository
+from app.services.google_identity_service import GoogleIdentity, google_identity_service
 from app.services.user_stats_service import user_stats_service
 from app.services.notification_service import notification_service
 import random
@@ -134,10 +136,39 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(min_length=10)
+
+
+class GoogleAuthCompleteRequest(BaseModel):
+    onboarding_token: str
+    username: str = Field(min_length=3, max_length=50)
+    country: str | None = None
+
+
 class TokenResponse(BaseModel):
     token: str
     access_token: str
     token_type: str = "bearer"
+
+
+class GoogleConfigResponse(BaseModel):
+    enabled: bool
+    client_id: str | None = None
+
+
+class GoogleAuthResponse(BaseModel):
+    needs_onboarding: bool = False
+    token: str | None = None
+    access_token: str | None = None
+    token_type: str = "bearer"
+    linked_account: bool = False
+    username: str | None = None
+    onboarding_token: str | None = None
+    suggested_username: str | None = None
+    email: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
 
 
 class MeResponse(BaseModel):
@@ -216,6 +247,68 @@ def create_access_token(user: User) -> str:
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_google_onboarding_token(identity: GoogleIdentity) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    return jwt.encode(
+        {
+            "sub": identity.sub,
+            "email": identity.email,
+            "display_name": identity.display_name,
+            "avatar_url": identity.avatar_url,
+            "email_verified": bool(identity.email_verified),
+            "purpose": "google_onboarding",
+            "exp": expire,
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def decode_google_onboarding_token(token: str) -> dict[str, object]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Google onboarding token yaroqsiz.") from exc
+
+    if payload.get("purpose") != "google_onboarding":
+        raise HTTPException(status_code=401, detail="Google onboarding token noto'g'ri.")
+    return payload
+
+
+def build_unusable_password_hash() -> str:
+    return get_password_hash(secrets.token_urlsafe(32))
+
+
+def derive_username_candidate(raw: str) -> str:
+    candidate = re.sub(r"[^a-z0-9_]", "_", (raw or "").strip().lower())
+    candidate = re.sub(r"_+", "_", candidate).strip("_")
+    if len(candidate) < 3:
+        return ""
+    return candidate[:40]
+
+
+def suggest_google_username(db: Session, identity: GoogleIdentity) -> str:
+    base_username = (
+        derive_username_candidate(identity.display_name or "")
+        or derive_username_from_email(identity.email)
+    )
+    return ensure_unique_username(db, base_username)
+
+
+def apply_google_identity(user: User, identity: GoogleIdentity, *, linked_existing_account: bool) -> None:
+    user.google_sub = identity.sub
+    user.email_verified = bool(identity.email_verified)
+    if not user.email:
+        user.email = identity.email
+    if not user.display_name and identity.display_name:
+        user.display_name = identity.display_name[:120]
+    if not user.avatar_url and identity.avatar_url:
+        user.avatar_url = identity.avatar_url[:512]
+    user.last_login_provider = "google"
+    user.last_active = datetime.now(timezone.utc)
+    user.auth_provider = "hybrid" if linked_existing_account else "google"
+
+
 def calculate_user_stats(db: Session, user_id: int) -> dict:
     snapshot = user_stats_service.ensure_user_stats_fresh(db, user_id)
     problem_bank = submission_tracking_repository.get_problem_bank_totals(db)
@@ -262,6 +355,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
             email=email,
             password_hash=get_password_hash(payload.password),
             country=payload.country,
+            auth_provider="local",
+            email_verified=False,
+            last_login_provider="local",
         )
         db.add(user)
         db.commit()
@@ -301,6 +397,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
         if not user or not verify_password(payload.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         user.last_active = datetime.now(timezone.utc)
+        user.last_login_provider = "local"
         db.commit()
         token = create_access_token(user)
         return TokenResponse(token=token, access_token=token)
@@ -311,6 +408,184 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
         logging.getLogger(__name__).exception("Login failed: %s", exc)
         raise HTTPException(status_code=500, detail="Login failed")
+
+
+@router.get("/google/config", response_model=GoogleConfigResponse)
+def google_auth_config() -> GoogleConfigResponse:
+    client_id = google_identity_service.get_client_id()
+    return GoogleConfigResponse(enabled=bool(client_id), client_id=client_id or None)
+
+
+@router.post("/google", response_model=GoogleAuthResponse)
+def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)) -> GoogleAuthResponse:
+    try:
+        identity = google_identity_service.verify_credential(payload.credential)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Google auth verification failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail="Google loginni tasdiqlab bo'lmadi.") from exc
+
+    if not identity.sub:
+        raise HTTPException(status_code=400, detail="Google akkaunti identifikatori topilmadi.")
+    if not identity.email_verified:
+        raise HTTPException(status_code=400, detail="Google emailingiz tasdiqlanmagan.")
+
+    user_by_google = db.query(User).filter(User.google_sub == identity.sub).first()
+    user_by_email = (
+        db.query(User)
+        .filter(func.lower(User.email) == identity.email)
+        .first()
+    )
+
+    if user_by_google and user_by_email and user_by_google.id != user_by_email.id:
+        raise HTTPException(
+            status_code=409,
+            detail="Bu Google akkaunt boshqa email bilan bog'langan. Iltimos support bilan bog'laning.",
+        )
+
+    if user_by_google:
+        apply_google_identity(
+            user_by_google,
+            identity,
+            linked_existing_account=(user_by_google.auth_provider or "google") == "hybrid",
+        )
+        db.commit()
+        db.refresh(user_by_google)
+        token = create_access_token(user_by_google)
+        return GoogleAuthResponse(
+            token=token,
+            access_token=token,
+            username=user_by_google.username,
+            linked_account=False,
+        )
+
+    if user_by_email:
+        if user_by_email.google_sub and user_by_email.google_sub != identity.sub:
+            raise HTTPException(
+                status_code=409,
+                detail="Bu email allaqachon boshqa Google akkauntga ulangan.",
+            )
+
+        apply_google_identity(user_by_email, identity, linked_existing_account=True)
+        db.commit()
+        db.refresh(user_by_email)
+        token = create_access_token(user_by_email)
+        return GoogleAuthResponse(
+            token=token,
+            access_token=token,
+            username=user_by_email.username,
+            linked_account=True,
+        )
+
+    return GoogleAuthResponse(
+        needs_onboarding=True,
+        onboarding_token=create_google_onboarding_token(identity),
+        suggested_username=suggest_google_username(db, identity),
+        email=identity.email,
+        display_name=identity.display_name,
+        avatar_url=identity.avatar_url,
+    )
+
+
+@router.post("/google/complete", response_model=GoogleAuthResponse)
+def complete_google_signup(
+    payload: GoogleAuthCompleteRequest,
+    db: Session = Depends(get_db),
+) -> GoogleAuthResponse:
+    onboarding_payload = decode_google_onboarding_token(payload.onboarding_token)
+    google_sub = str(onboarding_payload.get("sub") or "").strip()
+    email = str(onboarding_payload.get("email") or "").strip().lower()
+    display_name = (str(onboarding_payload.get("display_name") or "").strip() or None)
+    avatar_url = (str(onboarding_payload.get("avatar_url") or "").strip() or None)
+    email_verified = bool(onboarding_payload.get("email_verified"))
+
+    if not google_sub or not email:
+        raise HTTPException(status_code=400, detail="Google onboarding ma'lumotlari yetarli emas.")
+
+    existing_google_user = db.query(User).filter(User.google_sub == google_sub).first()
+    if existing_google_user:
+        apply_google_identity(
+            existing_google_user,
+            GoogleIdentity(
+                sub=google_sub,
+                email=email,
+                email_verified=email_verified,
+                display_name=display_name,
+                avatar_url=avatar_url,
+            ),
+            linked_existing_account=(existing_google_user.auth_provider or "google") == "hybrid",
+        )
+        db.commit()
+        db.refresh(existing_google_user)
+        token = create_access_token(existing_google_user)
+        return GoogleAuthResponse(
+            token=token,
+            access_token=token,
+            username=existing_google_user.username,
+        )
+
+    existing_email_user = (
+        db.query(User)
+        .filter(func.lower(User.email) == email)
+        .first()
+    )
+    if existing_email_user:
+        if existing_email_user.google_sub and existing_email_user.google_sub != google_sub:
+            raise HTTPException(
+                status_code=409,
+                detail="Bu email allaqachon boshqa Google akkauntga ulangan.",
+            )
+        apply_google_identity(
+            existing_email_user,
+            GoogleIdentity(
+                sub=google_sub,
+                email=email,
+                email_verified=email_verified,
+                display_name=display_name,
+                avatar_url=avatar_url,
+            ),
+            linked_existing_account=True,
+        )
+        db.commit()
+        db.refresh(existing_email_user)
+        token = create_access_token(existing_email_user)
+        return GoogleAuthResponse(
+            token=token,
+            access_token=token,
+            username=existing_email_user.username,
+            linked_account=True,
+        )
+
+    username = normalize_username(payload.username)
+    if len(username) < 3:
+        raise HTTPException(status_code=400, detail="Username kamida 3 belgidan iborat bo'lishi kerak.")
+
+    existing_username = db.query(User.id).filter(User.username == username).first()
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    user = User(
+        username=username,
+        email=email,
+        password_hash=build_unusable_password_hash(),
+        country=(payload.country or None),
+        display_name=display_name,
+        avatar_url=avatar_url,
+        google_sub=google_sub,
+        auth_provider="google",
+        email_verified=email_verified,
+        last_login_provider="google",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = create_access_token(user)
+    return GoogleAuthResponse(
+        token=token,
+        access_token=token,
+        username=user.username,
+    )
 
 
 @router.get("/me", response_model=MeResponse)
@@ -464,6 +739,9 @@ def update_password(request: PasswordUpdateRequest, user: User = Depends(get_cur
     
     # Update password
     user.password_hash = get_password_hash(request.new_password)
+    if user.google_sub:
+        user.auth_provider = "hybrid"
+    user.last_login_provider = "local"
     db.commit()
     return {"message": "Password updated successfully"}
 
@@ -572,6 +850,9 @@ def confirm_password_reset(payload: ResetConfirmRequest, db: Session = Depends(g
 
     # Update password
     user.password_hash = get_password_hash(payload.new_password)
+    if user.google_sub:
+        user.auth_provider = "hybrid"
+    user.last_login_provider = "local"
     
     # Delete the reset code after successful use
     db.delete(reset_entry)

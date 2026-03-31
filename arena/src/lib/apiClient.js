@@ -74,6 +74,9 @@ function extractToken(payload) {
 }
 
 export const authApi = {
+  googleConfig() {
+    return request("/api/google/config");
+  },
   async login(credentials) {
     const payload = await request("/api/login", {
       method: "POST",
@@ -87,6 +90,27 @@ export const authApi = {
     const payload = await request("/api/register", {
       method: "POST",
       body: JSON.stringify(credentials),
+    });
+    const token = extractToken(payload);
+    writeStoredToken(token);
+    return { ...payload, token };
+  },
+  async loginWithGoogle(credential) {
+    const payload = await request("/api/google", {
+      method: "POST",
+      body: JSON.stringify({ credential }),
+    });
+    if (payload?.token || payload?.access_token) {
+      const token = extractToken(payload);
+      writeStoredToken(token);
+      return { ...payload, token };
+    }
+    return payload;
+  },
+  async completeGoogleSignup(data) {
+    const payload = await request("/api/google/complete", {
+      method: "POST",
+      body: JSON.stringify(data),
     });
     const token = extractToken(payload);
     writeStoredToken(token);

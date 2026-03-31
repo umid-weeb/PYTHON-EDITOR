@@ -14,6 +14,18 @@ POSTGRES_BOOTSTRAP_SQL = [
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
     """,
     """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
+    """,
+    """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(32) NOT NULL DEFAULT 'local';
+    """,
+    """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+    """,
+    """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_provider VARCHAR(32);
+    """,
+    """
     ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;
     """,
     """
@@ -85,6 +97,10 @@ POSTGRES_BOOTSTRAP_SQL = [
     """,
     """
     UPDATE users
+    SET auth_provider = COALESCE(NULLIF(auth_provider, ''), 'local');
+    """,
+    """
+    UPDATE users
     SET email = NULL
     WHERE email IS NOT NULL
       AND email NOT LIKE '%@%.%';
@@ -126,6 +142,11 @@ POSTGRES_BOOTSTRAP_SQL = [
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
     ON users (LOWER(email))
     WHERE email IS NOT NULL;
+    """,
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub_unique
+    ON users (google_sub)
+    WHERE google_sub IS NOT NULL;
     """,
     """
     CREATE TABLE IF NOT EXISTS user_stats (

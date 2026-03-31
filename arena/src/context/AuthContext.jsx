@@ -83,6 +83,32 @@ export function AuthProvider({ children }) {
           throw error;
         }
       },
+      async loginWithGoogle(credential) {
+        setStatus("loading");
+        try {
+          const payload = await authApi.loginWithGoogle(credential);
+          if (payload?.token) {
+            setToken(payload.token);
+          } else {
+            setStatus("ready");
+          }
+          return payload;
+        } catch (error) {
+          setStatus("ready");
+          throw error;
+        }
+      },
+      async completeGoogleSignup(data) {
+        setStatus("loading");
+        try {
+          const payload = await authApi.completeGoogleSignup(data);
+          setToken(payload.token);
+          return payload;
+        } catch (error) {
+          setStatus("ready");
+          throw error;
+        }
+      },
       async refreshUser() {
         if (!token) return null;
         const me = await authApi.me(token);
@@ -92,6 +118,7 @@ export function AuthProvider({ children }) {
       async logout() {
         await authApi.logout(token);
         clearStoredToken();
+        clearStoredUsername();
         setToken("");
         setUser(null);
       },

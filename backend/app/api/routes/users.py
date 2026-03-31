@@ -181,6 +181,9 @@ def change_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
 
     current_user.password_hash = get_password_hash(payload.new_password)
+    if getattr(current_user, "google_sub", None):
+        current_user.auth_provider = "hybrid"
+    current_user.last_login_provider = "local"
     db.commit()
     return {"success": True}
 

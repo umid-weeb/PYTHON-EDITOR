@@ -56,6 +56,7 @@ class Settings:
     smtp_from: str
     email_provider: str
     email_timeout_seconds: float
+    google_client_id: str
     gmail_client_id: str
     gmail_client_secret: str
     gmail_refresh_token: str
@@ -153,6 +154,7 @@ def get_settings() -> Settings:
         smtp_from=os.getenv("ARENA_SMTP_FROM", "noreply@pyzone.uz"),
         email_provider=os.getenv("ARENA_EMAIL_PROVIDER", "auto").strip().lower(),
         email_timeout_seconds=float(os.getenv("ARENA_EMAIL_TIMEOUT_SECONDS", "15")),
+        google_client_id=os.getenv("ARENA_GOOGLE_CLIENT_ID", os.getenv("ARENA_GMAIL_CLIENT_ID", "")),
         gmail_client_id=os.getenv("ARENA_GMAIL_CLIENT_ID", ""),
         gmail_client_secret=os.getenv("ARENA_GMAIL_CLIENT_SECRET", ""),
         gmail_refresh_token=os.getenv("ARENA_GMAIL_REFRESH_TOKEN", ""),

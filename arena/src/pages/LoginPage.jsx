@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthCard from "../components/auth/AuthCard.jsx";
+import GoogleAuthButton from "../components/auth/GoogleAuthButton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { authApi } from "../lib/apiClient.js";
 import styles from "./AuthPage.module.css";
@@ -19,13 +20,15 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = useMemo(() => normalizeNextPath(params.get("next")), [params]);
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, loginWithGoogle, completeGoogleSignup } = useAuth();
   
   // Login State
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [googleOnboarding, setGoogleOnboarding] = useState(null);
+  const [googleUsername, setGoogleUsername] = useState("");
 
   // Reset State
   const [isResetting, setIsResetting] = useState(false);
@@ -37,10 +40,10 @@ export default function LoginPage() {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    if (isAuthenticated && !isResetting) {
+    if (isAuthenticated && !isResetting && !googleOnboarding) {
       navigate(next, { replace: true });
     }
-  }, [isAuthenticated, isResetting, navigate, next]);
+  }, [googleOnboarding, isAuthenticated, isResetting, navigate, next]);
 
   // Timer logic
   useEffect(() => {
@@ -73,6 +76,48 @@ export default function LoginPage() {
       await login(identifier.trim(), password);
     } catch (submitError) {
       setError(submitError.message || "Kirishda xatolik");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleCredential(credential) {
+    setSubmitting(true);
+    setError("");
+    try {
+      const payload = await loginWithGoogle(credential);
+      if (payload?.needs_onboarding) {
+        setGoogleOnboarding(payload);
+        setGoogleUsername(payload.suggested_username || "");
+      }
+    } catch (submitError) {
+      setError(submitError.message || "Google bilan kirishda xatolik");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleComplete(event) {
+    if (event) event.preventDefault();
+    setError("");
+
+    if (!googleUsername.trim()) {
+      setError("Username kiritilmagan.");
+      return;
+    }
+    if (googleUsername.trim().length < 3) {
+      setError("Username kamida 3 belgidan iborat bo'lishi kerak.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await completeGoogleSignup({
+        onboarding_token: googleOnboarding.onboarding_token,
+        username: googleUsername.trim(),
+      });
+    } catch (submitError) {
+      setError(submitError.message || "Google akkauntni yakunlashda xatolik");
     } finally {
       setSubmitting(false);
     }
@@ -137,24 +182,33 @@ export default function LoginPage() {
   }
 
   // Determine current form props based on state
-  const currentTitle = isResetting ? "Parolni tiklash" : "Kirish";
-  const currentSubtitle = !isResetting 
+  const isGoogleOnboarding = Boolean(googleOnboarding);
+
+  const currentTitle = isGoogleOnboarding
+    ? "Username tanlang"
+    : isResetting ? "Parolni tiklash" : "Kirish";
+  const currentSubtitle = isGoogleOnboarding
+    ? `${googleOnboarding?.email} Google akkaunti topildi. Davom etish uchun username tanlang.`
+    : !isResetting 
     ? "Arena-ga qayting, o'z natijalaringizni saqlang va masalalarni yechishda davom eting."
     : resetStep === 1 ? "Emailingizni kiriting, biz tasdiqlash kodini yuboramiz."
     : resetStep === 2 ? `Biz ${resetEmail} manziliga 4 xonali kod yubordik.`
     : "Endi yangi, xavfsiz parolingizni belgilang.";
 
-  const currentOnSubmit = !isResetting ? handleLogin
+  const currentOnSubmit = isGoogleOnboarding ? handleGoogleComplete
+    : !isResetting ? handleLogin
     : resetStep === 1 ? handleResetRequest
     : resetStep === 2 ? handleResetVerify
     : handleResetConfirm;
 
-  const currentSubmitLabel = !isResetting ? "Kirish"
+  const currentSubmitLabel = isGoogleOnboarding ? "Davom etish"
+    : !isResetting ? "Kirish"
     : resetStep === 1 ? "Kod yuborish"
     : resetStep === 2 ? "Kodni tasdiqlash"
     : "Parolni yangilash";
 
-  const currentSubmitBusyLabel = !isResetting ? "Kirilmoqda..."
+  const currentSubmitBusyLabel = isGoogleOnboarding ? "Davom etilmoqda..."
+    : !isResetting ? "Kirilmoqda..."
     : resetStep === 1 ? "Yuborilmoqda..."
     : resetStep === 2 ? "Tekshirilmoqda..."
     : "Saqlanmoqda...";
@@ -169,7 +223,11 @@ export default function LoginPage() {
       isSubmitting={submitting}
       error={error}
       footer={
-        isResetting ? (
+        isGoogleOnboarding ? (
+          <span className={styles.forgotLink} onClick={() => { setGoogleOnboarding(null); setGoogleUsername(""); setError(""); }}>
+            Bekor qilish va Kirish sahifasiga qaytish
+          </span>
+        ) : isResetting ? (
           <span className={styles.forgotLink} onClick={() => { setIsResetting(false); setResetStep(1); setError(""); }}>
             Bekor qilish va Kirish sahifasiga qaytish
           </span>
@@ -180,7 +238,24 @@ export default function LoginPage() {
         )
       }
     >
-      {!isResetting ? (
+      {isGoogleOnboarding ? (
+        <>
+          <p className={styles.helperText}>
+            Google profil rasmi va email avtomatik olinadi. Username keyin ham profilingizda ko'rinadi.
+          </p>
+          <label className={styles.field}>
+            <span className={styles.label}>Username</span>
+            <input
+              className={styles.input}
+              autoComplete="username"
+              placeholder="Masalan, isroilov0705"
+              type="text"
+              value={googleUsername}
+              onChange={(e) => setGoogleUsername(e.target.value)}
+            />
+          </label>
+        </>
+      ) : !isResetting ? (
         <>
           <label className={styles.field}>
             <span className={styles.label}>Username yoki Email</span>
@@ -209,6 +284,7 @@ export default function LoginPage() {
               Parolni unutdingizmi?
             </span>
           </div>
+          <GoogleAuthButton onCredential={handleGoogleCredential} onError={(submitError) => setError(submitError.message || "Google tugmasini yuklab bo'lmadi")} />
         </>
       ) : (
         <>
