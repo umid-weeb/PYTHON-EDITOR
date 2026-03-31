@@ -11,6 +11,7 @@ import { useArena } from "../context/ArenaContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SubmissionDetailsModal from "../components/submissions/SubmissionDetailsModal.tsx";
 import { useState } from "react";
+import AIChatBot from "../components/ai/AIChatBot.tsx";
 
 export default function ProblemPage() {
   const navigate = useNavigate();
@@ -182,6 +183,13 @@ export default function ProblemPage() {
       <SubmissionDetailsModal 
         submissionId={viewingSubmissionId} 
         onClose={() => setViewingSubmissionId(null)} 
+      />
+      
+      <AIChatBot 
+        problemId={problemKey}
+        problemTitle={selectedProblem?.title || ""}
+        code={code}
+        language={language}
       />
     </>
   );

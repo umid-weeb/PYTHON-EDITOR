@@ -76,15 +76,24 @@ class AIService:
             return "AI API Key not configured. Please set ARENA_AI_API_KEY."
 
         prompt = f"""
-        As an expert software engineer and teacher, provide a subtle hint for the following {language} code for the problem "{problem_title}".
+        Siz "Pyzone Arena" platformasida tajribali "AI Ustoz" (Tutor) role-idasiz. 
+        Masala: "{problem_title}"
+        Dasturlash tili: {language}
         
-        CODE:
-        {code if code.strip() else "(No code yet)"}
+        FOYDALANUVCHI KODI:
+        {code if code.strip() else "(Hali kod yo'q)"}
         
-        The user is stuck. Give a HINT in Uzbek that helps them move forward without giving away the full solution.
-        Be encouraging. Keep it short (2-3 sentences).
+        VAZIFANGIZ:
+        Dasturchi masala ustida qiynalib turibdi. Unga to'g'ri algoritmni tushunishga va qayerda xato qilayotganini topishga yordam bering.
         
-        HINT ONLY. No markdown blocks. No code.
+        QAT'IY QOIDALAR:
+        1. HECH QACHON to'liq kodni yozib bermang. Bu foydalanuvchiga bilim bermaydi.
+        2. O'zbek tilida, juda sodda va rag'batlantiruvchi tilda javob bering.
+        3. Javobingiz qisqa (3-4 jumla) va aniqlashtiruvchi savol yoki shama (hint) ko'rinishida bo'lsin.
+        4. Algoritmni tushuntirishda metaforalardan foydalaning.
+        5. Javobingiz faqat matn bo'lsin. Hech qanday markdown bloc yoki kod yozmang.
+        
+        Javobingiz:
         """
 
         for model_name in self.model_names:

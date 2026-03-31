@@ -170,6 +170,9 @@ export const arenaApi = {
   getDailyChallenge() {
     return request("/api/daily-challenge");
   },
+  getSolutions(problemSlug) {
+    return request(`/api/problems/${encodeURIComponent(problemSlug)}/solutions`);
+  },
 };
 
 export const userApi = {
