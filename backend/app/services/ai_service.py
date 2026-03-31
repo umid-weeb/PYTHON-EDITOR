@@ -13,10 +13,10 @@ class AIService:
         self.api_key = settings.ai_api_key
         self.openai_key = settings.openai_api_key
         self.model_names = [
-            'gemini-2.0-flash', 
-            'gemini-1.5-pro', 
-            'gemini-1.5-flash', 
-            'gemini-1.5-flash-8b'
+            'models/gemini-2.0-flash', 
+            'models/gemini-1.5-flash', 
+            'models/gemini-1.5-pro', 
+            'models/gemini-1.5-flash-8b'
         ]
         
         # Simple in-memory cache for hints to save quota/cost
