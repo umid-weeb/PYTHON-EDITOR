@@ -1,5 +1,6 @@
 "use client";
-import { useProblemStore } from './useProblemStore';
+
+import { useProblemStore } from "../../store/useProblemStore";
 
 export default function AICodeReviewPanel() {
   const { aiReview, isReviewLoading } = useProblemStore();
@@ -20,7 +21,7 @@ export default function AICodeReviewPanel() {
       {/* Header & Score */}
       <div className="bg-indigo-500/10 p-5 border-b border-indigo-500/20 flex justify-between items-center">
         <h3 className="text-lg font-bold text-indigo-300 flex items-center gap-2">
-          🤖 AI Code Review
+          <span>🤖</span> AI Code Review
         </h3>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400 font-medium">Overall Score:</span>

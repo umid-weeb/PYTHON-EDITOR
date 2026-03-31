@@ -3,6 +3,7 @@ import TestCasePanel from "../results/TestCasePanel.jsx";
 import ResultPanel from "../results/ResultPanel.jsx";
 import SubmissionHistory from "../submissions/SubmissionHistory.tsx";
 import AIReviewPanel from "../ai/AIReviewPanel.tsx";
+import AIHintPanel from "../ai/AIHintPanel.tsx";
 
 type VisibleTestcase = {
   name?: string;
@@ -29,7 +30,7 @@ type Props = {
   onViewSubmission?: (id: string) => void;
 };
 
-type Tab = "cases" | "result" | "console" | "history" | "ai";
+type Tab = "cases" | "result" | "console" | "history" | "ai" | "hint";
 
 export default function TestTabs({ cases, activeIndex, onSelect, result, busy, problemId, code, language, onViewSubmission }: Props) {
   const [active, setActive] = useState<Tab>("cases");
@@ -61,6 +62,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
           { key: "result", label: "Natija" },
           { key: "history", label: "Tarix" },
           { key: "ai", label: "AI Analiz (Beta)" },
+          { key: "hint", label: "AI Ustoz (Hint)" },
           { key: "console", label: "Konsol" },
         ].map((tab) => (
           <button
@@ -84,6 +86,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
         {active === "result" ? <ResultPanel busy={busy} result={result} /> : null}
         {active === "history" ? <SubmissionHistory problemId={problemId} lastSubmissionId={lastSubmissionId} onViewSubmission={onViewSubmission} /> : null}
         {active === "ai" ? <AIReviewPanel code={code} language={language} problemId={problemId} /> : null}
+        {active === "hint" ? <AIHintPanel code={code} language={language} problemId={problemId} /> : null}
         {active === "console" ? (
           <div className="flex h-full flex-col overflow-auto p-[10px]">
             <div className="rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] text-[var(--text-secondary)]">

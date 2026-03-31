@@ -71,6 +71,33 @@ class AIService:
             "alternative": ""
         }
 
+    async def get_hint(self, code: str, problem_title: str, language: str) -> str:
+        if not self.api_key:
+            return "AI API Key not configured. Please set ARENA_AI_API_KEY."
+
+        prompt = f"""
+        As an expert software engineer and teacher, provide a subtle hint for the following {language} code for the problem "{problem_title}".
+        
+        CODE:
+        {code if code.strip() else "(No code yet)"}
+        
+        The user is stuck. Give a HINT in Uzbek that helps them move forward without giving away the full solution.
+        Be encouraging. Keep it short (2-3 sentences).
+        
+        HINT ONLY. No markdown blocks. No code.
+        """
+
+        for model_name in self.model_names:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                return response.text.strip()
+            except Exception as e:
+                logger.warning(f"AI Hint failed with model {model_name}: {e}")
+                continue
+
+        return "Texnik xatolik: AI bilan bog'lanib bo'lmadi. Keyinroq qayta urining."
+
 ai_service = AIService()
 
 def get_ai_service() -> AIService:

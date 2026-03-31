@@ -42,3 +42,31 @@ async def review_code(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI analizida xatolik yuz berdi: {str(e)}"
         )
+
+@router.post("/hint")
+async def get_hint(
+    request: AIReviewRequest,
+    current_user: User | None = Depends(get_optional_user),
+    ai_service: AIService = Depends(get_ai_service),
+    problem_service: ProblemService = Depends(get_problem_service),
+):
+    try:
+        # Verify problem exists
+        problem = await problem_service.get_problem(request.problem_slug)
+        if not problem:
+            raise HTTPException(status_code=404, detail="Problem topilmadi")
+
+        # Call AI service for hint
+        hint = await ai_service.get_hint(
+            code=request.code,
+            problem_title=problem.title,
+            language=request.language
+        )
+        
+        return {"hint": hint}
+    except Exception as e:
+        logger.error(f"Error in AI hint route: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI shama (hint) yaratishda xatolik yuz berdi: {str(e)}"
+        )

@@ -264,6 +264,12 @@ export const aiApi = {
       body: JSON.stringify(payload),
     });
   },
+  async getHint(payload) {
+    return request("/api/ai/hint", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 function delay(ms) {
