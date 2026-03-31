@@ -61,57 +61,6 @@
   margin-top: 10px;
 }
 
-.helperText {
-  margin: -4px 0 4px;
-  font-size: 14px;
-  color: var(--arena-muted);
-}
-
-.googleSection {
-  display: grid;
-  gap: 12px;
-}
-
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--arena-muted);
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.divider::before,
-.divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--arena-border);
-}
-
-.divider span {
-  white-space: nowrap;
-}
-
-.googleButtonWrap {
-  display: grid;
-  gap: 8px;
-}
-
-.googleButton {
-  min-height: 44px;
-  display: flex;
-  justify-content: center;
-}
-
-.googleHint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--arena-muted);
-  text-align: center;
-}
-
 .primary, .secondary {
   flex: 1;
   padding: 14px;
