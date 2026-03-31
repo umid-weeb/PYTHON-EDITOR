@@ -10,8 +10,14 @@ class AIService:
     def __init__(self):
         settings = get_settings()
         self.api_key = settings.ai_api_key
-        self.model_names = ['gemini-2.0-flash', 'gemini-1.5-flash']
+        self.model_names = [
+            'gemini-2.0-flash', 
+            'gemini-1.5-pro', 
+            'gemini-1.5-flash', 
+            'gemini-1.5-flash-8b'
+        ]
         if self.api_key:
+            logger.info(f"AI Service initialized with API key ending in ...{self.api_key[-4:] if len(self.api_key) > 4 else '***'}")
             genai.configure(api_key=self.api_key)
             self.model = None
         else:
@@ -96,16 +102,20 @@ class AIService:
         Javobingiz:
         """
 
+        errors = []
         for model_name in self.model_names:
             try:
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
                 return response.text.strip()
             except Exception as e:
-                logger.warning(f"AI Hint failed with model {model_name}: {e}")
+                err_msg = str(e)
+                logger.warning(f"AI Hint failed with model {model_name}: {err_msg}")
+                errors.append(f"{model_name}: {err_msg}")
                 continue
 
-        return "Texnik xatolik: AI bilan bog'lanib bo'lmadi. Keyinroq qayta urining."
+        error_details = "; ".join(errors)
+        return f"Texnik xatolik: AI bilan bog'lanib bo'lmadi ({error_details}). Keyinroq qayta urining."
 
 ai_service = AIService()
 
