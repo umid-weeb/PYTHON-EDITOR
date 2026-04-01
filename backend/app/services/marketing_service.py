@@ -23,10 +23,10 @@ class MarketingService:
             <div style="background: rgba(250,204,21,0.1); padding: 25px; border-radius: 16px; margin-bottom: 25px; border: 1px solid rgba(250,204,21,0.3);">
                 <h2 style="color: #facc15;">Salom, {name}! 👑</h2>
                 <p style="font-size: 18px; line-height: 1.6;">Siz haqiqiy afsonasiz! Hozirda <b>{rating}</b> reyting bilan platformada <b>1-o'rinni</b> egallab turibsiz.</p>
-                <p>Siz {solved} ta masalani muvaffaqiyatli yechgansiz. Sizning bilimingiz barchaga o'rnak bo'lmoqda. Taxtni asrang!</p>
+                <p>Siz {solved} ta masalani muvaffaqiyatli yechgansiz. O'z o'rningizni asrang!</p>
             </div>
             <div style="text-align: center;">
-                <a href="https://www.pyzone.uz" style="display: inline-block; background: #facc15; color: #0f172a; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 18px;">Taxtga qaytish</a>
+                <a href="https://pyzone.uz/zone/problems" style="display: inline-block; background: #facc15; color: #0f172a; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 18px;">Arena-ga qaytish</a>
             </div>
         </div>
         """
@@ -41,11 +41,11 @@ class MarketingService:
             </div>
             <div style="background: rgba(148,163,184,0.1); padding: 25px; border-radius: 16px; margin-bottom: 25px;">
                 <h2 style="color: #cbd5e1;">Salom, {name}! 🔥</h2>
-                <p style="font-size: 17px; line-height: 1.6;">Siz {rank}-o'rindasiz (Reyting: {rating}). Top 1 likka erishish uchun juda oz qoldi!</p>
-                <p>Sizning natijalaringiz hayratlanarli ({solved} ta masala). Birgina g'alaba sizni Qirol darajasiga olib chiqishi mumkin.</p>
+                <p style="font-size: 17px; line-height: 1.6;">Siz <b>{rank}-o'rindasiz</b> (Reyting: {rating}). Top 1 likka erishish uchun juda oz qoldi!</p>
+                <p>Siz {solved} ta masala yechgansiz. Birgina g'alaba sizni Qirol darajasiga olib chiqishi mumkin.</p>
             </div>
             <div style="text-align: center;">
-                <a href="https://www.pyzone.uz" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 18px;">Cho'qqiga chiqish</a>
+                <a href="https://pyzone.uz/zone/problems" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 18px;">Arena-ni zabt etish</a>
             </div>
         </div>
         """
@@ -59,35 +59,37 @@ class MarketingService:
             </div>
             <div style="background: rgba(16,185,129,0.05); padding: 25px; border-radius: 16px; margin-bottom: 25px;">
                 <p style="font-size: 16px; line-height: 1.6;">Salom {name}! Sizning reytingingiz <b>{rating}</b> va yechilgan masalalar soni <b>{solved}</b> ga yetdi.</p>
-                <p>Top reytingga kirish va bilimingizni oshirish uchun yangi **Hard** masalalar qo'shildi. O'z salohiyatingizni ko'rsatish vaqti keldi!</p>
+                <p>Top reytingga kirish va bilimingizni oshirish uchun yangi masalalar qo'shildi. O'z salohiyatingizni ko'rsatish vaqti keldi!</p>
             </div>
             <div style="text-align: center;">
-                <a href="https://www.pyzone.uz" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold;">Arena-ni zabt etish</a>
+                <a href="https://pyzone.uz/zone/problems" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold;">Arena-ni zabt etish</a>
             </div>
         </div>
         """
 
     async def send_daily_motivation(self, db: Session):
         """Fetch users by rating and send daily tiered motivation letters."""
-        logger.info("🎬 Starting scheduled mass motivation task...")
+        logger.info("🎬 Starting scheduled mass motivation task with corrected rank logic...")
         
-        # Join User with UserRating and UserStats
+        # Use UserStats for the authoritative rating and solved count
         query = (
-            db.query(User, UserRating.rating, UserStats.solved_count)
-            .join(UserRating, User.id == UserRating.user_id)
-            .outerjoin(UserStats, User.id == UserStats.user_id)
+            db.query(User, UserStats.rating, UserStats.solved_count)
+            .join(UserStats, User.id == UserStats.user_id)
             .filter(User.email != None)
-            .order_by(desc(UserRating.rating))
+            .order_by(desc(UserStats.rating), desc(UserStats.solved_count))
         )
         
         results = query.all()
-        logger.info(f"📊 Found {len(results)} users with ratings.")
+        logger.info(f"📊 Found {len(results)} users in UserStats leaderboard.")
         
         count = 0
         for i, (user, rating, solved) in enumerate(results):
             rank = i + 1
             name = user.display_name or user.username
             solved = solved or 0
+            
+            # Diagnostic Log BEFORE sending
+            logger.info(f"Preparing Rank {rank}: {user.username} (Rating: {rating}, Solved: {solved})")
             
             subject = "✨ PyZone Arena: Sizni yangi marralar kutmoqda!"
             html_content = ""
@@ -108,7 +110,7 @@ class MarketingService:
                     count += 1
                 
                 # Small delay to prevent SMTP throttling
-                if i % 5 == 0:
+                if i % 3 == 0:
                     await asyncio.sleep(0.5)
             except Exception as e:
                 logger.error(f"Failed to send to {user.email}: {e}")
