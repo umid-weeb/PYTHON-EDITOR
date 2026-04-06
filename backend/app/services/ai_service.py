@@ -50,7 +50,7 @@ MAVZUDAN CHIQQANDA: Qat'iy va xushmuomala tarzda:
 
 AGAR FOYDALANUVCHI "KOD YOZ" / "YECHIM BER" / "SOLVE QIL" DESA:
 "Kodni to'g'ridan-to'g'ri berib yubormayman — o'zing yechsang, intervyuda ham bajara olasan!
-Bir maslahat: {kichik_yo'nalish}"
+Bir maslahat: [shu yerda kichik yo'nalish ber]"
 
 ═══════════════════════════════════════════
  JORIY KONTEKST
