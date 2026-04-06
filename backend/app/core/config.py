@@ -50,6 +50,7 @@ class Settings:
     jwt_secret: str
     ai_api_key: str
     openai_api_key: str
+    groq_api_key: str
     smtp_host: str
     smtp_port: int
     smtp_user: str
@@ -149,6 +150,7 @@ def get_settings() -> Settings:
         jwt_secret=os.getenv("ARENA_JWT_SECRET", "dev-secret-change-me"),
         ai_api_key=os.getenv("ARENA_AI_API_KEY", ""),
         openai_api_key=os.getenv("ARENA_OPENAI_API_KEY", ""),
+        groq_api_key=os.getenv("ARENA_GROQ_API_KEY", ""),
         smtp_host=os.getenv("ARENA_SMTP_HOST", "smtp.gmail.com"),
         smtp_port=int(os.getenv("ARENA_SMTP_PORT", "587")),
         smtp_user=os.getenv("ARENA_SMTP_USER", ""),

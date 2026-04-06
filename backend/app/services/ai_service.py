@@ -7,13 +7,16 @@ from app.core.config import get_settings
 
 logger = logging.getLogger("pyzone.ai")
 
-# Gemini REST API — v1 (not v1beta, which is outdated and missing models)
+# Gemini REST API — v1
 _GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1/models"
 _GEMINI_MODELS = [
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-8b",
 ]
+
+# Groq models (OpenAI-compatible, free tier: 30 RPM, 14400 RPD)
+_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # --------------------------------------------------------------------------- #
 #  System prompt for the AI tutor chatbot                                      #
@@ -56,8 +59,18 @@ class AIService:
         settings = get_settings()
         self.api_key = settings.ai_api_key
         self.openai_key = settings.openai_api_key
+        self.groq_key = settings.groq_api_key
 
         self._review_cache: Dict[str, Any] = {}
+
+        # Groq client (OpenAI-compatible)
+        self.groq_client = None
+        if self.groq_key:
+            logger.info("Groq initialized")
+            self.groq_client = OpenAI(
+                api_key=self.groq_key,
+                base_url=_GROQ_BASE_URL,
+            )
 
         self.openai_client = None
         if self.openai_key:
@@ -115,7 +128,22 @@ Return STRICT JSON only (no markdown):
   "alternative": "<str>"
 }}
 """
-        # Try Gemini REST
+        # 1. Groq (primary — free, fast)
+        if self.groq_client:
+            try:
+                resp = self.groq_client.chat.completions.create(
+                    model=_GROQ_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    max_tokens=512,
+                )
+                result = json.loads(resp.choices[0].message.content)
+                self._review_cache[cache_key] = result
+                return result
+            except Exception as e:
+                logger.warning(f"Groq Review: {e}")
+
+        # 2. Gemini REST fallback
         if self.api_key:
             for model in _GEMINI_MODELS:
                 try:
@@ -132,7 +160,7 @@ Return STRICT JSON only (no markdown):
                     logger.warning(f"Gemini Review {model}: {e}")
                     continue
 
-        # Fallback OpenAI
+        # 3. OpenAI fallback
         if self.openai_client:
             try:
                 resp = self.openai_client.chat.completions.create(
@@ -192,7 +220,29 @@ Return STRICT JSON only (no markdown):
 
         errors: list[str] = []
 
-        # Try Gemini REST
+        # Helper: build messages list for OpenAI-compatible clients
+        def build_messages() -> list:
+            msgs = [{"role": "system", "content": system_prompt}]
+            for msg in conversation_history:
+                msgs.append({"role": msg["role"], "content": msg["content"]})
+            msgs.append({"role": "user", "content": user_message})
+            return msgs
+
+        # 1. Groq (primary — free, 30 RPM, LLaMA 3.3 70B)
+        if self.groq_client:
+            try:
+                resp = self.groq_client.chat.completions.create(
+                    model=_GROQ_MODEL,
+                    messages=build_messages(),
+                    max_tokens=400,
+                )
+                return resp.choices[0].message.content.strip()
+            except Exception as e:
+                err = str(e)
+                logger.warning(f"Groq Chat: {err}")
+                errors.append(f"Groq: {err}")
+
+        # 2. Gemini REST fallback
         if self.api_key:
             for model in _GEMINI_MODELS:
                 try:
@@ -203,16 +253,12 @@ Return STRICT JSON only (no markdown):
                     errors.append(f"{model}: {err}")
                     continue
 
-        # Fallback OpenAI
+        # 3. OpenAI fallback
         if self.openai_client:
             try:
-                messages = [{"role": "system", "content": system_prompt}]
-                for msg in conversation_history:
-                    messages.append({"role": msg["role"], "content": msg["content"]})
-                messages.append({"role": "user", "content": user_message})
                 resp = self.openai_client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=messages,
+                    messages=build_messages(),
                     max_tokens=400,
                 )
                 return resp.choices[0].message.content.strip()
