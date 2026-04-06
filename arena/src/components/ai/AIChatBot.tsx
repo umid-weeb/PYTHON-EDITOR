@@ -55,10 +55,14 @@ export default function AIChatBot({ problemId, problemTitle, code, language }: P
   const navigate = useNavigate();
 
   const [isOpen, setIsOpen] = useState(false);
+  const welcomeText = problemTitle
+    ? `Assalomu alaykum! Men sizning AI Ustozi-ingizman. "${problemTitle}" masalasida qiynalayotgan bo'lsangiz, mendan so'rang — lekin kodni to'g'ridan-to'g'ri bermayman 😊`
+    : `Assalomu alaykum! Men sizning AI Ustozi-ingizman. Masala bo'yicha savollaringizni bering — kodni to'g'ridan-to'g'ri bermayman, lekin yo'nalish ko'rsataman 😊`;
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
-      text: `Assalomu alaykum! Men sizning AI Ustozi-ingizman. "${problemTitle}" masalasida qiynalayotgan bo'lsangiz, mendan so'rang — lekin kodni to'g'ridan-to'g'ri bermayman 😊`,
+      text: welcomeText,
       sender: "bot",
       timestamp: new Date(),
     },
