@@ -165,21 +165,22 @@ async def ai_chat(
     ip = _get_client_ip(raw_request)
     user_id = current_user.id if current_user else None
 
-    # Rate limit check
-    allowed, remaining, is_guest_limit = _check_and_increment(
-        db, user_id, ip, request_data.problem_slug
-    )
+    # Rate limit check — wrapped so DB errors never block the chatbot
+    allowed = True
+    remaining = None
+    is_guest_limit = False
+    try:
+        allowed, remaining, is_guest_limit = _check_and_increment(
+            db, user_id, ip, request_data.problem_slug
+        )
+    except Exception as e:
+        logger.error(f"Rate limit DB error (non-fatal): {e}")
+        # Fail open: let the request through so the chatbot still works
 
     if not allowed:
         if is_guest_limit:
-            # Guest hit 5-request limit — ask to register
-            return {
-                "reply": None,
-                "remaining": 0,
-                "requires_auth": True,
-            }
+            return {"reply": None, "remaining": 0, "requires_auth": True}
         else:
-            # Registered user hit 300/day limit
             return {
                 "reply": "Bugunlik 300 ta so'rov limitiga yetdingiz. Ertaga yana foydalanishingiz mumkin! 🌙",
                 "remaining": 0,
