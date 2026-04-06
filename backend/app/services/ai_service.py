@@ -187,24 +187,25 @@ class AIService:
 
         errors: list[str] = []
 
+        # Build a single flat prompt with conversation history embedded.
+        # This avoids start_chat/system_instruction API version differences.
+        def build_full_prompt() -> str:
+            lines = [system_prompt, ""]
+            for msg in conversation_history:
+                label = "Foydalanuvchi" if msg["role"] == "user" else "AI Ustoz"
+                lines.append(f"{label}: {msg['content']}")
+            lines.append(f"Foydalanuvchi: {user_message}")
+            lines.append("AI Ustoz:")
+            return "\n".join(lines)
+
+        full_prompt = build_full_prompt()
+
         # --- Try Gemini (free, preferred) ---
         if self.api_key:
             for model_name in self.gemini_models:
                 try:
-                    model = genai.GenerativeModel(
-                        model_name,
-                        system_instruction=system_prompt,
-                    )
-                    # Build Gemini history format
-                    gemini_history = []
-                    for msg in conversation_history:
-                        role = "user" if msg["role"] == "user" else "model"
-                        gemini_history.append(
-                            {"role": role, "parts": [{"text": msg["content"]}]}
-                        )
-
-                    chat = model.start_chat(history=gemini_history)
-                    response = chat.send_message(user_message)
+                    model = genai.GenerativeModel(model_name)
+                    response = model.generate_content(full_prompt)
                     return response.text.strip()
                 except Exception as e:
                     err = str(e)

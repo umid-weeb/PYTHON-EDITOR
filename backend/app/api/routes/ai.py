@@ -205,15 +205,19 @@ async def ai_chat(
     ]
 
     # Get AI response
-    reply = await ai_service.get_chat_response(
-        user_message=request_data.user_message,
-        conversation_history=history,
-        problem_title=problem.title,
-        problem_description=getattr(problem, "description", "") or "",
-        constraints=getattr(problem, "constraints_text", "") or "",
-        code=request_data.code,
-        language=request_data.language,
-    )
+    try:
+        reply = await ai_service.get_chat_response(
+            user_message=request_data.user_message,
+            conversation_history=history,
+            problem_title=problem.title,
+            problem_description=getattr(problem, "description", "") or "",
+            constraints=getattr(problem, "constraints_text", "") or "",
+            code=request_data.code,
+            language=request_data.language,
+        )
+    except Exception as e:
+        logger.error(f"AI chat get_chat_response error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"AI javob berishda xatolik: {str(e)}")
 
     return {
         "reply": reply,
