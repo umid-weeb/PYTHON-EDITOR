@@ -10,9 +10,9 @@ logger = logging.getLogger("pyzone.ai")
 # Gemini REST API — v1 (not v1beta, which is outdated and missing models)
 _GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1/models"
 _GEMINI_MODELS = [
-    "gemini-1.5-flash",
     "gemini-2.0-flash",
-    "gemini-1.5-pro",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-8b",
 ]
 
 # --------------------------------------------------------------------------- #
