@@ -16,6 +16,7 @@ from app.models.engagement import StreakHistory, DailyChallenge
 from app.models.rating import UserRating, RatingHistory
 from app.models.submission import Submission, SolvedProblem, UserStats
 from app.models.contest import Contest, ContestProblem, ContestEntry, ContestRegistration, ContestSubmission, ContestStanding
+from app.models.ai_usage import AIChatUsage
 
 __all__ = [
     "ProblemSummary",
@@ -41,4 +42,5 @@ __all__ = [
     "ContestRegistration",
     "ContestSubmission",
     "ContestStanding",
+    "AIChatUsage",
 ]

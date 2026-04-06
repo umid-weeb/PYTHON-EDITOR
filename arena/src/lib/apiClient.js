@@ -273,6 +273,17 @@ export const aiApi = {
       body: JSON.stringify(payload),
     });
   },
+  /**
+   * Multi-turn AI tutor chat.
+   * payload: { code, problem_slug, language, user_message, conversation_history }
+   * Returns: { reply, remaining, requires_auth }
+   */
+  async chat(payload) {
+    return request("/api/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 function delay(ms) {
