@@ -431,6 +431,16 @@ def _trap_water_solver(heights: list[int]) -> int:
     return total
 
 
+def _find_pivot_index_solver(nums: list[int]) -> int:
+    total = sum(nums)
+    left = 0
+    for i, num in enumerate(nums):
+        if left == total - left - num:
+            return i
+        left += num
+    return -1
+
+
 def _random_text(rng: random.Random, min_size: int, max_size: int, alphabet: str | None = None) -> str:
     source = alphabet or (string.ascii_lowercase + "     ")
     text = "".join(rng.choice(source) for _ in range(rng.randint(min_size, max_size)))
@@ -910,6 +920,49 @@ def _templates() -> list[TemplateDefinition]:
                     ),
                 ),
                 seed_prefix=1200 + index,
+            ),
+            variations=1,
+        ),
+        TemplateDefinition(
+            slug_prefix="find-pivot-index",
+            build_title=lambda index: "Muvozanat indeksini topish",
+            difficulty="easy",
+            tags=["array", "prefix-sum"],
+            build_description=lambda index: _problem_description(
+                title="Muvozanat indeksini topish",
+                summary="Berilgan butun sonlar massivida shunday indeksni topingki, undan chapdagi sonlar yig'indisi o'ngdagi sonlar yig'indisiga teng bo'lsin.",
+                steps=[
+                    "Massiv elementlari yig'indisini hisoblab boring.",
+                    "Agar shunday muvozanat indeksi topilsa, uni qaytaring.",
+                    "Agar bir nechta bo'lsa, eng chapdagisini qaytaring. Agar topilmasa -1 qaytaring.",
+                ],
+                examples=[
+                    "- [1, 7, 3, 6, 5, 6] uchun javob 3, chunki 1+7+3 = 5+6 = 11.",
+                    "- [1, 2, 3] uchun javob -1.",
+                ],
+                notes=["Chap yoki o'ng chekkadagi indeks uchun bo'sh tomon yig'indisi 0 deb olinadi.", "Massivda manfiy sonlar ham bo'lishi mumkin."],
+            ),
+            build_input_format=lambda index: "nums: butun sonlardan iborat ro'yxat",
+            build_output_format=lambda index: "Muvozanat indeksini butun son sifatida qaytaring.",
+            build_constraints=lambda index: [
+                "1 <= nums dagi elementlar soni <= 10^4",
+                "-1000 <= nums[i] <= 1000",
+            ],
+            build_starter_code=lambda index: _starter("nums"),
+            build_test_cases=lambda index: _mk_cases(
+                _find_pivot_index_solver,
+                lambda rng, case_index: (
+                    (
+                        [1, 7, 3, 6, 5, 6]
+                        if case_index == 0
+                        else [1, 2, 3]
+                        if case_index == 1
+                        else [2, 1, -1]
+                        if case_index == 2
+                        else [rng.randint(-100, 100) for _ in range(rng.randint(5, 15))]
+                    ),
+                ),
+                seed_prefix=1300 + index,
             ),
             variations=1,
         ),
