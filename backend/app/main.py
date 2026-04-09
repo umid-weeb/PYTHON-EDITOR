@@ -41,13 +41,18 @@ logger = logging.getLogger(__name__)
 # before the background sync has completed.
 catalog_ready = threading.Event()
 
+# Global flag – set to True once DB schema migrations have completed.
+migrations_complete = False
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    global migrations_complete
     # DB schema migrations (fast — DDL only)
     Base.metadata.create_all(bind=engine)
     run_startup_migrations(engine)
     Base.metadata.create_all(bind=engine)
+    migrations_complete = True
 
     # Start submission recovery loop
     submission_service = get_submission_service()
@@ -115,7 +120,44 @@ async def lifespan(_: FastAPI):
                 logger.error(f"Engagement loop failed: {e}")
                 time.sleep(3600)  # Retry in 1 hour if failed
 
+    def _daily_maintenance_loop() -> None:
+        """Runs once daily at 8:00 PM (20:00) Tashkent time."""
+        import time
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from app.services.marketing_service import marketing_service
+        
+        last_run_date = None
+        tz = ZoneInfo("Asia/Tashkent")
+        
+        logger.info("Daily maintenance scheduler active (checks for 20:00 Asia/Tashkent).")
+        
+        while True:
+            try:
+                now = datetime.now(tz)
+                today = now.date()
+                
+                # Check if it's 8:00 PM (20:00) and hasn't run today
+                if now.hour == 20 and now.minute == 0 and last_run_date != today:
+                    logger.info("🎬 [Maintenance] Triggering scheduled daily motivation (20:00)...")
+                    with SessionLocal() as db:
+                        # Create a dedicated event loop for this async execution in a worker thread
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(marketing_service.send_daily_motivation(db))
+                        loop.close()
+                    
+                    last_run_date = today
+                    logger.info("✅ [Maintenance] Daily motivation completed.")
+                
+                # Sleep and check again
+                time.sleep(45) 
+            except Exception as e:
+                logger.error(f"Maintenance loop failed: {e}")
+                time.sleep(60)
+
     threading.Thread(target=_automated_engagement_loop, daemon=True, name="engagement-agent").start()
+    threading.Thread(target=_daily_maintenance_loop, daemon=True, name="daily-maintenance").start()
 
     try:
         yield
