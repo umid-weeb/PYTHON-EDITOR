@@ -15,11 +15,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://python-editor-b87c.onrender.com/api/$1"
+      "destination": "http://16.16.26.138:5000/api/$1"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "https://python-editor-b87c.onrender.com/uploads/$1"
+      "destination": "http://16.16.26.138:5000/uploads/$1"
     },
     {
       "source": "/zone/(.*)",

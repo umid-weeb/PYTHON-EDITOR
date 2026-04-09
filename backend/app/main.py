@@ -85,7 +85,7 @@ async def lifespan(_: FastAPI):
         import urllib.request
         # Wait for the server to fully start before first ping
         time.sleep(30)
-        public_url = getattr(settings, "public_url", None) or "https://python-editor-b87c.onrender.com"
+        public_url = getattr(settings, "public_url", None) or "http://16.16.26.138:5000"
         ping_url = f"{public_url.rstrip('/')}/health"
         while True:
             try:

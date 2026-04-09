@@ -10,7 +10,7 @@ idx = text.find('export const API_BASE_URL =')
 if idx != -1:
     new_code = """let resolvedBase = String(import.meta.env.VITE_ARENA_API_BASE ?? DEFAULT_API_BASE).replace(/\\/+$/, "");
 if (!import.meta.env.DEV && (resolvedBase === "" || resolvedBase.includes("localhost") || resolvedBase.includes("127.0.0.1"))) {
-  resolvedBase = "https://python-editor-b87c.onrender.com";
+  resolvedBase = "http://16.16.26.138:5000";
 }
 export const API_BASE_URL = resolvedBase;
 """
