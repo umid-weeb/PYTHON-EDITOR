@@ -4,15 +4,15 @@ import {
   writeStoredToken,
 } from "./storage.js";
 
-const DEFAULT_API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000" : "http://16.16.26.138:5000";
+// In production, use empty string so all requests go to /api/... (relative path).
+// Vercel rewrites /api/* → http://16.16.26.138:5000/api/* server-side,
+// avoiding Mixed Content errors (HTTPS page → HTTP backend).
+// In dev, point directly at the local FastAPI server.
+const DEFAULT_API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
 
 let resolvedBase = String(
   import.meta.env.VITE_ARENA_API_BASE ?? DEFAULT_API_BASE
 ).replace(/\/+$/, "");
-
-if (!import.meta.env.DEV && (resolvedBase === "" || resolvedBase.includes("localhost") || resolvedBase.includes("127.0.0.1"))) {
-  resolvedBase = "http://16.16.26.138:5000";
-}
 
 export const API_BASE_URL = resolvedBase;
 
