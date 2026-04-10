@@ -7,6 +7,7 @@ let activeDebugSession = null;
 let activeDebugSteps = [];
 let activeDebugStepIndex = 0;
 let activeDebugLineNumber = null;
+let pendingRemoteRun = null;
 let currentLanguage = "python";
 let currentStarterPack = "array";
 
@@ -282,6 +283,52 @@ func main() {
     },
 };
 
+const LANGUAGE_GREETING_PRESETS = {
+    python: {
+        defaultCode: `print("Salom, Python tiliga xush kelibsiz")\n`,
+        outputPlaceholder: "Run bosilganda natija shu yerda ko'rsatiladi.",
+    },
+    javascript: {
+        defaultCode: `console.log("Salom, JavaScript tiliga xush kelibsiz");\n`,
+        outputPlaceholder: "Run bosilganda natija shu yerda ko'rsatiladi.",
+    },
+    cpp: {
+        defaultCode: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    cout << "Salom, C++ tiliga xush kelibsiz" << '\\n';
+    return 0;
+}
+`,
+        outputPlaceholder: "Run bosilganda natija shu yerda ko'rsatiladi.",
+    },
+    java: {
+        defaultCode: `public class Main {
+    public static void main(String[] args) {
+        System.out.println("Salom, Java tiliga xush kelibsiz");
+    }
+}
+`,
+        outputPlaceholder: "Run bosilganda natija shu yerda ko'rsatiladi.",
+    },
+    go: {
+        defaultCode: `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Salom, Go tiliga xush kelibsiz")
+}
+`,
+        outputPlaceholder: "Run bosilganda natija shu yerda ko'rsatiladi.",
+    },
+};
+
+for (const [language, preset] of Object.entries(LANGUAGE_GREETING_PRESETS)) {
+    Object.assign(LANGUAGE_CONFIGS[language], preset);
+}
+
 const LANGUAGE_AUTOCOMPLETE_WORDS = {
     python: [...PYTHON_KEYWORDS, ...MATH_FUNCTIONS],
     javascript: [
@@ -400,73 +447,49 @@ function getStarterPackBadge(pack = currentStarterPack) {
     return getStarterPackConfig(pack).badge;
 }
 
-const LEGACY_STARTER_CODES = {
-    python: `import sys
-
-
-def main():
-    raw = sys.stdin.read().strip()
-    name = raw.split()[0] if raw else "Python"
-    print(f"Salom, {name}!")
-
-
-if __name__ == "__main__":
-    main()
-`,
-    javascript: `const fs = require("fs");
-
-function main() {
-    const raw = fs.readFileSync(0, "utf8").trim();
-    const name = raw ? raw.split(/\\s+/)[0] : "JavaScript";
-    console.log("Salom, " + name + "!");
-}
-
-main();
-`,
-    cpp: `#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-
-    string name;
-    if (!(cin >> name)) name = "C++";
-
-    cout << "Salom, " << name << "!" << '\\n';
-    return 0;
-}
-`,
-    java: `import java.io.BufferedReader;
-import java.io.InputStreamReader;
-
-public class Main {
-    public static void main(String[] args) throws Exception {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String raw = reader.readLine();
-        String name = (raw == null || raw.trim().isEmpty()) ? "Java" : raw.trim().split("\\\\s+")[0];
-        System.out.println("Salom, " + name + "!");
-    }
-}
-`,
-    go: `package main
-
-import (
-    "bufio"
-    "fmt"
-    "os"
-)
-
-func main() {
-    reader := bufio.NewReader(os.Stdin)
-    var name string
-    if _, err := fmt.Fscan(reader, &name); err != nil {
-        name = "Go"
-    }
-    fmt.Printf("Salom, %s!\\n", name)
-}
-`,
+const LEGACY_STARTER_SIGNATURES = {
+    python: [
+        "numbers = [int(value) for value in sys.stdin.read().split()]",
+        "total = 0",
+        "maximum = numbers[0]",
+        "print(total)",
+        "print(maximum)",
+    ],
+    javascript: [
+        "const numbers = raw",
+        "let total = 0;",
+        "let maximum = numbers[0];",
+        "console.log(total);",
+        "console.log(maximum);",
+    ],
+    cpp: [
+        "long long total = 0;",
+        "long long maximum = 0;",
+        "while (cin >> value)",
+        "cout << total << endl << maximum << endl;",
+    ],
+    java: [
+        "long sum = 0;",
+        "Long maximum = null;",
+        "while (scanner.hasNextLong())",
+        "System.out.println(sum);",
+        "System.out.println(maximum);",
+    ],
+    go: [
+        "var sum int64",
+        "var maximum int64",
+        "hasValue := false",
+        "fmt.Println(sum)",
+        "fmt.Println(maximum)",
+    ],
 };
+
+function isLegacyStarterCode(language, code) {
+    const normalizedLanguage = normalizeLanguage(language);
+    const normalizedCode = String(code || "").replace(/\r\n/g, "\n");
+    const signatures = LEGACY_STARTER_SIGNATURES[normalizedLanguage] || [];
+    return signatures.length > 0 && signatures.every((fragment) => normalizedCode.includes(fragment));
+}
 
 const LANGUAGE_STARTER_CODES = {
     python: {
@@ -741,14 +764,14 @@ func main() {
 
 function isLegacyStarterCode(language, code) {
     const normalizedLanguage = normalizeLanguage(language);
-    return LEGACY_STARTER_CODES[normalizedLanguage] === code;
+    const normalizedCode = String(code || "").replace(/\r\n/g, "\n");
+    const signatures = LEGACY_STARTER_SIGNATURES[normalizedLanguage] || [];
+    return signatures.length > 0 && signatures.every((fragment) => normalizedCode.includes(fragment));
 }
 
 function getStarterCode(language = currentLanguage, pack = currentStarterPack) {
     const normalizedLanguage = normalizeLanguage(language);
-    const normalizedPack = normalizeStarterPack(pack);
-    const languagePackCodes = LANGUAGE_STARTER_CODES[normalizedLanguage] || {};
-    return languagePackCodes[normalizedPack] || getLanguageConfig(normalizedLanguage).defaultCode;
+    return getLanguageConfig(normalizedLanguage).defaultCode;
 }
 
 function getSavedCodeStorageKey(language = currentLanguage, pack = currentStarterPack) {
@@ -819,11 +842,11 @@ function getSelectedStarterPackStorageKey() {
 }
 
 function getStoredStarterPack() {
-    return normalizeStarterPack(localStorage.getItem(getSelectedStarterPackStorageKey()) || "array");
+    return "array";
 }
 
 function setStoredStarterPack(pack) {
-    localStorage.setItem(getSelectedStarterPackStorageKey(), normalizeStarterPack(pack));
+    localStorage.setItem(getSelectedStarterPackStorageKey(), "array");
 }
 
 function readAutoSavedCode(language = currentLanguage, pack = currentStarterPack) {
@@ -1037,13 +1060,7 @@ function renderInputPanel({
 }
 
 function renderIdleInputPanel({ preserveValue = true } = {}) {
-    renderInputPanel({
-        buttonLabel: "Yuborish",
-        buttonDisabled: true,
-        inputValue: preserveValue ? getInputPanelValue() : (readInputDraft(currentLanguage) || ""),
-        placeholder: getLanguageInputPlaceholder() || "Masalan: 1\\n2\\n3",
-        persistDraft: true,
-    });
+    clearOutputInputHost({ preserveValue });
 }
 
 function clearEditorInputPanel() {
@@ -1962,7 +1979,15 @@ function clearEditorDiagnostics() {
 }
 
 function clearOutputInputHost({ preserveValue = true } = {}) {
-    renderIdleInputPanel({ preserveValue });
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
+    }
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
+    }
 }
 
 function clearOutput({ preserveInput = true } = {}) {
@@ -1971,6 +1996,7 @@ function clearOutput({ preserveInput = true } = {}) {
         output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
         output.className = "output-content";
     }
+    pendingRemoteRun = null;
     clearEditorDiagnostics();
     clearOutputInputHost({ preserveValue: preserveInput });
 }
@@ -2089,6 +2115,50 @@ async function executeRemoteCode(language, code, stdin) {
     return data;
 }
 
+function looksLikeInputRequired(language, code) {
+    const normalizedLanguage = normalizeLanguage(language);
+    const text = String(code || "");
+    const patterns = {
+        python: [/\binput\s*\(/],
+        javascript: [
+            /fs\.readFileSync\s*\(\s*0/,
+            /process\.stdin/,
+            /readline/i,
+        ],
+        cpp: [
+            /\bcin\b/,
+            /\bscanf\s*\(/,
+            /\bgetline\s*\(/,
+        ],
+        java: [
+            /\bScanner\s*\(\s*System\.in\s*\)/,
+            /\bBufferedReader\b/,
+            /\breadLine\s*\(/,
+        ],
+        go: [
+            /\bfmt\.(?:Fscan|Scan|Scanln)\b/,
+            /\bbufio\.NewReader\s*\(\s*os\.Stdin\s*\)/,
+        ],
+    };
+
+    return (patterns[normalizedLanguage] || []).some((pattern) => pattern.test(text));
+}
+
+async function runRemoteExecution(language, code, stdinText) {
+    const config = getLanguageConfig(language);
+    showOutput(`${config.label} bajarilmoqda...`, "");
+    const startedAt = performance.now();
+    try {
+        const result = await executeRemoteCode(language, code, stdinText);
+        const elapsed = ((performance.now() - startedAt) / 1000).toFixed(3);
+        const verdict = result.verdict || "Runtime Error";
+        const message = buildRemoteOutputMessage(result, elapsed);
+        showOutput(message, verdict === "Accepted" ? "success" : "error");
+    } catch (error) {
+        showOutput(`Xatolik: ${error.message}`, "error");
+    }
+}
+
 async function runCode() {
     const config = getLanguageConfig(currentLanguage);
     const code = editor.getValue();
@@ -2099,7 +2169,7 @@ async function runCode() {
 
     if (config.supportsLocalRun) {
         if (!pyodide) return showOutput("Python yuklanmoqda...", "error");
-        const stdinText = getInputPanelValue();
+        const stdinText = getInputPanelValue() || readInputDraft(currentLanguage, currentStarterPack) || "";
         activeRunSession = { code, inputValues: splitInputLines(stdinText) };
         showOutput("Bajarilmoqda...", "");
         await continueRunSession();
@@ -2107,18 +2177,14 @@ async function runCode() {
     }
 
     if (config.supportsRemoteRun) {
-        const stdinText = getInputPanelValue();
-        showOutput(`${config.label} bajarilmoqda...`, "");
-        const startedAt = performance.now();
-        try {
-            const result = await executeRemoteCode(currentLanguage, code, stdinText);
-            const elapsed = ((performance.now() - startedAt) / 1000).toFixed(3);
-            const verdict = result.verdict || "Runtime Error";
-            const message = buildRemoteOutputMessage(result, elapsed);
-            showOutput(message, verdict === "Accepted" ? "success" : "error");
-        } catch (error) {
-            showOutput(`Xatolik: ${error.message}`, "error");
+        const stdinText = getInputPanelValue() || readInputDraft(currentLanguage, currentStarterPack) || "";
+        if (!stdinText.trim() && looksLikeInputRequired(currentLanguage, code)) {
+            pendingRemoteRun = { language: currentLanguage, code };
+            showOutput(`${config.label} uchun input kerak.`, "");
+            renderOutputPanelInput("stdin", 0);
+            return;
         }
+        await runRemoteExecution(currentLanguage, code, stdinText);
         return;
     }
 
@@ -2169,6 +2235,15 @@ function renderOutputPanelInput(prompt, index) {
         submitOnEnter: true,
         onSubmit: () => {
             const value = getInputPanelValue();
+            if (pendingRemoteRun) {
+                const queued = pendingRemoteRun;
+                pendingRemoteRun = null;
+                setInputPanelValue("");
+                clearInputDraft(queued.language, currentStarterPack);
+                clearOutputInputHost({ preserveValue: false });
+                void runRemoteExecution(queued.language, queued.code, value);
+                return;
+            }
             if (!activeRunSession && !activeDebugSession) return;
             const lines = value === "" ? [""] : splitInputLines(value);
             setInputPanelValue("");
