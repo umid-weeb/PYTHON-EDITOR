@@ -345,15 +345,15 @@ function getLanguageFileExtension(language = currentLanguage) {
 }
 
 function getLanguageInputHelp(language = currentLanguage, pack = currentStarterPack) {
-    return getStarterPackConfig(pack).helpText || getLanguageConfig(language).inputHelp || "";
+    return getLanguageConfig(language).inputHelp || "";
 }
 
 function getLanguageInputPlaceholder(language = currentLanguage, pack = currentStarterPack) {
-    return getStarterPackConfig(pack).inputPlaceholder || getLanguageConfig(language).inputPlaceholder || "";
+    return getLanguageConfig(language).inputPlaceholder || "";
 }
 
 function getLanguageOutputPlaceholder(language = currentLanguage, pack = currentStarterPack) {
-    return getStarterPackConfig(pack).outputPlaceholder || getLanguageConfig(language).outputPlaceholder || "Natija bu yerda ko'rsatiladi...";
+    return getLanguageConfig(language).outputPlaceholder || "Natija bu yerda ko'rsatiladi...";
 }
 
 function getLanguageRunModeLabel(language = currentLanguage) {
@@ -944,6 +944,11 @@ function bindInputPanelSubmit(handler) {
     if (button) button.onclick = handler;
     if (input) {
         input.onkeydown = (event) => {
+            if (event.key === "Enter" && (input.tagName === "INPUT" || input.dataset.submitOnEnter === "true")) {
+                event.preventDefault();
+                handler();
+                return;
+            }
             if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                 event.preventDefault();
                 handler();
@@ -961,33 +966,62 @@ function renderInputPanel({
     inputValue = "",
     placeholder = "",
     persistDraft = true,
+    multiline = true,
+    submitOnEnter = false,
     onSubmit = null,
+    inlinePrompt = "",
 } = {}) {
     const host = document.getElementById("output-input-host");
     if (!host) return;
-
-    host.className = "output-input-host active";
-    host.innerHTML = `
-        <div class="output-input-header">
-            <div class="output-input-meta">
-                <div class="output-input-label">${escapeHtml(title || "Input / stdin")}</div>
-                <div class="output-input-help">${escapeHtml(helpText || "Dastur uchun kirish ma'lumotlarini shu yerga yozing.")}</div>
-            </div>
-            <div class="output-input-chip">${escapeHtml(chipLabel || "STDIN")}</div>
-        </div>
-        <div class="output-input-row">
-            <textarea
+    const promptText = typeof inlinePrompt === "string" ? inlinePrompt.trim() : "";
+    const fieldHtml = multiline
+        ? `<textarea
                 id="output-panel-input"
                 class="output-input-field output-input-textarea"
                 spellcheck="false"
                 placeholder="${escapeHtml(placeholder || "Masalan: 1\\n2\\n3")}"
-            >${escapeHtml(inputValue || "")}</textarea>
+            >${escapeHtml(inputValue || "")}</textarea>`
+        : `<input
+                id="output-panel-input"
+                class="output-input-field output-input-singleline"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                enterkeyhint="done"
+                placeholder="${escapeHtml(placeholder || "Qiymat kiriting")}"
+                value="${escapeHtml(inputValue || "")}"
+            />`;
+
+    const headerHtml = !promptText && (title || helpText || chipLabel)
+        ? `
+        <div class="output-input-header">
+            <div class="output-input-meta">
+                ${title ? `<div class="output-input-label">${escapeHtml(title)}</div>` : ""}
+                ${helpText ? `<div class="output-input-help">${escapeHtml(helpText)}</div>` : ""}
+            </div>
+            ${chipLabel ? `<div class="output-input-chip">${escapeHtml(chipLabel)}</div>` : ""}
+        </div>`
+        : "";
+
+    host.className = "output-input-host active";
+    host.innerHTML = promptText ? `
+        <div class="output-input-terminal">
+            <div class="output-input-terminal-line">
+                <label class="output-input-terminal-prompt" for="output-panel-input">${escapeHtml(promptText)}</label>
+                ${fieldHtml}
+                <button id="output-panel-submit" class="output-input-submit output-input-submit--compact" type="button">${escapeHtml(buttonLabel || "Yuborish")}</button>
+            </div>
+        </div>` : `
+        ${headerHtml}
+        <div class="output-input-row">
+            ${fieldHtml}
             <button id="output-panel-submit" class="output-input-submit" type="button">${escapeHtml(buttonLabel || "Yuborish")}</button>
         </div>`;
 
     const input = getInputPanelElement();
     if (input && typeof inputValue === "string") {
         input.value = inputValue;
+        input.dataset.submitOnEnter = submitOnEnter ? "true" : "false";
         if (persistDraft) {
             input.oninput = () => saveInputDraft(currentLanguage, input.value);
         } else {
@@ -1003,15 +1037,11 @@ function renderInputPanel({
 }
 
 function renderIdleInputPanel({ preserveValue = true } = {}) {
-    const config = getLanguageConfig();
     renderInputPanel({
-        title: `${config.label} · ${getStarterPackLabel()} stdin`,
-        helpText: getLanguageInputHelp(),
-        chipLabel: getLanguageRunModeLabel(),
         buttonLabel: "Yuborish",
         buttonDisabled: true,
         inputValue: preserveValue ? getInputPanelValue() : (readInputDraft(currentLanguage) || ""),
-        placeholder: getLanguageInputPlaceholder() || "Masalan: Alisher",
+        placeholder: getLanguageInputPlaceholder() || "Masalan: 1\\n2\\n3",
         persistDraft: true,
     });
 }
@@ -1188,16 +1218,16 @@ async function initPyodide() {
 
     try {
         pyodide = await loadPyodide();
-        loading.textContent = "⏳ Formatlash vositalari yuklanmoqda...";
+        loading.textContent = "â³ Formatlash vositalari yuklanmoqda...";
         await ensurePythonRuntimeTools();
-        loading.textContent = "⏳ Python ishga tayyorlanmoqda...";
+        loading.textContent = "â³ Python ishga tayyorlanmoqda...";
         await setupSafeExecutionEnvironment();
-        loading.textContent = "✅ Python tayyor!";
+        loading.textContent = "âœ… Python tayyor!";
         setTimeout(() => {
             loading.classList.remove("active");
         }, 1500);
     } catch (error) {
-        loading.textContent = "❌ Xatolik: Python yuklanmadi!";
+        loading.textContent = "âŒ Xatolik: Python yuklanmadi!";
         loading.style.background = "#fee2e2";
         loading.style.color = "#991b1b";
     }
@@ -1277,9 +1307,6 @@ class SafeExecutor:
 
         def m_input(prompt=""):
             nonlocal consumed
-            if prompt:
-                sys.stdout.write(str(prompt))
-                sys.stdout.flush()
             line = sys.stdin.readline()
             if line == "":
                 raise AwaitingInput(str(prompt), consumed)
@@ -1346,10 +1373,10 @@ async function continueRunSession() {
         activeRunSession = null;
         if (!result.success) {
             highlightEditorError(result.error.line);
-            showOutput(`❌ ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
+            showOutput(`âŒ ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
         } else {
             clearEditorDiagnostics();
-            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\n⏱ Vaqt: ${time}s`, "success");
+            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nâ± Vaqt: ${time}s`, "success");
         }
     } catch (e) {
         showOutput("Xatolik: " + e.message, "error");
@@ -1443,7 +1470,7 @@ function updateEditorStatus() {
     const primary = document.getElementById("editor-status-primary");
     const secondary = document.getElementById("editor-status-secondary");
     if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
-    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | ${getStarterPackBadge()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
 }
 
 function highlightEditorError(line) {
@@ -1511,27 +1538,24 @@ function loadEditorTypographyPreferences() {
 // --- FILE OPERATIONS ---
 
 function saveCode() {
-    localStorage.setItem("pythonSavedCode", editor.getValue());
-    showOutput("✅ Kod saqlandi.", "success");
+    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
     setTimeout(clearOutput, 2000);
 }
 
 function loadCode() {
-    const code = localStorage.getItem("pythonSavedCode");
-    if (code) {
-        editor.setValue(code);
-        showOutput("✅ Saqlangan kod yuklandi.", "success");
-    } else {
-        showOutput("❌ Saqlangan kod topilmadi.", "error");
-    }
+    const code = getStoredCode(currentLanguage, currentStarterPack);
+    editor.setValue(code);
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
 }
 
 function downloadCode() {
-    const blob = new Blob([editor.getValue()], { type: "text/plain" });
+    const ext = getLanguageFileExtension(currentLanguage);
+    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `main_${Date.now()}.py`;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -1542,7 +1566,7 @@ function uploadFile(event) {
     const reader = new FileReader();
     reader.onload = (e) => {
         editor.setValue(e.target.result);
-        showOutput(`✅ Fayl yuklandi: ${file.name}`, "success");
+        showOutput(`âœ… Fayl yuklandi: ${file.name}`, "success");
     };
     reader.readAsText(file);
 }
@@ -1573,7 +1597,7 @@ async function formatEditorCode() {
         const result = JSON.parse(res);
         if (result.formatterAvailable) {
             editor.setValue(result.code);
-            showOutput("✅ Kod formatlandi.", "success");
+            showOutput("âœ… Kod formatlandi.", "success");
         } else {
             showOutput("Formatlash tooli (autopep8) hali yuklanmagan.", "error");
         }
@@ -1734,20 +1758,20 @@ async function initPyodide() {
     if (!loading) return;
 
     loading.classList.add("active");
-    loading.textContent = "⏳ Python vositalari yuklanmoqda...";
+    loading.textContent = "â³ Python vositalari yuklanmoqda...";
 
     try {
         pyodide = await loadPyodide();
         await ensurePythonRuntimeTools();
-        loading.textContent = "⏳ Python muhiti tayyorlanmoqda...";
+        loading.textContent = "â³ Python muhiti tayyorlanmoqda...";
         await setupSafeExecutionEnvironment();
-        loading.textContent = "✅ Python tayyor!";
+        loading.textContent = "âœ… Python tayyor!";
         setTimeout(() => {
             loading.classList.remove("active");
         }, 1500);
     } catch (error) {
         console.warn("Python muhiti yuklanmadi:", error);
-        loading.textContent = "⚠ Python muhiti yuklanmadi, lekin editor ishlaydi.";
+        loading.textContent = "âš  Python muhiti yuklanmadi, lekin editor ishlaydi.";
         loading.style.background = "#fef3c7";
         loading.style.color = "#92400e";
         setTimeout(() => {
@@ -1917,7 +1941,7 @@ function updateEditorStatus() {
     const primary = document.getElementById("editor-status-primary");
     const secondary = document.getElementById("editor-status-secondary");
     if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
-    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | ${getStarterPackBadge()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
 }
 
 function highlightEditorError(line) {
@@ -1961,14 +1985,14 @@ function showOutput(text, type) {
 
 function saveCode() {
     saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
-    showOutput(`✅ ${getLanguageLabel()} · ${getStarterPackLabel()} kodi saqlandi.`, "success");
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
     setTimeout(clearOutput, 2000);
 }
 
 function loadCode() {
     const code = getStoredCode(currentLanguage, currentStarterPack);
     editor.setValue(code);
-    showOutput(`✅ ${getLanguageLabel()} · ${getStarterPackLabel()} kodi yuklandi.`, "success");
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
 }
 
 function downloadCode() {
@@ -1977,7 +2001,7 @@ function downloadCode() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `main_${currentLanguage}_${currentStarterPack}_${Date.now()}.${ext}`;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -2008,7 +2032,7 @@ function uploadFile(event) {
             setEditorLanguage(targetLanguage, { persistCurrent: true });
         }
         editor.setValue(String(e.target.result || ""));
-        showOutput(`✅ Fayl yuklandi: ${file.name}`, "success");
+        showOutput(`âœ… Fayl yuklandi: ${file.name}`, "success");
     };
     reader.readAsText(file);
 }
@@ -2030,12 +2054,12 @@ function buildRemoteOutputMessage(result, durationSeconds) {
 
     if (verdict === "Accepted") {
         const body = stdout || "Muvaffaqiyatli bajarildi.";
-        return `${body}\n\n⏱ Vaqt: ${durationSeconds}s`;
+        return `${body}\n\nâ± Vaqt: ${durationSeconds}s`;
     }
 
     const parts = [stdout, compileOutput, stderr, error].filter((part, index, array) => Boolean(part) && array.indexOf(part) === index);
     const detail = parts.length ? `\n\n${parts.join("\n\n")}` : "";
-    return `❌ ${verdict}${detail}\n\n⏱ Vaqt: ${durationSeconds}s`;
+    return `âŒ ${verdict}${detail}\n\nâ± Vaqt: ${durationSeconds}s`;
 }
 
 async function executeRemoteCode(language, code, stdin) {
@@ -2110,12 +2134,12 @@ async function continueRunSession() {
         const time = ((performance.now() - start) / 1000).toFixed(3);
 
         if (result.awaitingInput) {
-            renderOutputPanelInput(result.error.prompt, result.error.inputIndex);
             if (result.output) {
                 showOutput(result.output + "\n...", "");
             } else {
                 showOutput("Input kutilmoqda...", "");
             }
+            renderOutputPanelInput(result.error.prompt, result.error.inputIndex);
             return;
         }
 
@@ -2123,9 +2147,9 @@ async function continueRunSession() {
         clearEditorDiagnostics();
         if (!result.success) {
             highlightEditorError(result.error.line);
-            showOutput(`❌ ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
+            showOutput(`âŒ ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
         } else {
-            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\n⏱ Vaqt: ${time}s`, "success");
+            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nâ± Vaqt: ${time}s`, "success");
         }
     } catch (error) {
         activeRunSession = null;
@@ -2135,14 +2159,14 @@ async function continueRunSession() {
 
 function renderOutputPanelInput(prompt, index) {
     renderInputPanel({
-        title: "Input kutilmoqda",
-        helpText: prompt ? `${prompt}. Ctrl+Enter bilan yuborish mumkin.` : "Dastur qo'shimcha input kutmoqda. Ctrl+Enter bilan yuborish mumkin.",
-        chipLabel: "INPUT",
-        buttonLabel: "Davom etish",
+        inlinePrompt: prompt ? String(prompt) : "Qiymat",
+        buttonLabel: "Yuborish",
         buttonDisabled: false,
         inputValue: "",
-        placeholder: "Keyingi inputni shu yerga yozing",
+        placeholder: "Javobni yozing",
         persistDraft: false,
+        multiline: false,
+        submitOnEnter: true,
         onSubmit: () => {
             const value = getInputPanelValue();
             if (!activeRunSession && !activeDebugSession) return;
@@ -2180,7 +2204,7 @@ function formatEditorCode() {
             const result = JSON.parse(res);
             if (result.formatterAvailable) {
                 editor.setValue(result.code);
-                showOutput("✅ Kod formatlandi.", "success");
+                showOutput("âœ… Kod formatlandi.", "success");
             } else {
                 showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
             }

@@ -450,11 +450,17 @@ body.panel-resizing-vertical {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
   margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
   text-transform: none;
   letter-spacing: normal;
+}
+
+.editor-header-controls::-webkit-scrollbar {
+  display: none;
 }
 
 .editor-control {
@@ -472,10 +478,6 @@ body.panel-resizing-vertical {
 
 .editor-control--language .editor-select-shell {
   min-width: 150px;
-}
-
-.editor-control--starter .editor-select-shell {
-  min-width: 235px;
 }
 
 .editor-select-shell {
@@ -715,7 +717,6 @@ body.dark-mode .debug-point-marker {
   min-height: 0;
   padding: 18px 20px 24px;
   background: var(--console-surface);
-  border-left: 1px solid var(--console-border);
   color: var(--text-main);
   font-family: "IBM Plex Mono", monospace;
   font-size: 14px;
@@ -736,8 +737,8 @@ body.dark-mode .debug-point-marker {
 
 .output-input-host {
   display: none;
-  padding: 16px 18px 18px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
   background: var(--surface-muted);
 }
 
@@ -750,7 +751,7 @@ body.dark-mode .debug-point-marker {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .output-input-meta {
@@ -783,13 +784,86 @@ body.dark-mode .debug-point-marker {
   text-transform: uppercase;
 }
 
+.output-input-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: output-input-rise 160ms ease-out;
+}
+
+.output-input-terminal-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.output-input-terminal-prompt {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  background: var(--success-soft);
+  color: var(--success);
+  font-family: var(--editor-font-family);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.output-input-terminal:focus-within .output-input-terminal-prompt {
+  border-color: rgba(15, 118, 110, 0.32);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.08);
+}
+
 .output-input-textarea {
-  width: 100%;
-  min-height: 96px;
+  flex: 1;
+  min-height: 84px;
   resize: vertical;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.output-input-singleline {
+  flex: 1;
+  min-width: 180px;
+  min-height: 42px;
+  height: 42px;
+  resize: none;
+  line-height: 1.3;
+}
+
+.output-input-terminal .output-input-field {
+  background: var(--console-surface);
+  border-color: var(--console-border);
+}
+
+.output-input-terminal .output-input-field:focus {
+  border-color: rgba(15, 118, 110, 0.4);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.output-input-submit--compact {
+  min-width: 92px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 14px;
+}
+
+@keyframes output-input-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .debug-panel {
@@ -1000,7 +1074,7 @@ body.dark-mode .debug-range-body-line {
 }
 
 .output-input-label {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   color: var(--text-muted);
   font-size: 0.82rem;
   font-weight: 700;
@@ -1009,7 +1083,8 @@ body.dark-mode .debug-range-body-line {
 
 .output-input-row {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: flex-end;
   gap: 10px;
 }
 
@@ -1020,7 +1095,7 @@ body.dark-mode .debug-range-body-line {
   border-radius: 12px;
   background: var(--surface);
   color: var(--text-main);
-  padding: 12px 14px;
+  padding: 10px 12px;
   font-family: var(--editor-font-family);
   font-size: var(--editor-font-size);
   overflow-x: auto;
@@ -1033,8 +1108,8 @@ body.dark-mode .debug-range-body-line {
 }
 
 .output-input-submit {
-  min-width: 120px;
-  min-height: 42px;
+  min-width: 104px;
+  min-height: 40px;
   border: 1px solid var(--primary);
   border-radius: 12px;
   background: var(--primary);
@@ -1229,6 +1304,8 @@ body.dark-mode .debug-range-body-line {
   .editor-header-controls {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
+    overflow-x: visible;
   }
 
   .editor-control {

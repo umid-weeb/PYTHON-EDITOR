@@ -186,28 +186,6 @@
                                 </select>
                             </span>
                         </label>
-                        <label class="editor-control editor-control--language">
-                            <span class="editor-control-label">Til</span>
-                            <span class="editor-select-shell">
-                                <select id="editor-language" class="editor-select">
-                                    <option value="python">Python</option>
-                                    <option value="javascript">JavaScript</option>
-                                    <option value="cpp">C++</option>
-                                    <option value="java">Java</option>
-                                    <option value="go">Go</option>
-                                </select>
-                            </span>
-                        </label>
-                        <label class="editor-control editor-control--starter">
-                            <span class="editor-control-label">Paket</span>
-                            <span class="editor-select-shell">
-                                <select id="editor-starter-pack" class="editor-select">
-                                    <option value="array">n + array</option>
-                                    <option value="loop">loop + condition</option>
-                                    <option value="string">string parsing + output formatting</option>
-                                </select>
-                            </span>
-                        </label>
                         <label class="editor-control">
                             <span class="editor-control-label">Size</span>
                             <span class="editor-select-shell">
@@ -219,6 +197,18 @@
                                     <option value="20px">20px</option>
                                     <option value="22px">22px</option>
                                     <option value="24px">24px</option>
+                                </select>
+                            </span>
+                        </label>
+                        <label class="editor-control editor-control--language">
+                            <span class="editor-control-label">Til</span>
+                            <span class="editor-select-shell">
+                                <select id="editor-language" class="editor-select">
+                                    <option value="python">Python</option>
+                                    <option value="javascript">JavaScript</option>
+                                    <option value="cpp">C++</option>
+                                    <option value="java">Java</option>
+                                    <option value="go">Go</option>
                                 </select>
                             </span>
                         </label>
@@ -240,9 +230,9 @@
             ></div>
 
             <div class="output-panel">
-                <div class="panel-header">Natija</div>
-                <div class="output-input-host" id="output-input-host"></div>
+                <div class="panel-header">Console</div>
                 <div class="output-content" id="output">Natija bu yerda ko'rsatiladi...</div>
+                <div class="output-input-host" id="output-input-host"></div>
                 <div class="debug-panel" id="debug-panel">
                     <div class="debug-toolbar">
                         <div class="debug-meta">
