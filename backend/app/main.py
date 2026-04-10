@@ -14,6 +14,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.users import router as user_router, account_router
 from app.api.routes.problems import router as problem_router
 from app.api.routes.submissions import router as submission_router
+from app.api.routes.editor import router as editor_router
 from app.api.routes.contests import router as contest_router, ws_router as contest_ws_router
 from app.api.routes.engagement import router as engagement_router
 from app.api.routes.ai import router as ai_router
@@ -191,6 +192,7 @@ app.add_middleware(
 
 app.include_router(problem_router, prefix=settings.api_prefix)
 app.include_router(submission_router, prefix=settings.api_prefix)
+app.include_router(editor_router, prefix=settings.api_prefix)
 app.include_router(ai_router, prefix=f"{settings.api_prefix}/ai")
 app.include_router(contest_router, prefix=settings.api_prefix)
 app.include_router(contest_ws_router)

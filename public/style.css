@@ -470,6 +470,14 @@ body.panel-resizing-vertical {
   font-weight: 700;
 }
 
+.editor-control--language .editor-select-shell {
+  min-width: 150px;
+}
+
+.editor-control--starter .editor-select-shell {
+  min-width: 235px;
+}
+
 .editor-select-shell {
   position: relative;
   display: inline-flex;
@@ -729,12 +737,59 @@ body.dark-mode .debug-point-marker {
 .output-input-host {
   display: none;
   padding: 16px 18px 18px;
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   background: var(--surface-muted);
 }
 
 .output-input-host.active {
   display: block;
+}
+
+.output-input-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.output-input-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.output-input-help {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.output-input-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(91, 141, 255, 0.18);
+  background: rgba(91, 141, 255, 0.1);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.output-input-textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .debug-panel {
@@ -954,6 +1009,7 @@ body.dark-mode .debug-range-body-line {
 
 .output-input-row {
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
@@ -965,8 +1021,8 @@ body.dark-mode .debug-range-body-line {
   background: var(--surface);
   color: var(--text-main);
   padding: 12px 14px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.95rem;
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
   overflow-x: auto;
 }
 
@@ -978,6 +1034,7 @@ body.dark-mode .debug-range-body-line {
 
 .output-input-submit {
   min-width: 120px;
+  min-height: 42px;
   border: 1px solid var(--primary);
   border-radius: 12px;
   background: var(--primary);
@@ -986,11 +1043,18 @@ body.dark-mode .debug-range-body-line {
   font-family: "IBM Plex Sans", sans-serif;
   font-weight: 700;
   cursor: pointer;
+  align-self: flex-end;
 }
 
 .output-input-submit:hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
+}
+
+.output-input-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .find-replace-dialog {

@@ -10,16 +10,16 @@
     <link rel="canonical" href="https://pyzone.uz/">
     <meta property="og:site_name" content="Isroilov's Online Editor">
     <meta property="og:title" content="Isroilov's Online Editor">
-    <meta property="og:description" content="Onlayn Python muharriri: kod yozing, ishga tushiring va natijalarni ko'ring.">
+    <meta property="og:description" content="Onlayn multi-language editor: Python, JavaScript, C++, Java va Go kodini yozing, ishga tushiring va natijalarni ko'ring.">
     <meta property="og:url" content="https://pyzone.uz/">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://pyzone.uz/python_icon_round.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Isroilov's Online Editor">
-    <meta name="twitter:description" content="Onlayn Python muharriri">
+    <meta name="twitter:description" content="Onlayn multi-language editor">
     <meta name="twitter:image" content="https://pyzone.uz/python_icon_round.png">
-    <meta name="description" content="Python uchun professional online editor. Kod yozing, ishga tushiring va natijalarni brauzer ichida ko'ring.">
-    <meta name="keywords" content="online python editor, python browser editor, python code runner, dasturlash online, python muharrir, browser python, online IDE, pyodide python, python web editor, python code sandbox, python learning tool, pyzone">
+    <meta name="description" content="Python, JavaScript, C++, Java va Go uchun professional online editor. Kod yozing, ishga tushiring va natijalarni brauzer ichida ko'ring.">
+    <meta name="keywords" content="online editor, online ide, python editor, javascript editor, cpp editor, java editor, go editor, browser code runner, dasturlash online, pyzone">
     <meta name="author" content="Isroilov's Team">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,6 +32,9 @@
     <link rel="stylesheet" href="./style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/python-hint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/anyword-hint.min.js"></script>
@@ -54,7 +57,29 @@
     </script>
     <script>
         var _iub = _iub || [];
-        _iub.csConfiguration = { "siteId": 4343250, "cookiePolicyId": 29133168, "lang": "en", "storage": { "useSiteId": true } };
+        _iub.csConfiguration = {
+            "siteId": 4343250,
+            "cookiePolicyId": 29133168,
+            "lang": "en",
+            "storage": { "useSiteId": true },
+            "floatingPreferencesButtonDisplay": false,
+            "banner": {
+                "position": "float-top-center",
+                "showTitle": false,
+                "backgroundOverlay": false,
+                "fontSize": "12px",
+                "acceptButtonDisplay": true,
+                "continueWithoutAcceptingButtonDisplay": true,
+                "closeButtonDisplay": false,
+                "rejectButtonDisplay": false,
+                "customizeButtonDisplay": false,
+                "useThirdParties": false,
+                "content": "Bu sayt editor ishlashi uchun zarur cookie'lardan foydalanadi. Batafsil %{cookie_policy_link}.",
+                "acceptButtonCaption": "Qabul qilish",
+                "continueWithoutAcceptingButtonCaption": "Davom etish",
+                "cookiePolicyLinkCaption": "cookie siyosati"
+            }
+        };
     </script>
     <script src="https://cs.iubenda.com/autoblocking/4343250.js"></script>
     <script src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
@@ -65,9 +90,9 @@
         <div class="header">
             <h1>
                 <span class="status-indicator">
-                    <img class="fa-python" src="./image.png" alt="Python online compiler">
+                <img class="fa-python" src="./image.png" alt="Online editor logo">
                 </span>
-                Python Online Editor
+                Online Editor
             </h1>
             <div class="header-buttons">
                 <button class="btn-run" onclick="runCode()" type="button">
@@ -131,11 +156,11 @@
                     </span>
                     <span class="button-label">Dark</span>
                 </button>
-                <input type="file" id="fileInput" accept=".py,.txt" onchange="uploadFile(event)">
+                <input type="file" id="fileInput" accept=".py,.txt,.js,.cpp,.cc,.cxx,.java,.go,.h,.hpp" onchange="uploadFile(event)">
             </div>
         </div>
 
-        <div class="loading" id="loading">Python muhiti yuklanmoqda...</div>
+        <div class="loading" id="loading">Editor muhiti yuklanmoqda...</div>
 
         <div class="editor-container">
             <div class="editor-panel">
@@ -161,6 +186,28 @@
                                 </select>
                             </span>
                         </label>
+                        <label class="editor-control editor-control--language">
+                            <span class="editor-control-label">Til</span>
+                            <span class="editor-select-shell">
+                                <select id="editor-language" class="editor-select">
+                                    <option value="python">Python</option>
+                                    <option value="javascript">JavaScript</option>
+                                    <option value="cpp">C++</option>
+                                    <option value="java">Java</option>
+                                    <option value="go">Go</option>
+                                </select>
+                            </span>
+                        </label>
+                        <label class="editor-control editor-control--starter">
+                            <span class="editor-control-label">Paket</span>
+                            <span class="editor-select-shell">
+                                <select id="editor-starter-pack" class="editor-select">
+                                    <option value="array">n + array</option>
+                                    <option value="loop">loop + condition</option>
+                                    <option value="string">string parsing + output formatting</option>
+                                </select>
+                            </span>
+                        </label>
                         <label class="editor-control">
                             <span class="editor-control-label">Size</span>
                             <span class="editor-select-shell">
@@ -177,11 +224,10 @@
                         </label>
                     </div>
                 </div>
-                <textarea id="code-editor">print("Salom, Python!")
-</textarea>
+                <textarea id="code-editor" spellcheck="false"></textarea>
                 <div class="editor-statusbar">
                     <div id="editor-status-primary">Ln 1, Col 1</div>
-                    <div id="editor-status-secondary">Spaces: 4</div>
+                    <div id="editor-status-secondary">Python 3 | UTF-8 | Spaces: 4</div>
                 </div>
             </div>
             <div
@@ -195,6 +241,7 @@
 
             <div class="output-panel">
                 <div class="panel-header">Natija</div>
+                <div class="output-input-host" id="output-input-host"></div>
                 <div class="output-content" id="output">Natija bu yerda ko'rsatiladi...</div>
                 <div class="debug-panel" id="debug-panel">
                     <div class="debug-toolbar">
@@ -225,7 +272,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="output-input-host" id="output-input-host"></div>
             </div>
         </div>
     </div>

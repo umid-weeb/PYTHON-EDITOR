@@ -17,7 +17,7 @@ class Judge0Settings:
 
 
 def get_judge0_settings() -> Judge0Settings:
-  base_url = os.getenv("JUDGE0_BASE_URL", "").rstrip("/")
+  base_url = os.getenv("JUDGE0_BASE_URL", "https://ce.judge0.com").rstrip("/")
   api_key = os.getenv("JUDGE0_API_KEY") or None
   enabled = bool(base_url)
   return Judge0Settings(base_url=base_url, api_key=api_key, enabled=enabled)
@@ -30,8 +30,33 @@ class Judge0Client:
   def _headers(self) -> dict[str, str]:
     headers: dict[str, str] = {"Content-Type": "application/json"}
     if self.settings.api_key:
+      # Support both self-hosted Judge0 CE and hosted deployments.
+      headers["X-Auth-Token"] = self.settings.api_key
       headers["X-RapidAPI-Key"] = self.settings.api_key
     return headers
+
+  def list_languages(self) -> list[dict[str, Any]]:
+    if not self.settings.enabled:
+      raise RuntimeError("Judge0 is not configured.")
+
+    response = requests.get(
+      f"{self.settings.base_url}/languages",
+      headers=self._headers(),
+      timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+
+    if isinstance(payload, list):
+      return [item for item in payload if isinstance(item, dict)]
+
+    if isinstance(payload, dict):
+      for key in ("languages", "items", "data"):
+        items = payload.get(key)
+        if isinstance(items, list):
+          return [item for item in items if isinstance(item, dict)]
+
+    raise RuntimeError("Unexpected response from Judge0 languages endpoint.")
 
   def submit(self, *, source_code: str, language_id: int, stdin: str = "") -> str:
     if not self.settings.enabled:
