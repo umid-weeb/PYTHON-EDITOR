@@ -15,11 +15,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "http://16.16.26.138:8000/api/$1"
+      "destination": "http://16.16.26.138/api/$1"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "http://16.16.26.138:8000/uploads/$1"
+      "destination": "http://16.16.26.138/uploads/$1"
     },
     {
       "source": "/zone/(.*)",

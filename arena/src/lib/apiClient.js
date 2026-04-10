@@ -4,9 +4,8 @@ import {
   writeStoredToken,
 } from "./storage.js";
 
-// In production, use empty string so all requests go to /api/... (relative path).
-// Vercel rewrites /api/* → http://16.16.26.138:5000/api/* server-side,
-// avoiding Mixed Content errors (HTTPS page → HTTP backend).
+// In production, use empty string so requests stay on /api/... (relative path).
+// That lets Vercel route the calls server-side without hardcoding a backend origin.
 // In dev, point directly at the local FastAPI server.
 const DEFAULT_API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
 
