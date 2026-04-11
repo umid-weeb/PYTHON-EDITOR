@@ -2122,9 +2122,9 @@ function extractErrorLineFromText(text) {
     if (!normalized) return null;
 
     const patterns = [
-        /:(\d+):\d+:\s*error/i,
-        /:(\d+):\s*error/i,
-        /line\s+(\d+)/i,
+        /:(\d+):\d+:\s*(?:error|warning)/i,
+        /:(\d+):\d+/i,
+        /line\s+(\d+)(?:,\s*column\s+\d+)?/i,
         /at\s+[^:\n]+:(\d+):(\d+)/i,
         /File "[^"]+", line (\d+)/i,
     ];
@@ -2140,6 +2140,335 @@ function extractErrorLineFromText(text) {
     }
 
     return null;
+}
+
+function matchErrorRule(lowerText, rules) {
+    for (const rule of rules) {
+        const matches = Array.isArray(rule.match) ? rule.match : [rule.match];
+        const shouldMatchAll = rule.all !== false;
+        const hit = shouldMatchAll
+            ? matches.every((term) => lowerText.includes(String(term).toLowerCase()))
+            : matches.some((term) => lowerText.includes(String(term).toLowerCase()));
+
+        if (hit) {
+            return {
+                summary: rule.summary,
+                tips: Array.isArray(rule.tips) ? rule.tips : [],
+            };
+        }
+    }
+
+    return null;
+}
+
+function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
+    const normalizedLanguage = normalizeLanguage(language);
+
+    const compilationRules = {
+        cpp: [
+            {
+                match: ["expected '}'", "expected }", "expected '}' at end of input"],
+                summary: "Kodda yopilmagan qavs bor. `}` yetishmayapti.",
+                tips: [
+                    "Har bir `{` uchun mos `}` borligini tekshiring.",
+                    "Ayniqsa `if`, `for`, `while` va `main` bloklarini ko'rib chiqing.",
+                ],
+            },
+            {
+                match: ["expected ';'", "missing ';'"],
+                summary: "Nuqta-vergul `;` yetishmayapti.",
+                tips: [
+                    "Har bir buyruq satrining oxirini tekshiring.",
+                    "Ayniqsa `return`, `int`, `cout`, `if` atrofini ko'ring.",
+                ],
+            },
+            {
+                match: ["was not declared in this scope"],
+                summary: "Bu nom bu joyda e'lon qilinmagan.",
+                tips: [
+                    "O'zgaruvchi yoki funksiya ishlatilishdan oldin e'lon qilinganini tekshiring.",
+                    "Nomni yozishda xatolik yo'qligiga ishonch hosil qiling.",
+                ],
+            },
+            {
+                match: ["no matching function for call to"],
+                summary: "Funksiya chaqiruvidagi argumentlar mos kelmadi.",
+                tips: [
+                    "Funksiya nomi va argumentlar sonini tekshiring.",
+                    "Qabul qiladigan tur bilan yuborayotgan tur mos ekanini ko'ring.",
+                ],
+            },
+            {
+                match: ["invalid conversion", "cannot convert"],
+                all: false,
+                summary: "Qiymat turi mos emas.",
+                tips: [
+                    "Son, matn va boolean qiymatlarni aralashtirib yubormaganingizni tekshiring.",
+                    "Kerak bo'lsa explicit type cast ishlating.",
+                ],
+            },
+            {
+                match: ["redefinition of"],
+                summary: "Nom ikki marta e'lon qilingan.",
+                tips: [
+                    "Bir xil nomdagi o'zgaruvchi yoki funksiya takrorlanmaganini tekshiring.",
+                ],
+            },
+            {
+                match: ["does not name a type"],
+                summary: "E'lon joyi noto'g'ri yoki oldingi qatorda sintaksis uzilib qolgan.",
+                tips: [
+                    "Oldingi qatorda `;` yetishmayotganini tekshiring.",
+                    "E'lon kodini blokdan tashqariga chiqarmaganingizga qarang.",
+                ],
+            },
+        ],
+        java: [
+            {
+                match: ["cannot find symbol"],
+                summary: "Java bu nomni topmadi.",
+                tips: [
+                    "O'zgaruvchi, funksiya yoki class nomini tekshiring.",
+                    "Kerakli importlar qo'shilganini ko'ring.",
+                ],
+            },
+            {
+                match: ["package ", " does not exist"],
+                summary: "Import qilinayotgan paket topilmadi.",
+                tips: [
+                    "Import yozuvi to'g'riligini tekshiring.",
+                    "Kerakli kutubxona mavjudligini ko'ring.",
+                ],
+            },
+            {
+                match: ["class, interface, or enum expected"],
+                summary: "Kod sinf tanasidan tashqariga chiqib qolgan yoki qavs yopilmagan.",
+                tips: [
+                    "Har bir `{` uchun `}` borligini tekshiring.",
+                    "Metodlar class ichida joylashganiga ishonch hosil qiling.",
+                ],
+            },
+            {
+                match: ["reached end of file while parsing"],
+                summary: "Kod oxirida blok yopilmay qolgan.",
+                tips: [
+                    "Oxirgi `}` larni tekshiring.",
+                    "String yoki bracket yopilganini ko'ring.",
+                ],
+            },
+            {
+                match: ["incompatible types"],
+                summary: "Qiymat turi mos emas.",
+                tips: [
+                    "Masalan, `String` o'rniga `int` yubormaganingizni tekshiring.",
+                ],
+            },
+            {
+                match: ["non-static method"],
+                summary: "Non-static metod static `main` ichidan noto'g'ri chaqirilgan.",
+                tips: [
+                    "Obyekt yarating yoki metodni `static` qiling.",
+                ],
+            },
+        ],
+        javascript: [
+            {
+                match: ["unexpected token"],
+                summary: "JS kutilmagan belgi yoki operator topdi.",
+                tips: [
+                    "Qavslar, vergullar va operatorlarni tekshiring.",
+                    "Yopilmagan `{`, `(` yoki matn qatori yo'qligiga qarang.",
+                ],
+            },
+            {
+                match: ["unexpected identifier"],
+                summary: "Nom noto'g'ri joyda ishlatilgan.",
+                tips: [
+                    "O'zgaruvchi yoki funksiya yozilish tartibini ko'ring.",
+                ],
+            },
+            {
+                match: ["missing ) after argument list"],
+                summary: "Yopuvchi qavs `)` yetishmayapti.",
+                tips: [
+                    "Funksiya chaqiruvlaridagi qavslarni tekshiring.",
+                ],
+            },
+            {
+                match: ["missing initializer in const declaration"],
+                summary: "`const` o'zgaruvchisi qiymatsiz e'lon qilingan.",
+                tips: [
+                    "`const x = ...` ko'rinishida qiymat berilganini tekshiring.",
+                ],
+            },
+            {
+                match: ["unexpected end of input"],
+                summary: "Kod oxirida qavs yoki blok yopilmay qolgan.",
+                tips: [
+                    "Har bir `(`, `{`, `[` uchun mos yopuvchi belgi borligini tekshiring.",
+                ],
+            },
+        ],
+        go: [
+            {
+                match: ["syntax error: unexpected"],
+                summary: "Go sintaksisida kutilmagan belgi bor.",
+                tips: [
+                    "Qavslar, `:=`, `,` va `}` joylashuvini tekshiring.",
+                ],
+            },
+            {
+                match: ["undefined:"],
+                summary: "Bu nom topilmadi yoki import yetishmaydi.",
+                tips: [
+                    "Nom yozilishi va importlar to'g'riligini tekshiring.",
+                ],
+            },
+            {
+                match: ["declared and not used"],
+                summary: "O'zgaruvchi e'lon qilingan, lekin ishlatilmagan.",
+                tips: [
+                    "Keraksiz o'zgaruvchini olib tashlang yoki uni ishlating.",
+                ],
+            },
+            {
+                match: ["cannot use"],
+                summary: "Qiymat turi mos emas.",
+                tips: [
+                    "Qabul qilinayotgan va yuborilayotgan turlarni taqqoslang.",
+                ],
+            },
+            {
+                match: ["missing return"],
+                summary: "Funksiya barcha yo'llarda `return` qilmayapti.",
+                tips: [
+                    "Har bir shartli yo'l oxirida return borligini tekshiring.",
+                ],
+            },
+            {
+                match: ["imported and not used"],
+                summary: "Import qilingan paket ishlatilmagan.",
+                tips: [
+                    "Keraksiz importni o'chiring yoki paketdan foydalaning.",
+                ],
+            },
+        ],
+    };
+
+    const runtimeRules = {
+        cpp: [
+            {
+                match: ["segmentation fault", "invalid memory address"],
+                all: false,
+                summary: "Xotiraga noto'g'ri murojaat qilindi.",
+                tips: [
+                    "Bo'sh ko'rsatkich yoki chegaradan chiqqan indeks yo'qligini tekshiring.",
+                ],
+            },
+            {
+                match: ["std::bad_alloc"],
+                summary: "Xotira yetmadi.",
+                tips: [
+                    "Juda katta massiv yoki keraksiz ko'p xotira ajratilmayotganini tekshiring.",
+                ],
+            },
+            {
+                match: ["terminate called after throwing an instance of"],
+                summary: "Tutib olinmagan exception yuz berdi.",
+                tips: [
+                    "Noto'g'ri parametr, bo'sh qiymat yoki container chegarasini tekshiring.",
+                ],
+            },
+        ],
+        java: [
+            {
+                match: ["nullpointerexception"],
+                summary: "Null obyekt ishlatildi.",
+                tips: [
+                    "Obyekt yaratilib bo'linganini tekshiring.",
+                    "Null tekshiruvi qo'shing.",
+                ],
+            },
+            {
+                match: ["arrayindexoutofboundsexception"],
+                summary: "Indeks chegaradan chiqdi.",
+                tips: [
+                    "Massiv uzunligi va indekslarni tekshiring.",
+                ],
+            },
+            {
+                match: ["numberformatexception"],
+                summary: "Matn son sifatida o'qildi, lekin format noto'g'ri.",
+                tips: [
+                    "Kiritilgan qiymat haqiqiy son ko'rinishida ekanini tekshiring.",
+                ],
+            },
+        ],
+        javascript: [
+            {
+                match: ["cannot read properties of undefined", "cannot read property of undefined"],
+                all: false,
+                summary: "Undefined yoki null ustida property o'qildi.",
+                tips: [
+                    "Obyekt mavjudligini tekshiring.",
+                    "Optional chaining yoki guard ishlating.",
+                ],
+            },
+            {
+                match: ["cannot set properties of undefined"],
+                summary: "Undefined qiymatga property yozishga urindingiz.",
+                tips: [
+                    "Avval obyekt yaratilganini tekshiring.",
+                ],
+            },
+            {
+                match: ["referenceerror", "is not defined"],
+                all: false,
+                summary: "Nom topilmadi.",
+                tips: [
+                    "O'zgaruvchi yoki funksiya e'lon qilinganini tekshiring.",
+                ],
+            },
+            {
+                match: ["typeerror"],
+                summary: "Qiymat turi mos emas yoki funksiya noto'g'ri ishlatilgan.",
+                tips: [
+                    "Qiymat turini va metod chaqiruvini ko'ring.",
+                ],
+            },
+        ],
+        go: [
+            {
+                match: ["panic:"],
+                summary: "Go panic holatiga tushdi.",
+                tips: [
+                    "Nil pointer, indeks yoki formatlash xatolarini tekshiring.",
+                ],
+            },
+            {
+                match: ["index out of range"],
+                summary: "Indeks chegaradan chiqdi.",
+                tips: [
+                    "Slice yoki array uzunligini tekshiring.",
+                ],
+            },
+            {
+                match: ["invalid memory address"],
+                summary: "Nil pointer yoki bo'sh manzilga murojaat qilindi.",
+                tips: [
+                    "Nil tekshiruv qo'shing.",
+                ],
+            },
+        ],
+    };
+
+    const rules = verdict === "Compilation Error"
+        ? compilationRules[normalizedLanguage] || []
+        : verdict === "Runtime Error"
+            ? runtimeRules[normalizedLanguage] || []
+            : [];
+
+    return matchErrorRule(lowerText, rules);
 }
 
 function translatePythonError(errorType, errorMessage) {
@@ -2288,6 +2617,15 @@ function translateRemoteError(language, verdict, text) {
 
     if (verdict === "Accepted") {
         return { title: `${lang} muvaffaqiyatli`, summary: "", tips: [] };
+    }
+
+    const languageAdvice = getLanguageSpecificErrorAdvice(language, verdict, lower);
+    if (languageAdvice) {
+        return {
+            title: baseTitle,
+            summary: languageAdvice.summary,
+            tips: languageAdvice.tips,
+        };
     }
 
     if (verdict === "Compilation Error") {
@@ -2462,6 +2800,7 @@ function buildRemoteOutputMessage(result, durationSeconds) {
     const stderr = normalizeErrorText(result.stderr);
     const error = normalizeErrorText(result.error || result.message || result.status);
     const rawText = [compileOutput, stderr, error].filter(Boolean).join("\n\n");
+    const errorLine = extractErrorLineFromText(rawText);
 
     if (verdict === "Accepted") {
         const body = stdout || "Muvaffaqiyatli bajarildi.";
@@ -2477,6 +2816,10 @@ function buildRemoteOutputMessage(result, durationSeconds) {
         for (const tip of friendly.tips) {
             parts.push(`- ${tip}`);
         }
+    }
+    if (errorLine) {
+        parts.push("");
+        parts.push(`Qator: ${errorLine}`);
     }
     if (stdout) {
         parts.push("");
