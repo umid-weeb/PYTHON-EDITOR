@@ -68,6 +68,101 @@ const EDITOR_FONT_FAMILIES = {
 
 const LANGUAGE_STORAGE_KEY = "onlineEditorLanguage";
 const STARTER_PACK_STORAGE_KEY = "onlineEditorStarterPack";
+
+function svgToDataUri(svg) {
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function createLanguageBadge(label, options = {}) {
+    const {
+        background = "#1f3c88",
+        foreground = "#ffffff",
+        accent = "rgba(255, 255, 255, 0.18)",
+        circle = "rgba(255, 255, 255, 0.08)",
+        badge = label,
+        textSize = 20,
+    } = options;
+
+    return svgToDataUri(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="${label}">
+            <defs>
+                <linearGradient id="bg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="${background}"/>
+                    <stop offset="1" stop-color="${accent}"/>
+                </linearGradient>
+            </defs>
+            <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#bg)"/>
+            <circle cx="18" cy="18" r="9" fill="${circle}"/>
+            <text x="32" y="${textSize === 18 ? 39 : 40}" text-anchor="middle" fill="${foreground}" font-family="Arial, Helvetica, sans-serif" font-size="${textSize}" font-weight="700" letter-spacing="0.03em">${badge}</text>
+        </svg>
+    `);
+}
+
+const LANGUAGE_BRAND_ICONS = {
+    python: {
+        src: "./image.png",
+        alt: "Python logo",
+        title: "Python",
+    },
+    javascript: {
+        src: createLanguageBadge("JS", {
+            background: "#1f2937",
+            accent: "#facc15",
+            circle: "rgba(250, 204, 21, 0.18)",
+            badge: "JS",
+            textSize: 21,
+        }),
+        alt: "JavaScript logo",
+        title: "JavaScript",
+    },
+    cpp: {
+        src: createLanguageBadge("C++", {
+            background: "#1d4ed8",
+            accent: "#60a5fa",
+            circle: "rgba(255, 255, 255, 0.16)",
+            badge: "C++",
+            textSize: 18,
+        }),
+        alt: "C plus plus logo",
+        title: "C++",
+    },
+    java: {
+        src: createLanguageBadge("Java", {
+            background: "#7c2d12",
+            accent: "#f97316",
+            circle: "rgba(255, 255, 255, 0.14)",
+            badge: "Java",
+            textSize: 18,
+        }),
+        alt: "Java logo",
+        title: "Java",
+    },
+    go: {
+        src: createLanguageBadge("Go", {
+            background: "#0f766e",
+            accent: "#22d3ee",
+            circle: "rgba(255, 255, 255, 0.12)",
+            badge: "Go",
+            textSize: 21,
+        }),
+        alt: "Go logo",
+        title: "Go",
+    },
+};
+
+function getLanguageBrandIcon(language = currentLanguage) {
+    return LANGUAGE_BRAND_ICONS[normalizeLanguage(language)] || LANGUAGE_BRAND_ICONS.python;
+}
+
+function updateHeaderLanguageBranding(language = currentLanguage) {
+    const brand = document.getElementById("editor-language-brand");
+    if (!brand) return;
+
+    const icon = getLanguageBrandIcon(language);
+    brand.src = icon.src;
+    brand.alt = icon.alt;
+    brand.title = icon.title || icon.alt;
+}
 const LANGUAGE_CONFIGS = {
     python: {
         label: "Python",
@@ -1860,6 +1955,7 @@ function syncLanguageSelector() {
     if (selector) {
         selector.value = currentLanguage;
     }
+    updateHeaderLanguageBranding(currentLanguage);
 }
 
 function setupLanguageSelector() {
@@ -1867,6 +1963,7 @@ function setupLanguageSelector() {
     if (!selector) return;
     selector.value = currentLanguage;
     selector.onchange = () => setEditorLanguage(selector.value);
+    updateHeaderLanguageBranding(currentLanguage);
 }
 
 function syncStarterPackSelector() {
@@ -1925,12 +2022,14 @@ function setEditorLanguage(language, options = {}) {
         currentLanguage = nextLanguage;
         setStoredLanguage(nextLanguage);
         syncLanguageSelector();
+        updateHeaderLanguageBranding(nextLanguage);
         return;
     }
 
     if (currentLanguage === nextLanguage && !options.force) {
         syncLanguageSelector();
         updateEditorStatus();
+        updateHeaderLanguageBranding(nextLanguage);
         return;
     }
 
@@ -1952,6 +2051,7 @@ function setEditorLanguage(language, options = {}) {
     syncStarterPackSelector();
     updateEditorStatus();
     dispatchEditorContextUpdate();
+    updateHeaderLanguageBranding(nextLanguage);
 }
 
 function setupEditor() {
@@ -2012,6 +2112,7 @@ function setupEditor() {
     updateEditorStatus();
     syncLanguageSelector();
     syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
     clearOutput({ preserveInput: false });
 }
 

@@ -185,6 +185,7 @@ body.dark-mode .container {
   justify-content: center;
 }
 
+.editor-brand-icon,
 .fa-python {
   width: 42px;
   height: 42px;
