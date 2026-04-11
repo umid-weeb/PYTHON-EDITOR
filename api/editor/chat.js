@@ -282,6 +282,97 @@ function json(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function languageLabel(language) {
+  switch (String(language || "").toLowerCase()) {
+    case "python":
+      return "Python";
+    case "javascript":
+      return "JavaScript";
+    case "cpp":
+      return "C++";
+    case "java":
+      return "Java";
+    case "go":
+      return "Go";
+    default:
+      return String(language || "kod").toUpperCase();
+  }
+}
+
+function linePreview(code) {
+  const lines = String(code || "")
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+
+  if (!lines.length) {
+    return "";
+  }
+
+  return lines.slice(0, 2).join(" ").slice(0, 220);
+}
+
+function extractErrorHint(text) {
+  const value = String(text || "");
+  const lowered = value.toLowerCase();
+
+  if (/syntaxerror|invalid syntax/i.test(value)) {
+    return "sintaksis xatosi bor";
+  }
+  if (/indentationerror/i.test(value)) {
+    return "indentation noto'g'ri";
+  }
+  if (/expected ['"`;)}\]]/i.test(value) || /missing.*[;)}\]]/i.test(lowered)) {
+    return "qavs yoki `;` yetishmayapti";
+  }
+  if (/not declared|not defined|undefined identifier|cannot find symbol/i.test(value)) {
+    return "o'zgaruvchi yoki funksiya e'lon qilinmagan";
+  }
+  if (/runtime error|segmentation fault|nullpointerexception/i.test(value)) {
+    return "ishlash paytida xatolik bor";
+  }
+  if (/wrong answer/i.test(value)) {
+    return "mantiqiy natija mos kelmayapti";
+  }
+
+  return "";
+}
+
+function buildLocalFallbackReply(parsed, errors) {
+  const language = languageLabel(parsed.language);
+  const preview = linePreview(parsed.code);
+  const outputText = String(parsed.outputText || "");
+  const userMessage = String(parsed.userMessage || "").trim();
+  const errorHint = extractErrorHint(outputText) || extractErrorHint(errors.join(" | "));
+  const hasRealCode = String(parsed.code || "").trim().length > 0;
+  const looksLikeGreeting = /^[\p{L}\p{N}\s!?.,'"\-]+$/u.test(userMessage) && userMessage.length <= 24;
+  const hasErrorPanel = /xatolik|error|failed|exception|not found/i.test(outputText);
+
+  if (hasErrorPanel && errorHint) {
+    return [
+      `Xatolik ko'rinmoqda: ${errorHint}.`,
+      preview ? `Kod satri: ${preview}` : null,
+      "Tuzatish: aynan shu joyda qavs, `;`, nom yoki indentationni tekshiring.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (looksLikeGreeting || !hasRealCode) {
+    return `Salom, men editor yordamchisiman. ${language} kodini yuboring yoki kompilyator xatosini pastga qo'ying, men qaysi qatorga qarash kerakligini aytaman.`;
+  }
+
+  if (preview) {
+    return [
+      `${language} kodi ko'rinib turibdi.`,
+      `Kod satri: ${preview}`,
+      "Agar xato chiqsa, konsoldagi matnni yuboring, men aniq qator va tuzatishni aytaman.",
+    ].join(" ");
+  }
+
+  return `Men ${language} kodi bo'yicha yordam beraman. Xatoni yoki savolingizni yuboring, men uni qisqa va aniq tushuntiraman.`;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -369,8 +460,10 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  json(res, 502, {
-    detail: "AI javob berishda xatolik yuz berdi.",
-    error: errors.join(" | "),
+  json(res, 200, {
+    reply: buildLocalFallbackReply(parsed, errors),
+    remaining: null,
+    requires_auth: false,
+    source: "local",
   });
 };
