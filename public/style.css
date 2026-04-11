@@ -1413,8 +1413,8 @@ body.dark-mode .editor-ai-trigger {
   position: absolute;
   right: 0;
   bottom: 68px;
-  width: min(360px, calc(100vw - 20px));
-  max-height: min(52vh, 440px);
+  width: min(350px, calc(100vw - 20px));
+  max-height: min(58vh, 540px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1900,8 +1900,8 @@ body.dark-mode .editor-ai-input-shell {
   }
 
   .editor-ai-panel {
-    width: min(340px, calc(100vw - 16px));
-    max-height: min(56vh, 420px);
+    width: min(330px, calc(100vw - 16px));
+    max-height: min(62vh, 520px);
   }
 
   .editor-ai-header,
