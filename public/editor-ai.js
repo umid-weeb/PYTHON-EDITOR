@@ -330,7 +330,13 @@
 
     root.innerHTML = `
       <button type="button" class="editor-ai-trigger" aria-label="AI yordamchi">
-        <span class="editor-ai-trigger-text">AI</span>
+        <span class="editor-ai-trigger-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 12c0 3.87-3.58 7-8 7a9.7 9.7 0 0 1-2.2-.25L5 20l1.3-3.4A6.7 6.7 0 0 1 4 12c0-3.87 3.58-7 8-7s8 3.13 8 7Z"/>
+            <path d="M9 11h.01M12 11h.01M15 11h.01"/>
+            <path d="M16.75 6.75 17 6l.25.75L18 7l-.75.25L17 8l-.25-.75L16 7l.75-.25Z"/>
+          </svg>
+        </span>
       </button>
       <section class="editor-ai-panel" aria-label="AI yordamchi paneli">
         <header class="editor-ai-header">

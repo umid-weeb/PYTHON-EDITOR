@@ -1397,11 +1397,15 @@ body.dark-mode .editor-ai-trigger {
   box-shadow: var(--focus-ring);
 }
 
-.editor-ai-trigger-text {
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.editor-ai-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-ai-trigger-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .editor-ai-panel {

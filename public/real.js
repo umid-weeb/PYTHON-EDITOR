@@ -2183,6 +2183,47 @@ function extractErrorLineFromText(text) {
     return null;
 }
 
+function getCodeLineAt(code, lineNumber) {
+    const lines = String(code || "").replace(/\r\n/g, "\n").split("\n");
+    const index = Number(lineNumber) - 1;
+    if (!Number.isFinite(index) || index < 0 || index >= lines.length) return "";
+    return String(lines[index] || "").trimEnd();
+}
+
+function truncateErrorSnippet(text, limit = 140) {
+    const value = String(text || "").replace(/\s+/g, " ").trim();
+    if (!value) return "";
+    if (value.length <= limit) return value;
+    return value.slice(0, Math.max(0, limit - 3)).trimEnd() + "...";
+}
+
+function buildCompactErrorMessage({
+    title,
+    summary,
+    line,
+    codeLine,
+    tips = [],
+    durationSeconds,
+} = {}) {
+    const parts = [];
+    if (title) parts.push(`Xatolik: ${title}`);
+    if (summary) parts.push(summary);
+    if (line) parts.push(`Qator: ${line}`);
+    if (codeLine) parts.push(`Kod satri: ${truncateErrorSnippet(codeLine, 180)}`);
+    if (tips.length) {
+        parts.push("");
+        parts.push("Tuzatish:");
+        for (const tip of tips.slice(0, 2)) {
+            parts.push(`- ${tip}`);
+        }
+    }
+    if (durationSeconds !== undefined && durationSeconds !== null) {
+        parts.push("");
+        parts.push(`Vaqt: ${durationSeconds}s`);
+    }
+    return parts.join("\n");
+}
+
 function matchErrorRule(lowerText, rules) {
     for (const rule of rules) {
         const matches = Array.isArray(rule.match) ? rule.match : [rule.match];
@@ -2729,7 +2770,7 @@ function translateRemoteError(language, verdict, text) {
         }
         return {
             title: baseTitle,
-            summary: "Kompilyatsiya xatosi topildi. Pastdagi texnik tafsilotlarni va yuqoridagi qatorni tekshiring.",
+            summary: "Kompilyatsiya xatosi topildi. Qator va kod satrini tekshiring.",
             tips: [
                 "Xatolik ko'rsatilgan qator atrofini diqqat bilan ko'ring.",
                 "Qavslar, vergullar va `;` lar to'g'ri ekanini tekshiring.",
@@ -2787,7 +2828,7 @@ function translateRemoteError(language, verdict, text) {
         }
         return {
             title: baseTitle,
-            summary: "Dastur bajarilishida xatolik yuz berdi.",
+            summary: "Dastur bajarilishida xatolik yuz berdi. Qator va kod satrini tekshiring.",
             tips: [
                 "Kiritilgan input va ishlatilgan o'zgaruvchilarni qayta ko'ring.",
             ],
@@ -2834,7 +2875,7 @@ function translateRemoteError(language, verdict, text) {
     };
 }
 
-function buildRemoteOutputMessage(result, durationSeconds) {
+function buildRemoteOutputMessage(result, durationSeconds, code) {
     const verdict = result.verdict || "Runtime Error";
     const stdout = normalizeErrorText(result.stdout);
     const compileOutput = normalizeErrorText(result.compile_output);
@@ -2849,32 +2890,15 @@ function buildRemoteOutputMessage(result, durationSeconds) {
     }
 
     const friendly = translateRemoteError(currentLanguage, verdict, rawText);
-    const parts = [`Xatolik: ${friendly.title}`];
-    if (friendly.summary) parts.push(friendly.summary);
-    if (friendly.tips.length) {
-        parts.push("");
-        parts.push("Qanday tuzatish mumkin:");
-        for (const tip of friendly.tips) {
-            parts.push(`- ${tip}`);
-        }
-    }
-    if (errorLine) {
-        parts.push("");
-        parts.push(`Qator: ${errorLine}`);
-    }
-    if (stdout) {
-        parts.push("");
-        parts.push("Dastur chiqishi:");
-        parts.push(stdout);
-    }
-    if (rawText) {
-        parts.push("");
-        parts.push("Texnik tafsilotlar:");
-        parts.push(rawText);
-    }
-    parts.push("");
-    parts.push(`Vaqt: ${durationSeconds}s`);
-    return parts.join("\n");
+    const codeLine = errorLine ? getCodeLineAt(code, errorLine) : "";
+    return buildCompactErrorMessage({
+        title: friendly.title,
+        summary: friendly.summary,
+        line: errorLine,
+        codeLine,
+        tips: friendly.tips,
+        durationSeconds,
+    });
 }
 
 async function executeRemoteCode(language, code, stdin) {
@@ -2946,7 +2970,7 @@ async function runRemoteExecution(language, code, stdinText) {
         if (errorLine) {
             highlightEditorError(errorLine);
         }
-        const message = buildRemoteOutputMessage(result, elapsed);
+        const message = buildRemoteOutputMessage(result, elapsed, code);
         showOutput(message, verdict === "Accepted" ? "success" : "error");
     } catch (error) {
         showOutput(`Ulanishda xatolik: ${error.message}`, "error");
@@ -3003,36 +3027,21 @@ async function continueRunSession() {
             return;
         }
 
+        const runCode = activeRunSession ? activeRunSession.code : editor.getValue();
         activeRunSession = null;
         clearEditorDiagnostics();
         if (!result.success) {
             highlightEditorError(result.error.line);
             const friendly = translatePythonError(result.error.type, result.error.message);
-            const parts = [`Xatolik: ${friendly.title}`];
-            if (friendly.summary) parts.push(friendly.summary);
-            if (friendly.tips.length) {
-                parts.push("");
-                parts.push("Qanday tuzatish mumkin:");
-                for (const tip of friendly.tips) {
-                    parts.push(`- ${tip}`);
-                }
-            }
-            parts.push("");
-            parts.push(`Qator: ${result.error.line}`);
-            if (result.output) {
-                parts.push("");
-                parts.push("Dastur chiqishi:");
-                parts.push(result.output);
-            }
-            const rawPythonError = [result.error.type, result.error.message].filter(Boolean).join(": ");
-            if (rawPythonError) {
-                parts.push("");
-                parts.push("Texnik tafsilotlar:");
-                parts.push(rawPythonError);
-            }
-            parts.push("");
-            parts.push(`Vaqt: ${time}s`);
-            showOutput(parts.join("\n"), "error");
+            const codeLine = getCodeLineAt(runCode, result.error.line);
+            showOutput(buildCompactErrorMessage({
+                title: friendly.title,
+                summary: friendly.summary,
+                line: result.error.line,
+                codeLine,
+                tips: friendly.tips,
+                durationSeconds: time,
+            }), "error");
         } else {
             showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nVaqt: ${time}s`, "success");
         }
