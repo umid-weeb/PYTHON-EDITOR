@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.ai_usage import AIChatUsage
 from app.models.user import User
 from app.judge.judge0_client import Judge0Client, get_judge0_settings
+from app.services.editor_runtime_service import EditorRuntimeService, get_editor_runtime_service
 from app.services.editor_ai_service import EditorAIService, get_editor_ai_service
 
 
@@ -242,6 +243,21 @@ def _build_response(
     )
 
 
+def _build_local_response(
+    *,
+    language: str,
+    runtime: EditorRuntimeService,
+    payload: dict[str, Any],
+) -> EditorRunResponse:
+    return _build_response(
+        language=language,
+        language_name=runtime.language_label(language),
+        language_id=None,
+        token=None,
+        payload=payload,
+    )
+
+
 @router.post("/chat", response_model=EditorChatResponse)
 async def editor_chat(
     payload: EditorChatRequest,
@@ -308,6 +324,21 @@ async def editor_chat(
 
 @router.post("/run", response_model=EditorRunResponse)
 async def run_editor_code(payload: EditorRunRequest) -> EditorRunResponse:
+    runtime = get_editor_runtime_service()
+    local_payload = runtime.run(
+        language=payload.language,
+        code=payload.code,
+        stdin=payload.stdin,
+        time_limit_seconds=payload.time_limit_seconds,
+    )
+    if local_payload is not None:
+        logger.info("Editor local runtime used for %s", payload.language)
+        return _build_local_response(
+            language=payload.language,
+            runtime=runtime,
+            payload=local_payload,
+        )
+
     settings = get_judge0_settings()
     if not settings.enabled:
         raise HTTPException(

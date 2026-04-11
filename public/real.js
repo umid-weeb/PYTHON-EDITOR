@@ -10,6 +10,7 @@ let activeDebugLineNumber = null;
 let pendingRemoteRun = null;
 let currentLanguage = "python";
 let currentStarterPack = "array";
+const editorRuntimeWarmupTimers = new Map();
 
 let debugRangeStartLine = null;
 let debugRangeEndLine = null;
@@ -1959,6 +1960,7 @@ function setStarterPack(pack, options = {}) {
     syncStarterPackSelector();
     updateEditorStatus();
     dispatchEditorContextUpdate();
+    scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
 }
 
 function setEditorLanguage(language, options = {}) {
@@ -1999,6 +2001,7 @@ function setEditorLanguage(language, options = {}) {
     updateEditorStatus();
     dispatchEditorContextUpdate();
     updateHeaderLanguageBranding(nextLanguage);
+    scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
 }
 
 function setupEditor() {
@@ -2060,6 +2063,7 @@ function setupEditor() {
     syncLanguageSelector();
     syncStarterPackSelector();
     updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
     clearOutput({ preserveInput: false });
 }
 
@@ -3529,6 +3533,59 @@ async function executeRemoteCode(language, code, stdin) {
     }
 
     return data;
+}
+
+function clearEditorRuntimeWarmupTimers() {
+    for (const timer of editorRuntimeWarmupTimers.values()) {
+        clearTimeout(timer);
+    }
+    editorRuntimeWarmupTimers.clear();
+}
+
+function scheduleEditorRuntimeWarmup(language, pack, code) {
+    const normalizedLanguage = normalizeLanguage(language);
+    const normalizedPack = normalizeStarterPack(pack);
+    if (normalizedLanguage === "python") return;
+
+    const starterCode = getStarterCode(normalizedLanguage, normalizedPack);
+    if (String(code || "") !== starterCode) return;
+
+    clearEditorRuntimeWarmupTimers();
+
+    const timer = setTimeout(() => {
+        editorRuntimeWarmupTimers.delete(`${normalizedLanguage}:${normalizedPack}`);
+        if (!editor || currentLanguage !== normalizedLanguage || currentStarterPack !== normalizedPack) {
+            return;
+        }
+
+        const currentCode = editor.getValue();
+        if (currentCode !== starterCode) {
+            return;
+        }
+
+        void warmEditorRuntime(normalizedLanguage, starterCode);
+    }, 350);
+
+    editorRuntimeWarmupTimers.set(`${normalizedLanguage}:${normalizedPack}`, timer);
+}
+
+async function warmEditorRuntime(language, code) {
+    try {
+        await fetch("/api/editor/run", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                language,
+                code,
+                stdin: "",
+                time_limit_seconds: 5,
+            }),
+        });
+    } catch (error) {
+        // Fire-and-forget warmup only.
+    }
 }
 
 function looksLikeInputRequired(language, code) {
