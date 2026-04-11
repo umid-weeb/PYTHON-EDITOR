@@ -36,6 +36,7 @@ class EditorRunRequest(BaseModel):
 class EditorRunResponse(BaseModel):
     language: str
     language_name: str | None = None
+    execution_mode: str | None = None
     verdict: str
     stdout: str = ""
     stderr: str = ""
@@ -193,6 +194,7 @@ def _build_response(
     *,
     language: str,
     language_name: str | None,
+    execution_mode: str | None,
     language_id: int | None,
     token: str | None,
     payload: dict[str, Any],
@@ -229,6 +231,7 @@ def _build_response(
     return EditorRunResponse(
         language=language,
         language_name=language_name,
+        execution_mode=execution_mode,
         verdict=verdict,
         stdout=stdout,
         stderr=stderr,
@@ -252,6 +255,7 @@ def _build_local_response(
     return _build_response(
         language=language,
         language_name=runtime.language_label(language),
+        execution_mode=str(payload.get("execution_mode") or "LOCAL"),
         language_id=None,
         token=None,
         payload=payload,
@@ -379,6 +383,7 @@ async def run_editor_code(payload: EditorRunRequest) -> EditorRunResponse:
     return _build_response(
         language=payload.language,
         language_name=language_name,
+        execution_mode="FALLBACK",
         language_id=language_id,
         token=token,
         payload=result,

@@ -10,6 +10,7 @@ let activeDebugLineNumber = null;
 let pendingRemoteRun = null;
 let currentLanguage = "python";
 let currentStarterPack = "array";
+let currentEditorRuntimeMode = "LOCAL";
 const editorRuntimeWarmupTimers = new Map();
 
 let debugRangeStartLine = null;
@@ -111,6 +112,26 @@ function updateHeaderLanguageBranding(language = currentLanguage) {
     brand.alt = icon.alt;
     brand.title = icon.title || icon.alt;
 }
+
+function normalizeEditorRuntimeMode(mode, fallbackMode = "LOCAL") {
+    const normalized = String(mode || "").trim().toUpperCase();
+    if (normalized === "LOCAL") return "LOCAL";
+    if (normalized === "FALLBACK" || normalized === "REMOTE") return "FALLBACK";
+    return fallbackMode;
+}
+
+function setEditorRuntimeMode(mode, fallbackMode = "LOCAL") {
+    const nextMode = normalizeEditorRuntimeMode(mode, fallbackMode);
+    currentEditorRuntimeMode = nextMode;
+
+    const badge = document.getElementById("editor-runtime-mode");
+    if (!badge) return nextMode;
+
+    badge.textContent = nextMode;
+    badge.classList.toggle("is-fallback", nextMode === "FALLBACK");
+    return nextMode;
+}
+
 const LANGUAGE_CONFIGS = {
     python: {
         label: "Python",
@@ -1959,6 +1980,7 @@ function setStarterPack(pack, options = {}) {
     clearOutput({ preserveInput: false });
     syncStarterPackSelector();
     updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
     dispatchEditorContextUpdate();
     scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
 }
@@ -1999,6 +2021,7 @@ function setEditorLanguage(language, options = {}) {
     syncLanguageSelector();
     syncStarterPackSelector();
     updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
     dispatchEditorContextUpdate();
     updateHeaderLanguageBranding(nextLanguage);
     scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
@@ -2060,6 +2083,7 @@ function setupEditor() {
     editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
     setupPanelResizer();
     updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
     syncLanguageSelector();
     syncStarterPackSelector();
     updateHeaderLanguageBranding(currentLanguage);
@@ -3623,6 +3647,7 @@ async function runRemoteExecution(language, code, stdinText) {
     const startedAt = performance.now();
     try {
         const result = await executeRemoteCode(language, code, stdinText);
+        setEditorRuntimeMode(result.execution_mode || "FALLBACK");
         const elapsed = ((performance.now() - startedAt) / 1000).toFixed(3);
         const verdict = result.verdict || "Runtime Error";
         const remoteText = [result.compile_output, result.stderr, result.error, result.message].filter(Boolean).join("\n\n");
@@ -3649,6 +3674,7 @@ async function runCode() {
         if (!pyodide) return showOutput("Python yuklanmoqda...", "error");
         const stdinText = getInputPanelValue() || readInputDraft(currentLanguage, currentStarterPack) || "";
         activeRunSession = { code, inputValues: splitInputLines(stdinText) };
+        setEditorRuntimeMode("LOCAL");
         showOutput("Bajarilmoqda...", "");
         await continueRunSession();
         return;
@@ -3675,6 +3701,7 @@ async function continueRunSession() {
     try {
         const res = await pyodide.runPythonAsync(`import json; json.dumps(safe_run(${JSON.stringify(activeRunSession.code)}, ${JSON.stringify(activeRunSession.inputValues)}))`);
         const result = JSON.parse(res);
+        setEditorRuntimeMode(result.execution_mode || "LOCAL");
         const time = ((performance.now() - start) / 1000).toFixed(3);
 
         if (result.awaitingInput) {

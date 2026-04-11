@@ -136,6 +136,7 @@ class EditorRuntimeService:
         compile_output: str = "",
         elapsed: float = 0.0,
         message: str | None = None,
+        execution_mode: str = "LOCAL",
     ) -> dict[str, Any]:
         return {
             "status": {"description": status_description},
@@ -145,6 +146,7 @@ class EditorRuntimeService:
             "time": f"{max(0.0, elapsed):.6f}",
             "memory": 0,
             "message": message,
+            "execution_mode": execution_mode,
         }
 
     def _compile_or_run_error(self, *, label: str, process: dict[str, Any], stage: str) -> dict[str, Any]:

@@ -826,6 +826,38 @@ body.dark-mode .debug-point-marker {
   font-size: 0.8rem;
 }
 
+.editor-status-right {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.editor-runtime-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 118, 110, 0.22);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.editor-runtime-badge.is-fallback {
+  border-color: rgba(154, 103, 0, 0.22);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .output-content {
   flex: 1;
   height: auto;
