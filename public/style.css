@@ -1354,16 +1354,15 @@ body.dark-mode .debug-range-body-line {
 .editor-ai-trigger {
   pointer-events: auto;
   position: relative;
-  width: 50px;
+  min-width: 54px;
   height: 50px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 16px;
   border: 1px solid rgba(91, 141, 255, 0.28);
-  background:
-    radial-gradient(circle at 30% 25%, rgba(45, 212, 191, 0.18), transparent 48%),
-    linear-gradient(180deg, rgba(35, 83, 215, 0.24), rgba(15, 118, 110, 0.16));
+  background: linear-gradient(180deg, rgba(35, 83, 215, 0.22), rgba(15, 118, 110, 0.12));
   color: var(--text-main);
   cursor: pointer;
   box-shadow:
@@ -1379,9 +1378,7 @@ body.dark-mode .debug-range-body-line {
 
 body.dark-mode .editor-ai-trigger {
   border-color: rgba(91, 141, 255, 0.34);
-  background:
-    radial-gradient(circle at 30% 25%, rgba(45, 212, 191, 0.18), transparent 48%),
-    linear-gradient(180deg, rgba(91, 141, 255, 0.24), rgba(15, 23, 42, 0.92));
+  background: linear-gradient(180deg, rgba(91, 141, 255, 0.22), rgba(15, 23, 42, 0.92));
 }
 
 .editor-ai-trigger:hover {
@@ -1400,33 +1397,11 @@ body.dark-mode .editor-ai-trigger {
   box-shadow: var(--focus-ring);
 }
 
-.editor-ai-trigger-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.editor-ai-trigger-dot {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #2dd4bf;
-  box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.38);
-  animation: editorAiPulse 2.2s infinite;
-}
-
-@keyframes editorAiPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.34);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(45, 212, 191, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0);
-  }
+.editor-ai-trigger-text {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .editor-ai-panel {
@@ -1434,8 +1409,8 @@ body.dark-mode .editor-ai-trigger {
   position: absolute;
   right: 0;
   bottom: 66px;
-  width: min(312px, calc(100vw - 20px));
-  max-height: min(48vh, 440px);
+  width: min(324px, calc(100vw - 20px));
+  max-height: min(51vh, 452px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1469,8 +1444,8 @@ body.dark-mode .editor-ai-panel {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 12px 8px;
+  gap: 14px;
+  padding: 14px 14px 10px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(35, 83, 215, 0.05), rgba(15, 23, 42, 0));
 }
@@ -1517,9 +1492,9 @@ body.dark-mode .editor-ai-badge {
 }
 
 .editor-ai-title {
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--text-main);
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -1562,22 +1537,22 @@ body.dark-mode .editor-ai-badge {
 }
 
 .editor-ai-context {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text-muted);
-  font-size: 0.73rem;
+  font-size: 0.74rem;
   line-height: 1.45;
 }
 
 .editor-ai-message-list {
   display: flex;
   flex: 1;
-  min-height: 96px;
+  min-height: 112px;
   flex-direction: column;
   gap: 8px;
   overflow: auto;
-  padding: 10px 12px 8px;
+  padding: 12px 14px 10px;
 }
 
 .editor-ai-message-list::-webkit-scrollbar {
@@ -1618,7 +1593,7 @@ body.dark-mode .editor-ai-badge {
 
 .editor-ai-bubble {
   max-width: 100%;
-  padding: 9px 11px;
+  padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -1672,7 +1647,7 @@ body.dark-mode .editor-ai-badge {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 0 12px 12px;
+  padding: 0 14px 14px;
   border-top: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(35, 83, 215, 0.02));
 }
@@ -1683,7 +1658,7 @@ body.dark-mode .editor-ai-input-shell {
 
 .editor-ai-input {
   width: 100%;
-  min-height: 62px;
+  min-height: 68px;
   resize: none;
   border-radius: 14px;
   border: 1px solid var(--border);
@@ -1721,9 +1696,9 @@ body.dark-mode .editor-ai-input-shell {
 
 .editor-ai-send {
   pointer-events: auto;
-  min-width: 86px;
-  min-height: 34px;
-  padding: 7px 11px;
+  min-width: 92px;
+  min-height: 36px;
+  padding: 8px 12px;
   border: none;
   border-radius: 10px;
   background: linear-gradient(135deg, var(--primary), #4d72ea);
@@ -1923,8 +1898,8 @@ body .iubenda-cs-preferences-button {
   }
 
   .editor-ai-panel {
-    width: min(304px, calc(100vw - 16px));
-    max-height: min(50vh, 450px);
+    width: min(312px, calc(100vw - 16px));
+    max-height: min(52vh, 462px);
   }
 
   .editor-ai-header,
@@ -1932,8 +1907,8 @@ body .iubenda-cs-preferences-button {
   .editor-ai-message-list,
   .editor-ai-suggestions,
   .editor-ai-input-shell {
-    padding-left: 12px;
-    padding-right: 12px;
+    padding-left: 14px;
+    padding-right: 14px;
   }
 
   .editor-ai-send {
