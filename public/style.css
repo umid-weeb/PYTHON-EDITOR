@@ -190,6 +190,7 @@ body.dark-mode .container {
   width: 42px;
   height: 42px;
   object-fit: contain;
+  background: transparent;
 }
 
 .header-buttons {
