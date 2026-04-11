@@ -4,6 +4,9 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1/models";
 const GEMINI_MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
 const OPENAI_MODEL = "gpt-4o-mini";
+const DEFAULT_FALLBACK_PROBLEM_SLUG = "find-pivot-index-01";
+
+let fallbackProblemSlugPromise = null;
 
 const SYSTEM_PROMPT_TEMPLATE = `Sen Pyzone online editor uchun aqlli kod yordamchisan.
 
@@ -193,6 +196,88 @@ async function tryBackend(body) {
   }
 }
 
+async function resolveFallbackProblemSlug() {
+  if (!fallbackProblemSlugPromise) {
+    fallbackProblemSlugPromise = (async () => {
+      try {
+        const response = await fetch("http://16.16.26.138/api/problems?per_page=1", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          return DEFAULT_FALLBACK_PROBLEM_SLUG;
+        }
+
+        const payload = await readJsonResponse(response);
+        const firstItem = Array.isArray(payload?.items) ? payload.items[0] : null;
+        return (
+          pickString(firstItem?.slug, firstItem?.problem_slug, firstItem?.id) ||
+          DEFAULT_FALLBACK_PROBLEM_SLUG
+        );
+      } catch {
+        return DEFAULT_FALLBACK_PROBLEM_SLUG;
+      }
+    })();
+  }
+
+  return fallbackProblemSlugPromise;
+}
+
+async function tryBackendTutor(body, parsed) {
+  try {
+    const fallbackSlug = await resolveFallbackProblemSlug();
+    const contextBlock = [
+      `Til: ${parsed.language}`,
+      `Starter pack: ${parsed.starterPack}`,
+      `Tanlangan matn: ${parsed.selectedText || "(yo'q)"}`,
+      `Natija paneli: ${parsed.outputText || "(bo'sh)"}`,
+      `Kursor: satr ${Math.max(1, toInt(body.cursor_line, 1))}, ustun ${Math.max(1, toInt(body.cursor_column, 1))}`,
+      `Satrlar soni: ${Math.max(0, toInt(body.line_count, 0))}`,
+      `Tema: ${body.is_dark_mode ? "dark" : "light"}`,
+      `Console input: ${body.console_input_active ? "aktiv" : "idle"}${parsed.consolePrompt ? ` | prompt: ${parsed.consolePrompt}` : ""}`,
+    ].join("\n");
+
+    const response = await fetch("http://16.16.26.138/api/ai/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        code: parsed.code,
+        problem_slug: fallbackSlug,
+        language: parsed.language,
+        user_message: `${parsed.userMessage}\n\n[Editor konteksti]\n${contextBlock}`,
+        conversation_history: parsed.history.map((item) => ({
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: String(item.content || ""),
+        })),
+      }),
+    });
+
+    const payload = await readJsonResponse(response);
+    if (response.ok) {
+      return { ok: true, payload };
+    }
+
+    const detail = pickString(payload?.detail, payload?.message, payload?.error, `HTTP ${response.status}`);
+    return {
+      ok: false,
+      status: response.status,
+      detail,
+      payload,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      detail: error instanceof Error ? error.message : "Backend tutor bilan bog'lanib bo'lmadi.",
+    };
+  }
+}
+
 async function callGroq(messages, apiKey) {
   const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -308,7 +393,16 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const errors = [`Backend: ${backend.status || "network"} ${backend.detail}`];
+  const tutor = await tryBackendTutor(body, parsed);
+  if (tutor.ok) {
+    json(res, 200, tutor.payload);
+    return;
+  }
+
+  const errors = [
+    `Editor backend: ${backend.status || "network"} ${backend.detail}`,
+    `Tutor backend: ${tutor.status || "network"} ${tutor.detail}`,
+  ];
 
   const groqKey = pickString(
     process.env.ARENA_GROQ_API_KEY,
