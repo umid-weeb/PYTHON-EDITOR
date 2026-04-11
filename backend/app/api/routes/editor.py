@@ -63,6 +63,8 @@ class EditorChatRequest(BaseModel):
     cursor_column: int = 1
     line_count: int = 0
     is_dark_mode: bool = False
+    console_input_active: bool = False
+    console_input_prompt: str = ""
     context_tag: str = "online-editor"
     user_message: str = Field(min_length=1)
     conversation_history: list[EditorChatMessage] = Field(default_factory=list)
@@ -275,7 +277,7 @@ async def editor_chat(
 
     history = [
         {"role": msg.role, "content": msg.content}
-        for msg in payload.conversation_history[-10:]
+        for msg in payload.conversation_history[-4:]
     ]
 
     try:
@@ -291,6 +293,8 @@ async def editor_chat(
             cursor_column=payload.cursor_column,
             line_count=payload.line_count,
             is_dark_mode=payload.is_dark_mode,
+            console_input_active=payload.console_input_active,
+            console_input_prompt=payload.console_input_prompt,
         )
     except Exception as exc:
         logger.error("Editor chat get_editor_chat_response error: %s", exc, exc_info=True)

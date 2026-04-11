@@ -1339,8 +1339,8 @@ body.dark-mode .debug-range-body-line {
 
 .editor-ai-widget {
   position: fixed;
-  right: 22px;
-  bottom: 22px;
+  right: 18px;
+  bottom: 18px;
   z-index: 2147483647;
   font-family: "IBM Plex Sans", sans-serif;
   pointer-events: none;
@@ -1354,12 +1354,12 @@ body.dark-mode .debug-range-body-line {
 .editor-ai-trigger {
   pointer-events: auto;
   position: relative;
-  width: 58px;
-  height: 58px;
+  width: 50px;
+  height: 50px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px solid rgba(91, 141, 255, 0.28);
   background:
     radial-gradient(circle at 30% 25%, rgba(45, 212, 191, 0.18), transparent 48%),
@@ -1401,8 +1401,8 @@ body.dark-mode .editor-ai-trigger {
 }
 
 .editor-ai-trigger-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
 .editor-ai-trigger-dot {
@@ -1433,13 +1433,13 @@ body.dark-mode .editor-ai-trigger {
   pointer-events: auto;
   position: absolute;
   right: 0;
-  bottom: 72px;
-  width: min(420px, calc(100vw - 44px));
-  max-height: min(72vh, 720px);
+  bottom: 66px;
+  width: min(312px, calc(100vw - 20px));
+  max-height: min(48vh, 440px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 18px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 24px 80px rgba(8, 15, 29, 0.26);
@@ -1470,7 +1470,7 @@ body.dark-mode .editor-ai-panel {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 18px 14px;
+  padding: 12px 12px 8px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(35, 83, 215, 0.05), rgba(15, 23, 42, 0));
 }
@@ -1517,18 +1517,15 @@ body.dark-mode .editor-ai-badge {
 }
 
 .editor-ai-title {
-  margin-top: 8px;
+  margin-top: 4px;
   color: var(--text-main);
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 
 .editor-ai-subtitle {
-  margin-top: 6px;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  line-height: 1.5;
+  display: none;
 }
 
 .editor-ai-close {
@@ -1565,22 +1562,22 @@ body.dark-mode .editor-ai-badge {
 }
 
 .editor-ai-context {
-  padding: 12px 18px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text-muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.73rem;
+  line-height: 1.45;
 }
 
 .editor-ai-message-list {
   display: flex;
   flex: 1;
-  min-height: 180px;
+  min-height: 96px;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   overflow: auto;
-  padding: 16px 18px 14px;
+  padding: 10px 12px 8px;
 }
 
 .editor-ai-message-list::-webkit-scrollbar {
@@ -1606,27 +1603,28 @@ body.dark-mode .editor-ai-badge {
 
 .editor-ai-avatar {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   background: linear-gradient(135deg, rgba(35, 83, 215, 0.96), rgba(15, 118, 110, 0.96));
   color: #ffffff;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
 .editor-ai-bubble {
   max-width: 100%;
-  padding: 12px 14px;
-  border-radius: 18px;
+  padding: 9px 11px;
+  border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-main);
-  line-height: 1.55;
+  font-size: 0.84rem;
+  line-height: 1.45;
   white-space: normal;
   word-break: break-word;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
@@ -1644,21 +1642,18 @@ body.dark-mode .editor-ai-badge {
 }
 
 .editor-ai-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 18px 14px;
+  display: none;
 }
 
 .editor-ai-chip {
   pointer-events: auto;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text-main);
   font-family: inherit;
-  font-size: 0.84rem;
+  font-size: 0.74rem;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1676,8 +1671,8 @@ body.dark-mode .editor-ai-badge {
 .editor-ai-input-shell {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 0 18px 18px;
+  gap: 8px;
+  padding: 0 12px 12px;
   border-top: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(35, 83, 215, 0.02));
 }
@@ -1688,16 +1683,16 @@ body.dark-mode .editor-ai-input-shell {
 
 .editor-ai-input {
   width: 100%;
-  min-height: 88px;
+  min-height: 62px;
   resize: none;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-main);
-  padding: 12px 14px;
+  padding: 10px 12px;
   font-family: var(--editor-font-family);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.45;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
@@ -1715,26 +1710,26 @@ body.dark-mode .editor-ai-input-shell {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .editor-ai-hint {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.7rem;
 }
 
 .editor-ai-send {
   pointer-events: auto;
-  min-width: 112px;
-  min-height: 42px;
-  padding: 10px 14px;
+  min-width: 86px;
+  min-height: 34px;
+  padding: 7px 11px;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   background: linear-gradient(135deg, var(--primary), #4d72ea);
   color: #ffffff;
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(35, 83, 215, 0.24);
@@ -1928,8 +1923,8 @@ body .iubenda-cs-preferences-button {
   }
 
   .editor-ai-panel {
-    width: min(420px, calc(100vw - 24px));
-    max-height: min(64vh, 680px);
+    width: min(304px, calc(100vw - 16px));
+    max-height: min(50vh, 450px);
   }
 
   .editor-ai-header,
@@ -1937,8 +1932,8 @@ body .iubenda-cs-preferences-button {
   .editor-ai-message-list,
   .editor-ai-suggestions,
   .editor-ai-input-shell {
-    padding-left: 14px;
-    padding-right: 14px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .editor-ai-send {

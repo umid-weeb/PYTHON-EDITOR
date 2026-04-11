@@ -1057,6 +1057,7 @@ function renderInputPanel({
     } else {
         bindInputPanelSubmit(() => {});
     }
+    dispatchEditorContextUpdate();
 }
 
 function renderIdleInputPanel({ preserveValue = true } = {}) {
@@ -1427,6 +1428,7 @@ function renderOutputPanelInput(prompt, index) {
     input.onkeydown = (e) => { if (e.key === "Enter") submit(); };
     input.focus();
     scrollOutputToLatest();
+    dispatchEditorContextUpdate();
 }
 
 // --- EDITOR SETUP ---
@@ -1632,6 +1634,7 @@ function clearOutput() {
     }
     clearEditorDiagnostics();
     clearOutputInputHost();
+    dispatchEditorContextUpdate();
 }
 
 function showOutput(text, type) {
@@ -1640,6 +1643,7 @@ function showOutput(text, type) {
     output.textContent = text;
     output.className = type ? "output-content " + type : "output-content";
     scrollOutputToLatest();
+    dispatchEditorContextUpdate();
 }
 
 function openArena() {
@@ -2008,6 +2012,8 @@ function updateEditorStatus() {
 
 function getEditorAssistantContext() {
     const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
     const selection = editor ? editor.getSelection() : "";
     const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
 
@@ -2023,6 +2029,8 @@ function getEditorAssistantContext() {
         cursorColumn: cursor.ch + 1,
         lineCount: editor ? editor.lineCount() : 0,
         isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
     };
 }
 
@@ -2060,6 +2068,7 @@ function clearOutputInputHost({ preserveValue = true } = {}) {
         host.className = "output-input-host";
         host.innerHTML = "";
     }
+    dispatchEditorContextUpdate();
 }
 
 function clearOutput({ preserveInput = true } = {}) {
@@ -2071,6 +2080,7 @@ function clearOutput({ preserveInput = true } = {}) {
     pendingRemoteRun = null;
     clearEditorDiagnostics();
     clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
 }
 
 function showOutput(text, type) {
@@ -2079,6 +2089,7 @@ function showOutput(text, type) {
     output.textContent = text;
     output.className = type ? "output-content " + type : "output-content";
     scrollOutputToLatest();
+    dispatchEditorContextUpdate();
 }
 
 function saveCode() {

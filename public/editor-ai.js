@@ -1,11 +1,6 @@
 (function () {
   const STORAGE_PREFIX = "pyzone_editor_ai_history";
   const TOKEN_KEYS = ["userToken", "auth_token", "token", "arena_jwt", "access_token"];
-  const QUICK_PROMPTS = [
-    "Bu kod nimani qiladi?",
-    "Xatoni topib ber",
-    "Qanday yaxshilash mumkin?",
-  ];
 
   const state = {
     open: false,
@@ -25,7 +20,6 @@
     messages: null,
     input: null,
     send: null,
-    quicks: null,
     close: null,
   };
 
@@ -52,6 +46,8 @@
       cursorColumn: 1,
       lineCount: 0,
       isDarkMode: false,
+      consoleInputActive: false,
+      consoleInputPrompt: "",
     };
 
     try {
@@ -92,7 +88,7 @@
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((item) => item && typeof item === "object" && typeof item.role === "string" && typeof item.text === "string")
-        .slice(-24);
+        .slice(-16);
     } catch {
       return [];
     }
@@ -100,21 +96,17 @@
 
   function saveMessages() {
     try {
-      localStorage.setItem(storageKey(state.contextKey), JSON.stringify(state.messages.slice(-24)));
+      localStorage.setItem(storageKey(state.contextKey), JSON.stringify(state.messages.slice(-16)));
     } catch {}
   }
 
   function createInitialMessages(ctx) {
-    const outputText = normalizeOutputText(ctx.outputText);
-    const intro = outputText
-      ? `Men hozir ${ctx.languageLabel} kodini, starter packni va natija panelini ko'rib turibman. Savolingizni yozing.`
-      : `Men hozir ${ctx.languageLabel} kodini va starter packni ko'rib turibman. Savolingizni yozing.`;
+    const intro = `Men hozir ${ctx.languageLabel} kodini ko'rib turibman. Savolingizni yozing.`;
 
-    const details = [
-      `${ctx.languageLabel} | ${ctx.starterPackLabel}`,
-      `Qator: ${ctx.cursorLine}, Ustun: ${ctx.cursorColumn}`,
-      `Satrlar: ${ctx.lineCount || 0}`,
-    ];
+    const details = [`${ctx.languageLabel} | ${ctx.starterPackLabel} | Qator ${ctx.cursorLine}:${ctx.cursorColumn}`];
+    if (ctx.consoleInputActive) {
+      details.push(`Console input: ${ctx.consoleInputPrompt || "faol"}`);
+    }
 
     return [
       {
@@ -130,6 +122,9 @@
     if (ctx.selectedText && ctx.selectedText.trim()) {
       const selection = ctx.selectedText.trim().replace(/\s+/g, " ");
       parts.push(`Tanlov: ${selection.length > 30 ? `${selection.slice(0, 30)}...` : selection}`);
+    }
+    if (ctx.consoleInputActive) {
+      parts.push(`Input: ${ctx.consoleInputPrompt || "kutilmoqda"}`);
     }
     return parts.join(" | ");
   }
@@ -238,7 +233,7 @@
   function buildConversationHistory() {
     return state.messages
       .filter((message) => message.role === "user" || message.role === "assistant")
-      .slice(-10)
+      .slice(-4)
       .map((message) => ({
         role: message.role,
         content: message.text,
@@ -264,6 +259,8 @@
       cursor_column: Number(ctx.cursorColumn || 1),
       line_count: Number(ctx.lineCount || 0),
       is_dark_mode: Boolean(ctx.isDarkMode),
+      console_input_active: Boolean(ctx.consoleInputActive),
+      console_input_prompt: String(ctx.consoleInputPrompt || ""),
       context_tag: `online-editor:${ctx.language || "python"}:${ctx.starterPack || "array"}`,
       user_message: userMessage,
       conversation_history: buildConversationHistory(),
@@ -327,15 +324,6 @@
     }
   }
 
-  function createButton(label, onClick, className) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = className;
-    button.textContent = label;
-    button.addEventListener("click", onClick);
-    return button;
-  }
-
   function mountWidget() {
     const root = document.createElement("div");
     root.className = "editor-ai-widget";
@@ -359,7 +347,6 @@
               <span class="editor-ai-status" id="editor-ai-status">Tayyor</span>
             </div>
             <h3 class="editor-ai-title">Kodingiz yonida turaman</h3>
-            <p class="editor-ai-subtitle">Til, starter pack, natija va tanlovni hisobga olib javob beraman.</p>
           </div>
           <button type="button" class="editor-ai-close" aria-label="Yopish" title="Yopish">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -369,7 +356,6 @@
         </header>
         <div class="editor-ai-context" id="editor-ai-context">Kontekst yuklanmoqda...</div>
         <div class="editor-ai-message-list" id="editor-ai-messages"></div>
-        <div class="editor-ai-suggestions" id="editor-ai-suggestions"></div>
         <div class="editor-ai-input-shell">
           <textarea id="editor-ai-input" class="editor-ai-input" rows="2" placeholder="Savolingizni yozing..."></textarea>
           <div class="editor-ai-actions">
@@ -391,7 +377,6 @@
     elements.messages = root.querySelector("#editor-ai-messages");
     elements.input = root.querySelector("#editor-ai-input");
     elements.send = root.querySelector(".editor-ai-send");
-    elements.quicks = root.querySelector("#editor-ai-suggestions");
     elements.close = root.querySelector(".editor-ai-close");
 
     elements.trigger.addEventListener("click", () => setOpen());
@@ -405,20 +390,16 @@
       }
     });
 
-    for (const prompt of QUICK_PROMPTS) {
-      const chip = createButton(prompt, () => {
-        if (elements.input) {
-          elements.input.value = prompt;
-          applyInputState();
-          elements.input.focus();
-        }
-      }, "editor-ai-chip");
-      chip.title = "Bosib savolni inputga qo'yish";
-      elements.quicks.appendChild(chip);
-    }
-
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && state.open) {
+        setOpen(false);
+      }
+    });
+
+    document.addEventListener("pointerdown", (event) => {
+      if (!state.open || !elements.root) return;
+      const target = event.target;
+      if (target instanceof Node && !elements.root.contains(target)) {
         setOpen(false);
       }
     });
@@ -428,13 +409,13 @@
       applyInputState();
     });
 
-    ensureHistoryForCurrentContext(true);
     applyInputState();
 
     setInterval(() => {
+      if (!state.open) return;
       ensureHistoryForCurrentContext();
       applyInputState();
-    }, 1500);
+    }, 4000);
   }
 
   function boot() {

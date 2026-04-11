@@ -31,8 +31,10 @@ JAVOB QOIDALARI:
 - Agar foydalanuvchi yechim so'rasa, minimal va ishlaydigan snippet berishing mumkin.
 - Agar faqat tushuntirish so'rasa, ortiqcha kod yozma.
 - Javob qisqa, amaliy va muloyim bo'lsin.
+- Agar console input holati faol bo'lsa, kutilyotgan qiymatni yoki promptni tushuntir.
 - Agar savol noaniq bo'lsa, bitta aniqlashtiruvchi savol ber.
 - Kodni copy-paste qilishga qulay tarzda tartibli yoz.
+- Javobni 2-4 qisqa jumlada yoki qisqa punktlarda ber.
 
 EDITOR KONTEKSTI:
 {editor_context}
@@ -76,7 +78,7 @@ class EditorAIService:
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "maxOutputTokens": 512,
+                "maxOutputTokens": 256,
                 "temperature": 0.7,
             },
         }
@@ -104,6 +106,8 @@ class EditorAIService:
         cursor_column: int = 1,
         line_count: int = 0,
         is_dark_mode: bool = False,
+        console_input_active: bool = False,
+        console_input_prompt: str = "",
     ) -> str:
         def trim(value: str, limit: int) -> str:
             text = (value or "").strip()
@@ -111,15 +115,18 @@ class EditorAIService:
                 return text
             return text[:limit].rstrip() + "..."
 
-        normalized_code = trim(code, 7000) or "(Hali kod yozilmagan)"
-        normalized_selected = trim(selected_text, 1800) or "(Tanlangan matn yo'q)"
-        normalized_output = trim(output_text, 1800) or "(Natija paneli hozircha bo'sh)"
+        normalized_code = trim(code, 2600) or "(Hali kod yozilmagan)"
+        normalized_selected = trim(selected_text, 700) or "(Tanlangan matn yo'q)"
+        normalized_output = trim(output_text, 700) or "(Natija paneli hozircha bo'sh)"
+        normalized_console_prompt = trim(console_input_prompt, 180) or "(faol emas)"
         editor_context = (
             f"Til: {language}\n"
             f"Starter pack: {starter_pack or 'default'}\n"
             f"Kursor: satr {max(1, int(cursor_line or 1))}, ustun {max(1, int(cursor_column or 1))}\n"
             f"Satrlar soni: {max(0, int(line_count or 0))}\n"
             f"Tema: {'dark' if is_dark_mode else 'light'}\n"
+            f"Console input holati: {'aktiv' if console_input_active else 'idle'}\n"
+            f"Console input prompt: {normalized_console_prompt}\n"
             f"Foydalanuvchi savoli: {trim(user_message, 1000)}"
         )
 
@@ -131,7 +138,7 @@ class EditorAIService:
         )
 
         history_lines = [system_prompt, ""]
-        for msg in conversation_history:
+        for msg in conversation_history[-4:]:
             label = "Foydalanuvchi" if msg["role"] == "user" else "AI Yordamchi"
             history_lines.append(f"{label}: {msg['content']}")
         history_lines.append(f"Foydalanuvchi: {user_message}")
@@ -140,7 +147,7 @@ class EditorAIService:
 
         def build_messages() -> list:
             msgs = [{"role": "system", "content": system_prompt}]
-            for msg in conversation_history:
+            for msg in conversation_history[-4:]:
                 msgs.append({"role": msg["role"], "content": msg["content"]})
             msgs.append({"role": "user", "content": user_message})
             return msgs
@@ -152,7 +159,7 @@ class EditorAIService:
                 resp = self.groq_client.chat.completions.create(
                     model=_GROQ_MODEL,
                     messages=build_messages(),
-                    max_tokens=420,
+                    max_tokens=192,
                 )
                 return resp.choices[0].message.content.strip()
             except Exception as exc:
@@ -175,7 +182,7 @@ class EditorAIService:
                 resp = self.openai_client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=build_messages(),
-                    max_tokens=420,
+                    max_tokens=192,
                 )
                 return resp.choices[0].message.content.strip()
             except Exception as exc:
