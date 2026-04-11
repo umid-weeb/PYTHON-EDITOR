@@ -1388,10 +1388,22 @@ async function continueRunSession() {
             return;
         }
 
+        const runCode = activeRunSession ? activeRunSession.code : editor.getValue();
         activeRunSession = null;
         if (!result.success) {
-            highlightEditorError(result.error.line);
-            showOutput(`Xatolik: ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
+            highlightEditorError(result.error.line, result.error.column || 1);
+            showOutput(buildCompactErrorMessage({
+                title: `${result.error.type}`,
+                summary: normalizeErrorText(result.error.message) || "Python bajarilishida xatolik yuz berdi.",
+                line: result.error.line,
+                codeLine: result.error.codeLine || getCodeLineAt(runCode, result.error.line),
+                column: result.error.column || null,
+                tips: [
+                    "Qator ustidagi kodni aynan shu joyda tekshiring.",
+                    "Agar xato `end` yoki `endl` ga o'xshasa, to'g'ri yozuvni qo'ying.",
+                ],
+                durationSeconds: time,
+            }), "error");
         } else {
             clearEditorDiagnostics();
             showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nVaqt: ${time}s`, "success");
@@ -1492,14 +1504,15 @@ function updateEditorStatus() {
     if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
 }
 
-function highlightEditorError(line) {
+function highlightEditorError(line, column = 1) {
     clearEditorDiagnostics();
     if (!line || line > editor.lineCount()) return;
     const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
     activeDebugLineNumber = idx; // Reuse variable for simple highlight
     editor.addLineClass(idx, "background", "error-line");
-    editor.setCursor({ line: idx, ch: 0 });
-    editor.scrollIntoView({ line: idx, ch: 0 }, 100);
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
 }
 
 function clearEditorDiagnostics() {
@@ -2041,14 +2054,15 @@ function dispatchEditorContextUpdate() {
     }));
 }
 
-function highlightEditorError(line) {
+function highlightEditorError(line, column = 1) {
     clearEditorDiagnostics();
     if (!editor || !line || line > editor.lineCount()) return;
     const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
     activeDebugLineNumber = idx;
     editor.addLineClass(idx, "background", "error-line");
-    editor.setCursor({ line: idx, ch: 0 });
-    editor.scrollIntoView({ line: idx, ch: 0 }, 100);
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
 }
 
 function clearEditorDiagnostics() {
@@ -2158,13 +2172,14 @@ function normalizeErrorText(text) {
     return String(text || "").replace(/\r\n/g, "\n").trim();
 }
 
-function extractErrorLineFromText(text) {
+function extractErrorLocationFromText(text) {
     const normalized = normalizeErrorText(text);
-    if (!normalized) return null;
+    if (!normalized) return { line: null, column: null };
 
     const patterns = [
-        /:(\d+):\d+:\s*(?:error|warning)/i,
-        /:(\d+):\d+/i,
+        /:(\d+):(\d+):\s*(?:error|warning)/i,
+        /:(\d+):(\d+)/i,
+        /line\s+(\d+),\s*column\s+(\d+)/i,
         /line\s+(\d+)(?:,\s*column\s+\d+)?/i,
         /at\s+[^:\n]+:(\d+):(\d+)/i,
         /File "[^"]+", line (\d+)/i,
@@ -2174,13 +2189,19 @@ function extractErrorLineFromText(text) {
         const match = normalized.match(pattern);
         if (match) {
             const line = Number(match[1]);
-            if (Number.isFinite(line) && line > 0) {
-                return line;
-            }
+            const column = Number(match[2]);
+            return {
+                line: Number.isFinite(line) && line > 0 ? line : null,
+                column: Number.isFinite(column) && column > 0 ? column : null,
+            };
         }
     }
 
-    return null;
+    return { line: null, column: null };
+}
+
+function extractErrorLineFromText(text) {
+    return extractErrorLocationFromText(text).line;
 }
 
 function getCodeLineAt(code, lineNumber) {
@@ -2190,11 +2211,9 @@ function getCodeLineAt(code, lineNumber) {
     return String(lines[index] || "").trimEnd();
 }
 
-function truncateErrorSnippet(text, limit = 140) {
-    const value = String(text || "").replace(/\s+/g, " ").trim();
-    if (!value) return "";
-    if (value.length <= limit) return value;
-    return value.slice(0, Math.max(0, limit - 3)).trimEnd() + "...";
+function getPointerIndent(column, maxWidth = 88) {
+    const col = Math.max(1, Number(column) || 1);
+    return " ".repeat(Math.min(maxWidth, Math.max(0, col - 1)));
 }
 
 function buildCompactErrorMessage({
@@ -2202,18 +2221,26 @@ function buildCompactErrorMessage({
     summary,
     line,
     codeLine,
+    column,
     tips = [],
     durationSeconds,
 } = {}) {
     const parts = [];
     if (title) parts.push(`Xatolik: ${title}`);
     if (summary) parts.push(summary);
-    if (line) parts.push(`Qator: ${line}`);
-    if (codeLine) parts.push(`Kod satri: ${truncateErrorSnippet(codeLine, 180)}`);
+    if (line) {
+        const lineText = column ? `Qator: ${line}, Ustun: ${column}` : `Qator: ${line}`;
+        parts.push(lineText);
+    }
+    if (codeLine) {
+        parts.push("Kod satri:");
+        parts.push(codeLine);
+        parts.push(`${getPointerIndent(column)}↑ xato shu yerda`);
+    }
     if (tips.length) {
         parts.push("");
         parts.push("Tuzatish:");
-        for (const tip of tips.slice(0, 2)) {
+        for (const tip of tips.slice(0, 3)) {
             parts.push(`- ${tip}`);
         }
     }
@@ -2875,6 +2902,40 @@ function translateRemoteError(language, verdict, text) {
     };
 }
 
+function buildSpecificFixTips(language, verdict, rawText, codeLine, line, column) {
+    const tips = [];
+    const lowerText = normalizeErrorText(rawText).toLowerCase();
+    const lowerCodeLine = normalizeErrorText(codeLine).toLowerCase();
+    const normalizedLanguage = normalizeLanguage(language);
+
+    if (normalizedLanguage === "cpp") {
+        if (lowerCodeLine.includes("<<end") && !lowerCodeLine.includes("<<endl")) {
+            tips.push("Bu joyda `end` emas, `endl` yozing.");
+            tips.push("To'g'ri variant: `cout << \"...\" << endl;`");
+        }
+        if ((lowerText.includes("expected '}'") || lowerText.includes("expected }")) && line) {
+            tips.push("Agar `{` ochilgan bo'lsa, shu blokni `}` bilan yoping.");
+        }
+    }
+
+    if (normalizedLanguage === "javascript" && verdict === "Compilation Error") {
+        if (lowerText.includes("unexpected token")) {
+            tips.push("Bu qatorni tekshiring: qavs, vergul yoki nuqta-vergul yetishmayotgan bo'lishi mumkin.");
+        }
+    }
+
+    if (normalizedLanguage === "python") {
+        if (lowerText.includes("expected ':'")) {
+            tips.push("Qator oxiriga `:` qo'ying.");
+        }
+        if (lowerText.includes("indentationerror")) {
+            tips.push("Blok ichidagi qatorlarni bir xil bo'shliq bilan suring.");
+        }
+    }
+
+    return [...new Set(tips)];
+}
+
 function buildRemoteOutputMessage(result, durationSeconds, code) {
     const verdict = result.verdict || "Runtime Error";
     const stdout = normalizeErrorText(result.stdout);
@@ -2882,7 +2943,8 @@ function buildRemoteOutputMessage(result, durationSeconds, code) {
     const stderr = normalizeErrorText(result.stderr);
     const error = normalizeErrorText(result.error || result.message || result.status);
     const rawText = [compileOutput, stderr, error].filter(Boolean).join("\n\n");
-    const errorLine = extractErrorLineFromText(rawText);
+    const location = extractErrorLocationFromText(rawText);
+    const errorLine = location.line;
 
     if (verdict === "Accepted") {
         const body = stdout || "Muvaffaqiyatli bajarildi.";
@@ -2891,12 +2953,14 @@ function buildRemoteOutputMessage(result, durationSeconds, code) {
 
     const friendly = translateRemoteError(currentLanguage, verdict, rawText);
     const codeLine = errorLine ? getCodeLineAt(code, errorLine) : "";
+    const specificTips = buildSpecificFixTips(currentLanguage, verdict, rawText, codeLine, errorLine, location.column);
     return buildCompactErrorMessage({
         title: friendly.title,
         summary: friendly.summary,
         line: errorLine,
         codeLine,
-        tips: friendly.tips,
+        column: location.column,
+        tips: [...new Set([...specificTips, ...friendly.tips])],
         durationSeconds,
     });
 }
@@ -2966,9 +3030,9 @@ async function runRemoteExecution(language, code, stdinText) {
         const elapsed = ((performance.now() - startedAt) / 1000).toFixed(3);
         const verdict = result.verdict || "Runtime Error";
         const remoteText = [result.compile_output, result.stderr, result.error, result.message].filter(Boolean).join("\n\n");
-        const errorLine = extractErrorLineFromText(remoteText);
-        if (errorLine) {
-            highlightEditorError(errorLine);
+        const location = extractErrorLocationFromText(remoteText);
+        if (location.line) {
+            highlightEditorError(location.line, location.column || 1);
         }
         const message = buildRemoteOutputMessage(result, elapsed, code);
         showOutput(message, verdict === "Accepted" ? "success" : "error");
@@ -3031,15 +3095,16 @@ async function continueRunSession() {
         activeRunSession = null;
         clearEditorDiagnostics();
         if (!result.success) {
-            highlightEditorError(result.error.line);
+            highlightEditorError(result.error.line, result.error.column || 1);
             const friendly = translatePythonError(result.error.type, result.error.message);
-            const codeLine = getCodeLineAt(runCode, result.error.line);
+            const codeLine = result.error.codeLine || getCodeLineAt(runCode, result.error.line);
             showOutput(buildCompactErrorMessage({
                 title: friendly.title,
                 summary: friendly.summary,
                 line: result.error.line,
                 codeLine,
-                tips: friendly.tips,
+                column: result.error.column || null,
+                tips: [...new Set(friendly.tips)],
                 durationSeconds: time,
             }), "error");
         } else {

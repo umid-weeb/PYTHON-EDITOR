@@ -1339,8 +1339,8 @@ body.dark-mode .debug-range-body-line {
 
 .editor-ai-widget {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: 10px;
+  bottom: 10px;
   z-index: 2147483647;
   font-family: "IBM Plex Sans", sans-serif;
   pointer-events: none;
@@ -1412,7 +1412,7 @@ body.dark-mode .editor-ai-trigger {
   pointer-events: auto;
   position: absolute;
   right: 0;
-  bottom: 66px;
+  bottom: 68px;
   width: min(324px, calc(100vw - 20px));
   max-height: min(51vh, 452px);
   display: flex;
