@@ -1235,16 +1235,16 @@ async function initPyodide() {
 
     try {
         pyodide = await loadPyodide();
-        loading.textContent = "â³ Formatlash vositalari yuklanmoqda...";
+        loading.textContent = "Formatlash vositalari yuklanmoqda...";
         await ensurePythonRuntimeTools();
-        loading.textContent = "â³ Python ishga tayyorlanmoqda...";
+        loading.textContent = "Python ishga tayyorlanmoqda...";
         await setupSafeExecutionEnvironment();
-        loading.textContent = "âœ… Python tayyor!";
+        loading.textContent = "Python tayyor!";
         setTimeout(() => {
             loading.classList.remove("active");
         }, 1500);
     } catch (error) {
-        loading.textContent = "âŒ Xatolik: Python yuklanmadi!";
+        loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
         loading.style.background = "#fee2e2";
         loading.style.color = "#991b1b";
     }
@@ -1390,10 +1390,10 @@ async function continueRunSession() {
         activeRunSession = null;
         if (!result.success) {
             highlightEditorError(result.error.line);
-            showOutput(`âŒ ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
+            showOutput(`Xatolik: ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
         } else {
             clearEditorDiagnostics();
-            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nâ± Vaqt: ${time}s`, "success");
+            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nVaqt: ${time}s`, "success");
         }
     } catch (e) {
         showOutput("Xatolik: " + e.message, "error");
@@ -1583,7 +1583,7 @@ function uploadFile(event) {
     const reader = new FileReader();
     reader.onload = (e) => {
         editor.setValue(e.target.result);
-        showOutput(`âœ… Fayl yuklandi: ${file.name}`, "success");
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
     };
     reader.readAsText(file);
 }
@@ -1614,7 +1614,7 @@ async function formatEditorCode() {
         const result = JSON.parse(res);
         if (result.formatterAvailable) {
             editor.setValue(result.code);
-            showOutput("âœ… Kod formatlandi.", "success");
+                showOutput("OK: Kod formatlandi.", "success");
         } else {
             showOutput("Formatlash tooli (autopep8) hali yuklanmagan.", "error");
         }
@@ -1770,25 +1770,66 @@ function loadEditorTypographyPreferences() {
     applyEditorTypography(family, size);
 }
 
+const IDENTIFIER_RESERVED_WORDS = (() => {
+    const words = new Set(Object.values(LANGUAGE_AUTOCOMPLETE_WORDS).flat());
+    words.delete("main");
+    words.delete("Main");
+    return words;
+})();
+
+const IDENTIFIER_TONE_COUNT = 10;
+
+function hashIdentifier(name) {
+    let hash = 0;
+    for (let index = 0; index < name.length; index += 1) {
+        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+}
+
+function getIdentifierToneClass(name) {
+    return `cm-identifier-tone-${hashIdentifier(name) % IDENTIFIER_TONE_COUNT}`;
+}
+
+function createIdentifierOverlay() {
+    return {
+        token(stream) {
+            if (stream.eatSpace()) return null;
+
+            const word = stream.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+            if (word) {
+                const token = word[0];
+                if (!IDENTIFIER_RESERVED_WORDS.has(token)) {
+                    return getIdentifierToneClass(token);
+                }
+                return null;
+            }
+
+            stream.next();
+            return null;
+        },
+    };
+}
+
 async function initPyodide() {
     const loading = document.getElementById("loading");
     if (!loading) return;
 
     loading.classList.add("active");
-    loading.textContent = "â³ Python vositalari yuklanmoqda...";
+    loading.textContent = "Python vositalari yuklanmoqda...";
 
     try {
         pyodide = await loadPyodide();
         await ensurePythonRuntimeTools();
-        loading.textContent = "â³ Python muhiti tayyorlanmoqda...";
+        loading.textContent = "Python muhiti tayyorlanmoqda...";
         await setupSafeExecutionEnvironment();
-        loading.textContent = "âœ… Python tayyor!";
+        loading.textContent = "Python tayyor!";
         setTimeout(() => {
             loading.classList.remove("active");
         }, 1500);
     } catch (error) {
         console.warn("Python muhiti yuklanmadi:", error);
-        loading.textContent = "âš  Python muhiti yuklanmadi, lekin editor ishlaydi.";
+        loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
         loading.style.background = "#fef3c7";
         loading.style.color = "#92400e";
         setTimeout(() => {
@@ -1933,6 +1974,7 @@ function setupEditor() {
             closeOnUnfocus: true,
         },
     });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
 
     editor.on("inputRead", onEditorInputRead);
     editor.on("cursorActivity", updateEditorStatus);
@@ -2011,14 +2053,14 @@ function showOutput(text, type) {
 
 function saveCode() {
     saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
-    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
+    showOutput(`OK: ${getLanguageLabel()} kodi saqlandi.`, "success");
     setTimeout(clearOutput, 2000);
 }
 
 function loadCode() {
     const code = getStoredCode(currentLanguage, currentStarterPack);
     editor.setValue(code);
-    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
+    showOutput(`OK: ${getLanguageLabel()} kodi yuklandi.`, "success");
 }
 
 function downloadCode() {
@@ -2058,7 +2100,7 @@ function uploadFile(event) {
             setEditorLanguage(targetLanguage, { persistCurrent: true });
         }
         editor.setValue(String(e.target.result || ""));
-        showOutput(`âœ… Fayl yuklandi: ${file.name}`, "success");
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
     };
     reader.readAsText(file);
 }
@@ -2071,21 +2113,384 @@ function loadAutoSavedCode() {
     editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
 }
 
+function normalizeErrorText(text) {
+    return String(text || "").replace(/\r\n/g, "\n").trim();
+}
+
+function extractErrorLineFromText(text) {
+    const normalized = normalizeErrorText(text);
+    if (!normalized) return null;
+
+    const patterns = [
+        /:(\d+):\d+:\s*error/i,
+        /:(\d+):\s*error/i,
+        /line\s+(\d+)/i,
+        /at\s+[^:\n]+:(\d+):(\d+)/i,
+        /File "[^"]+", line (\d+)/i,
+    ];
+
+    for (const pattern of patterns) {
+        const match = normalized.match(pattern);
+        if (match) {
+            const line = Number(match[1]);
+            if (Number.isFinite(line) && line > 0) {
+                return line;
+            }
+        }
+    }
+
+    return null;
+}
+
+function translatePythonError(errorType, errorMessage) {
+    const type = String(errorType || "Error").trim();
+    const message = normalizeErrorText(errorMessage);
+    const lowerType = type.toLowerCase();
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerType.includes("indentationerror")) {
+        return {
+            title: "Python indentatsiya xatosi",
+            summary: "Bo'shliqlar noto'g'ri joylashgan. Python'da blok ichidagi qatorlar bir xil surilgan bo'lishi kerak.",
+            tips: [
+                "Har bir blok uchun bir xil bo'shliq ishlating.",
+                "`if`, `for`, `def`, `while` dan keyingi qatorlarni tekshiring.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("syntaxerror")) {
+        if (lowerMessage.includes("expected ':'")) {
+            return {
+                title: "Python sintaksis xatosi",
+                summary: "Qator oxirida `:` yetishmayapti.",
+                tips: [
+                    "`if`, `for`, `while`, `def`, `class` dan keyin `:` qo'yilganini tekshiring.",
+                ],
+            };
+        }
+        if (lowerMessage.includes("unterminated string") || lowerMessage.includes("eol while scanning string literal")) {
+            return {
+                title: "Python matn qatori yopilmagan",
+                summary: "Qo'shtirnoq yoki apostrof bilan boshlangan matn qatori yopilmagan.",
+                tips: [
+                    "Ochilgan qo'shtirnoqni aynan shu turdagi qo'shtirnoq bilan yoping.",
+                    "Matn ichida qo'shtirnoq ishlatsangiz, uni `\\` bilan escape qiling.",
+                ],
+            };
+        }
+        if (lowerMessage.includes("unexpected eof")) {
+            return {
+                title: "Python sintaksis xatosi",
+                summary: "Kod oxirida blok yoki qavs yopilmay qolgan ko'rinadi.",
+                tips: [
+                    "Har bir `(`, `[`, `{` uchun mos yopilish belgisi borligini tekshiring.",
+                ],
+            };
+        }
+        return {
+            title: "Python sintaksis xatosi",
+            summary: "Kod tuzilishida xatolik bor. Qavs, vergul yoki `:` ni tekshiring.",
+            tips: [
+                "Xatolik ko'rsatilgan qatorni yana bir bor ko'rib chiqing.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("nameerror")) {
+        return {
+            title: "Python nom xatosi",
+            summary: "O'zgaruvchi yoki funksiya topilmadi. U avval e'lon qilinganini tekshiring.",
+            tips: [
+                "Nomni bir xil yozganingizga ishonch hosil qiling.",
+                "O'zgaruvchini ishlatishdan oldin yaratganingizni tekshiring.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("typeerror")) {
+        return {
+            title: "Python tur xatosi",
+            summary: "Noto'g'ri turdagi qiymat bilan ishlatyapsiz.",
+            tips: [
+                "Masalan, matn va sonni bevosita aralashtirib yubormaganingizni tekshiring.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("valueerror")) {
+        return {
+            title: "Python qiymat xatosi",
+            summary: "Qiymat noto'g'ri formatda kiritilgan.",
+            tips: [
+                "Son kutilgan joyda haqiqiy son yozilganini tekshiring.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("zero divisionerror")) {
+        return {
+            title: "Nolga bo'lish mumkin emas",
+            summary: "Dastur 0 ga bo'lishga uringan.",
+            tips: [
+                "Bo'luvchi nol bo'lmasligini oldindan tekshiring.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("indexerror")) {
+        return {
+            title: "Python indeks xatosi",
+            summary: "Ro'yxat yoki massiv indeksi chegaradan chiqib ketdi.",
+            tips: [
+                "Indeks 0 dan boshlanishini unutmang.",
+                "Ro'yxat uzunligini `len(...)` bilan tekshiring.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("keyerror")) {
+        return {
+            title: "Python kalit xatosi",
+            summary: "Dictionary'da bu kalit topilmadi.",
+            tips: [
+                "Kalit mavjudligini oldindan tekshiring.",
+            ],
+        };
+    }
+
+    if (lowerType.includes("eoferror")) {
+        return {
+            title: "Python input tugadi",
+            summary: "Dastur yana input kutayotgan edi, lekin kirish tugab qolgan.",
+            tips: [
+                "Kutilgan input soni to'liq kiritilganini tekshiring.",
+            ],
+        };
+    }
+
+    return {
+        title: `Python ${type}`.trim(),
+        summary: message || "Python bajarilishida xatolik yuz berdi.",
+        tips: [],
+    };
+}
+
+function translateRemoteError(language, verdict, text) {
+    const lang = getLanguageLabel(language);
+    const normalizedText = normalizeErrorText(text);
+    const lower = normalizedText.toLowerCase();
+    const baseTitle = verdict === "Compilation Error"
+        ? `${lang} kompilyatsiya xatosi`
+        : verdict === "Runtime Error"
+            ? `${lang} ishga tushish xatosi`
+            : `${lang} xatosi`;
+
+    if (verdict === "Accepted") {
+        return { title: `${lang} muvaffaqiyatli`, summary: "", tips: [] };
+    }
+
+    if (verdict === "Compilation Error") {
+        if (lower.includes("expected '}'") || lower.includes("expected '}' at end of input") || lower.includes("expected }")) {
+            return {
+                title: baseTitle,
+                summary: "Kodda yopilmagan qavs bor. `}` yetishmayapti.",
+                tips: [
+                    "Har bir `{` uchun mos `}` borligini tekshiring.",
+                    "Ayniqsa `if`, `for`, `while`, `main` bloklarini ko'rib chiqing.",
+                ],
+            };
+        }
+        if (lower.includes("expected ';'") || lower.includes("';' expected")) {
+            return {
+                title: baseTitle,
+                summary: "Nuqta-vergul `;` yetishmayapti.",
+                tips: [
+                    "Har bir operatorli qatorda `;` borligini tekshiring.",
+                ],
+            };
+        }
+        if (lower.includes("cannot find symbol")) {
+            return {
+                title: baseTitle,
+                summary: "Java'da nom topilmadi. O'zgaruvchi yoki funksiya e'lonini tekshiring.",
+                tips: [
+                    "Nomni aynan bir xil yozing.",
+                    "Kerakli importlar qo'shilganini tekshiring.",
+                ],
+            };
+        }
+        if (lower.includes("was not declared in this scope")) {
+            return {
+                title: baseTitle,
+                summary: "C++ da bu nom ushbu joyda e'lon qilinmagan.",
+                tips: [
+                    "O'zgaruvchi yoki funksiya avval e'lon qilinganini tekshiring.",
+                ],
+            };
+        }
+        if (lower.includes("missing terminating \" character") || lower.includes("unclosed string literal") || lower.includes("unterminated string")) {
+            return {
+                title: baseTitle,
+                summary: "Matn qatori yopilmagan.",
+                tips: [
+                    "Ochilgan qo'shtirnoqni yopganingizni tekshiring.",
+                    "Ichki qo'shtirnoqlarni escape qiling.",
+                ],
+            };
+        }
+        if (lower.includes("undefined") && lower.includes("javascript")) {
+            return {
+                title: baseTitle,
+                summary: "JavaScript kodida noma'lum nom ishlatilgan.",
+                tips: [
+                    "O'zgaruvchi yoki funksiya oldin e'lon qilinganini tekshiring.",
+                ],
+            };
+        }
+        return {
+            title: baseTitle,
+            summary: "Kompilyatsiya xatosi topildi. Pastdagi texnik tafsilotlarni va yuqoridagi qatorni tekshiring.",
+            tips: [
+                "Xatolik ko'rsatilgan qator atrofini diqqat bilan ko'ring.",
+                "Qavslar, vergullar va `;` lar to'g'ri ekanini tekshiring.",
+            ],
+        };
+    }
+
+    if (verdict === "Runtime Error") {
+        if (lower.includes("referenceerror") || lower.includes("is not defined")) {
+            return {
+                title: baseTitle,
+                summary: "Nom topilmadi. O'zgaruvchi yoki funksiya aniqlanmagan.",
+                tips: [
+                    "Nomni yozishda xatolik yo'qligini tekshiring.",
+                    "Qiymat avval e'lon qilinganini ko'ring.",
+                ],
+            };
+        }
+        if (lower.includes("null pointer") || lower.includes("segmentation fault") || lower.includes("invalid memory address")) {
+            return {
+                title: baseTitle,
+                summary: "Xotiraga noto'g'ri murojaat qilindi.",
+                tips: [
+                    "Bo'sh ko'rsatkich yoki mavjud bo'lmagan elementga murojaat qilmaganingizni tekshiring.",
+                ],
+            };
+        }
+        if (lower.includes("division by zero")) {
+            return {
+                title: baseTitle,
+                summary: "Nolga bo'lish mumkin emas.",
+                tips: [
+                    "Bo'luvchi 0 bo'lishi mumkin bo'lgan joyni tekshiring.",
+                ],
+            };
+        }
+        if (lower.includes("index out of range") || lower.includes("out of bounds")) {
+            return {
+                title: baseTitle,
+                summary: "Indeks chegaradan chiqib ketdi.",
+                tips: [
+                    "Massiv yoki ro'yxat uzunligini tekshiring.",
+                    "Tsikl chegaralari to'g'ri ekanini ko'ring.",
+                ],
+            };
+        }
+        if (lower.includes("panic:")) {
+            return {
+                title: baseTitle,
+                summary: "Go dasturi panic holatiga tushdi.",
+                tips: [
+                    "Nil pointer, indeks yoki formatlash xatolarini tekshiring.",
+                ],
+            };
+        }
+        return {
+            title: baseTitle,
+            summary: "Dastur bajarilishida xatolik yuz berdi.",
+            tips: [
+                "Kiritilgan input va ishlatilgan o'zgaruvchilarni qayta ko'ring.",
+            ],
+        };
+    }
+
+    if (verdict === "Time Limit Exceeded") {
+        return {
+            title: baseTitle,
+            summary: "Dastur juda sekin ishladi yoki cheksiz siklga tushib qoldi.",
+            tips: [
+                "Tsikl chegaralarini tekshiring.",
+                "Katta input uchun murakkablikni kamaytiring.",
+            ],
+        };
+    }
+
+    if (verdict === "Memory Limit Exceeded") {
+        return {
+            title: baseTitle,
+            summary: "Xotira me'yordan oshib ketdi.",
+            tips: [
+                "Keraksiz katta massivlar yaratmayotganingizni tekshiring.",
+                "Kirishni to'liq saqlash o'rniga oqimda ishlashni ko'ring.",
+            ],
+        };
+    }
+
+    if (verdict === "Wrong Answer") {
+        return {
+            title: baseTitle,
+            summary: "Natija test bilan mos kelmadi.",
+            tips: [
+                "Chegara holatlarni tekshiring.",
+                "Input va output formatini yana bir ko'rib chiqing.",
+            ],
+        };
+    }
+
+    return {
+        title: baseTitle,
+        summary: normalizedText || "Xatolik haqida qo'shimcha ma'lumot yo'q.",
+        tips: [],
+    };
+}
+
 function buildRemoteOutputMessage(result, durationSeconds) {
     const verdict = result.verdict || "Runtime Error";
-    const stdout = String(result.stdout || "").trimEnd();
-    const compileOutput = String(result.compile_output || "").trimEnd();
-    const stderr = String(result.stderr || "").trimEnd();
-    const error = String(result.error || result.message || result.status || "").trimEnd();
+    const stdout = normalizeErrorText(result.stdout);
+    const compileOutput = normalizeErrorText(result.compile_output);
+    const stderr = normalizeErrorText(result.stderr);
+    const error = normalizeErrorText(result.error || result.message || result.status);
+    const rawText = [compileOutput, stderr, error].filter(Boolean).join("\n\n");
 
     if (verdict === "Accepted") {
         const body = stdout || "Muvaffaqiyatli bajarildi.";
-        return `${body}\n\nâ± Vaqt: ${durationSeconds}s`;
+        return `${body}\n\nVaqt: ${durationSeconds}s`;
     }
 
-    const parts = [stdout, compileOutput, stderr, error].filter((part, index, array) => Boolean(part) && array.indexOf(part) === index);
-    const detail = parts.length ? `\n\n${parts.join("\n\n")}` : "";
-    return `âŒ ${verdict}${detail}\n\nâ± Vaqt: ${durationSeconds}s`;
+    const friendly = translateRemoteError(currentLanguage, verdict, rawText);
+    const parts = [`Xatolik: ${friendly.title}`];
+    if (friendly.summary) parts.push(friendly.summary);
+    if (friendly.tips.length) {
+        parts.push("");
+        parts.push("Qanday tuzatish mumkin:");
+        for (const tip of friendly.tips) {
+            parts.push(`- ${tip}`);
+        }
+    }
+    if (stdout) {
+        parts.push("");
+        parts.push("Dastur chiqishi:");
+        parts.push(stdout);
+    }
+    if (rawText) {
+        parts.push("");
+        parts.push("Texnik tafsilotlar:");
+        parts.push(rawText);
+    }
+    parts.push("");
+    parts.push(`Vaqt: ${durationSeconds}s`);
+    return parts.join("\n");
 }
 
 async function executeRemoteCode(language, code, stdin) {
@@ -2152,10 +2557,15 @@ async function runRemoteExecution(language, code, stdinText) {
         const result = await executeRemoteCode(language, code, stdinText);
         const elapsed = ((performance.now() - startedAt) / 1000).toFixed(3);
         const verdict = result.verdict || "Runtime Error";
+        const remoteText = [result.compile_output, result.stderr, result.error, result.message].filter(Boolean).join("\n\n");
+        const errorLine = extractErrorLineFromText(remoteText);
+        if (errorLine) {
+            highlightEditorError(errorLine);
+        }
         const message = buildRemoteOutputMessage(result, elapsed);
         showOutput(message, verdict === "Accepted" ? "success" : "error");
     } catch (error) {
-        showOutput(`Xatolik: ${error.message}`, "error");
+        showOutput(`Ulanishda xatolik: ${error.message}`, "error");
     }
 }
 
@@ -2213,13 +2623,38 @@ async function continueRunSession() {
         clearEditorDiagnostics();
         if (!result.success) {
             highlightEditorError(result.error.line);
-            showOutput(`âŒ ${result.error.type}: ${result.error.message}\n\nQator: ${result.error.line}\n${result.output}`, "error");
+            const friendly = translatePythonError(result.error.type, result.error.message);
+            const parts = [`Xatolik: ${friendly.title}`];
+            if (friendly.summary) parts.push(friendly.summary);
+            if (friendly.tips.length) {
+                parts.push("");
+                parts.push("Qanday tuzatish mumkin:");
+                for (const tip of friendly.tips) {
+                    parts.push(`- ${tip}`);
+                }
+            }
+            parts.push("");
+            parts.push(`Qator: ${result.error.line}`);
+            if (result.output) {
+                parts.push("");
+                parts.push("Dastur chiqishi:");
+                parts.push(result.output);
+            }
+            const rawPythonError = [result.error.type, result.error.message].filter(Boolean).join(": ");
+            if (rawPythonError) {
+                parts.push("");
+                parts.push("Texnik tafsilotlar:");
+                parts.push(rawPythonError);
+            }
+            parts.push("");
+            parts.push(`Vaqt: ${time}s`);
+            showOutput(parts.join("\n"), "error");
         } else {
-            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nâ± Vaqt: ${time}s`, "success");
+            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nVaqt: ${time}s`, "success");
         }
     } catch (error) {
         activeRunSession = null;
-        showOutput("Xatolik: " + error.message, "error");
+        showOutput("Bajarishda xatolik: " + error.message, "error");
     }
 }
 
@@ -2279,7 +2714,7 @@ function formatEditorCode() {
             const result = JSON.parse(res);
             if (result.formatterAvailable) {
                 editor.setValue(result.code);
-                showOutput("âœ… Kod formatlandi.", "success");
+                showOutput("OK: Kod formatlandi.", "success");
             } else {
                 showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
             }

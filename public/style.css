@@ -28,6 +28,29 @@
   --editor-surface: #fcfdff;
   --console-surface: #f8fafc;
   --console-border: #e2e8f0;
+  --code-keyword: #2153d6;
+  --code-def: #0f766e;
+  --code-string: #b45309;
+  --code-number: #b42318;
+  --code-comment: #6b7280;
+  --code-atom: #7c3aed;
+  --code-property: #0b6b7a;
+  --code-variable: #0f172a;
+  --code-operator: #6d28d9;
+  --bracket-match-bg: rgba(35, 83, 215, 0.12);
+  --bracket-match-border: rgba(35, 83, 215, 0.32);
+  --bracket-mismatch-bg: rgba(185, 56, 74, 0.14);
+  --bracket-mismatch-border: rgba(185, 56, 74, 0.35);
+  --identifier-tone-0: #2153d6;
+  --identifier-tone-1: #0f766e;
+  --identifier-tone-2: #7c3aed;
+  --identifier-tone-3: #c2410c;
+  --identifier-tone-4: #0f9d8e;
+  --identifier-tone-5: #b91c1c;
+  --identifier-tone-6: #0369a1;
+  --identifier-tone-7: #8b5cf6;
+  --identifier-tone-8: #0891b2;
+  --identifier-tone-9: #0f9f62;
   --shadow-soft: 0 24px 70px rgba(15, 23, 42, 0.08);
   --shadow-panel: 0 10px 30px rgba(15, 23, 42, 0.05);
   --focus-ring: 0 0 0 3px rgba(35, 83, 215, 0.16);
@@ -58,6 +81,29 @@ body.dark-mode {
   --editor-surface: #131b2d;
   --console-surface: #0b1220;
   --console-border: #1d2a3f;
+  --code-keyword: #7da2ff;
+  --code-def: #5ee7b0;
+  --code-string: #ffbf69;
+  --code-number: #fca5a5;
+  --code-comment: #94a3b8;
+  --code-atom: #c4b5fd;
+  --code-property: #67e8f9;
+  --code-variable: #e2e8f0;
+  --code-operator: #d8b4fe;
+  --bracket-match-bg: rgba(91, 141, 255, 0.16);
+  --bracket-match-border: rgba(91, 141, 255, 0.42);
+  --bracket-mismatch-bg: rgba(255, 123, 135, 0.18);
+  --bracket-mismatch-border: rgba(255, 123, 135, 0.38);
+  --identifier-tone-0: #7da2ff;
+  --identifier-tone-1: #5ee7b0;
+  --identifier-tone-2: #c4b5fd;
+  --identifier-tone-3: #ffbf69;
+  --identifier-tone-4: #67e8f9;
+  --identifier-tone-5: #fca5a5;
+  --identifier-tone-6: #f9a8d4;
+  --identifier-tone-7: #93c5fd;
+  --identifier-tone-8: #86efac;
+  --identifier-tone-9: #fcd34d;
   --shadow-soft: 0 28px 80px rgba(0, 0, 0, 0.36);
   --shadow-panel: 0 18px 40px rgba(0, 0, 0, 0.28);
   --focus-ring: 0 0 0 3px rgba(91, 141, 255, 0.22);
@@ -634,6 +680,73 @@ body.dark-mode .editor-select option {
   background: rgba(185, 56, 74, 0.1);
   color: inherit !important;
 }
+
+.CodeMirror span.cm-keyword {
+  color: var(--code-keyword);
+  font-weight: 600;
+}
+
+.CodeMirror span.cm-def {
+  color: var(--code-def);
+  font-weight: 600;
+}
+
+.CodeMirror span.cm-string {
+  color: var(--code-string);
+}
+
+.CodeMirror span.cm-number {
+  color: var(--code-number);
+}
+
+.CodeMirror span.cm-comment {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.CodeMirror span.cm-atom {
+  color: var(--code-atom);
+}
+
+.CodeMirror span.cm-property {
+  color: var(--code-property);
+}
+
+.CodeMirror span.cm-variable,
+.CodeMirror span.cm-variable-2 {
+  color: var(--code-variable);
+}
+
+.CodeMirror span.cm-operator {
+  color: var(--code-operator);
+}
+
+.CodeMirror .CodeMirror-matchingbracket {
+  background: var(--bracket-match-bg);
+  color: var(--text-main);
+  border-bottom: 1px solid var(--bracket-match-border);
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+.CodeMirror .CodeMirror-nonmatchingbracket {
+  background: var(--bracket-mismatch-bg);
+  color: var(--danger);
+  border-bottom: 1px solid var(--bracket-mismatch-border);
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+.CodeMirror span.cm-identifier-tone-0 { color: var(--identifier-tone-0); }
+.CodeMirror span.cm-identifier-tone-1 { color: var(--identifier-tone-1); }
+.CodeMirror span.cm-identifier-tone-2 { color: var(--identifier-tone-2); }
+.CodeMirror span.cm-identifier-tone-3 { color: var(--identifier-tone-3); }
+.CodeMirror span.cm-identifier-tone-4 { color: var(--identifier-tone-4); }
+.CodeMirror span.cm-identifier-tone-5 { color: var(--identifier-tone-5); }
+.CodeMirror span.cm-identifier-tone-6 { color: var(--identifier-tone-6); }
+.CodeMirror span.cm-identifier-tone-7 { color: var(--identifier-tone-7); }
+.CodeMirror span.cm-identifier-tone-8 { color: var(--identifier-tone-8); }
+.CodeMirror span.cm-identifier-tone-9 { color: var(--identifier-tone-9); }
 
 .CodeMirror-foldgutter {
   width: 14px;
