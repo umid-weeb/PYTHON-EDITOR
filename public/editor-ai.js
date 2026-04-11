@@ -1,5 +1,5 @@
 (function () {
-  const STORAGE_PREFIX = "pyzone_editor_ai_history";
+  const STORAGE_PREFIX = "pyzone_editor_ai_history_v2";
   const TOKEN_KEYS = ["userToken", "auth_token", "token", "arena_jwt", "access_token"];
 
   const state = {
@@ -101,18 +101,11 @@
   }
 
   function createInitialMessages(ctx) {
-    const intro = `Men hozir ${ctx.languageLabel} kodini ko'rib turibman. Savolingizni yozing.`;
-
-    const details = [`${ctx.languageLabel} | ${ctx.starterPackLabel} | Qator ${ctx.cursorLine}:${ctx.cursorColumn}`];
-    if (ctx.consoleInputActive) {
-      details.push(`Console input: ${ctx.consoleInputPrompt || "faol"}`);
-    }
-
     return [
       {
         id: `welcome-${Date.now()}`,
         role: "assistant",
-        text: `${intro}\n\n${details.join(" | ")}`,
+        text: "Salom, xush kelibsiz",
       },
     ];
   }
@@ -284,7 +277,7 @@
     setLoading(true);
 
     try {
-      const response = await fetch("/api/editor/chat", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -356,11 +349,11 @@
         <div class="editor-ai-context" id="editor-ai-context">Kontekst yuklanmoqda...</div>
         <div class="editor-ai-message-list" id="editor-ai-messages"></div>
         <div class="editor-ai-input-shell">
-          <textarea id="editor-ai-input" class="editor-ai-input" rows="2" placeholder="Savolingizni yozing..."></textarea>
-          <div class="editor-ai-actions">
-            <span class="editor-ai-hint">Enter - yuborish, Shift+Enter - yangi qatorda</span>
+          <div class="editor-ai-composer">
+            <textarea id="editor-ai-input" class="editor-ai-input" rows="1" placeholder="Savolingizni yozing..."></textarea>
             <button type="button" class="editor-ai-send">Yuborish</button>
           </div>
+          <span class="editor-ai-hint">Enter - yuborish, Shift+Enter - yangi qatorda</span>
         </div>
       </section>
     `;
