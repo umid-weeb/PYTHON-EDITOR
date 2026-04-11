@@ -1897,6 +1897,7 @@ function setStarterPack(pack, options = {}) {
     clearOutput({ preserveInput: false });
     syncStarterPackSelector();
     updateEditorStatus();
+    dispatchEditorContextUpdate();
 }
 
 function setEditorLanguage(language, options = {}) {
@@ -1933,6 +1934,7 @@ function setEditorLanguage(language, options = {}) {
     syncLanguageSelector();
     syncStarterPackSelector();
     updateEditorStatus();
+    dispatchEditorContextUpdate();
 }
 
 function setupEditor() {
@@ -1981,6 +1983,7 @@ function setupEditor() {
     editor.on("change", () => {
         updateEditorStatus();
         autoSaveCode();
+        dispatchEditorContextUpdate();
     });
 
     setupLanguageSelector();
@@ -2001,6 +2004,33 @@ function updateEditorStatus() {
     const secondary = document.getElementById("editor-status-secondary");
     if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
     if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+}
+
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
 }
 
 function highlightEditorError(line) {
@@ -3139,6 +3169,11 @@ function showAutocompleteHints(cm) {
         completeSingle: false,
     });
 }
+
+window.pyzoneEditorAssistant = {
+    getContext: getEditorAssistantContext,
+    isReady: () => Boolean(editor),
+};
 
 // --- INITIALIZE ---
 

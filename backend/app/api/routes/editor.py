@@ -1,17 +1,28 @@
 from __future__ import annotations
 
+import json
+from datetime import date
 import logging
 import re
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from app.api.routes.auth import get_optional_user
+from app.database import get_db
+from app.models.ai_usage import AIChatUsage
+from app.models.user import User
 from app.judge.judge0_client import Judge0Client, get_judge0_settings
+from app.services.editor_ai_service import EditorAIService, get_editor_ai_service
 
 
 router = APIRouter(tags=["editor"])
 logger = logging.getLogger("pyzone.editor")
+
+EDITOR_DAILY_GUEST_LIMIT = 5
+EDITOR_DAILY_USER_LIMIT = 300
 
 
 class EditorRunRequest(BaseModel):
@@ -35,6 +46,32 @@ class EditorRunResponse(BaseModel):
     error: str | None = None
     token: str | None = None
     language_id: int | None = None
+
+
+class EditorChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class EditorChatRequest(BaseModel):
+    language: Literal["python", "javascript", "cpp", "java", "go"] = "python"
+    starter_pack: str = "array"
+    code: str = Field(min_length=1)
+    selected_text: str = ""
+    output_text: str = ""
+    cursor_line: int = 1
+    cursor_column: int = 1
+    line_count: int = 0
+    is_dark_mode: bool = False
+    context_tag: str = "online-editor"
+    user_message: str = Field(min_length=1)
+    conversation_history: list[EditorChatMessage] = Field(default_factory=list)
+
+
+class EditorChatResponse(BaseModel):
+    reply: str | None = None
+    remaining: int | None = None
+    requires_auth: bool = False
 
 
 _LANGUAGE_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
@@ -64,6 +101,66 @@ def _to_int(value: Any, default: int = 0) -> int:
         return int(float(value))
     except Exception:
         return default
+
+
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _check_and_increment(
+    db: Session,
+    user_id: int | None,
+    ip_address: str,
+    context_tag: str,
+) -> tuple[bool, int, bool]:
+    today = date.today()
+
+    if user_id:
+        limit = EDITOR_DAILY_USER_LIMIT
+        usage = (
+            db.query(AIChatUsage)
+            .filter(AIChatUsage.user_id == user_id, AIChatUsage.date == today)
+            .first()
+        )
+        if not usage:
+            usage = AIChatUsage(user_id=user_id, date=today, request_count=0, topics_summary="[]")
+            db.add(usage)
+            db.flush()
+    else:
+        limit = EDITOR_DAILY_GUEST_LIMIT
+        usage = (
+            db.query(AIChatUsage)
+            .filter(
+                AIChatUsage.ip_address == ip_address,
+                AIChatUsage.user_id.is_(None),
+                AIChatUsage.date == today,
+            )
+            .first()
+        )
+        if not usage:
+            usage = AIChatUsage(ip_address=ip_address, date=today, request_count=0, topics_summary="[]")
+            db.add(usage)
+            db.flush()
+
+    if usage.request_count >= limit:
+        return False, 0, (user_id is None)
+
+    usage.request_count += 1
+
+    try:
+        topics: list = json.loads(usage.topics_summary or "[]")
+    except Exception:
+        topics = []
+    if context_tag and context_tag not in topics:
+        topics.append(context_tag)
+        usage.topics_summary = json.dumps(topics)
+
+    db.commit()
+    remaining = limit - usage.request_count
+    return True, remaining, False
 
 
 def _resolve_language_id(client: Judge0Client, language: str) -> tuple[int | None, str | None]:
@@ -141,6 +238,68 @@ def _build_response(
         token=token,
         language_id=language_id,
     )
+
+
+@router.post("/chat", response_model=EditorChatResponse)
+async def editor_chat(
+    payload: EditorChatRequest,
+    raw_request: Request,
+    current_user: User | None = Depends(get_optional_user),
+    editor_ai_service: EditorAIService = Depends(get_editor_ai_service),
+    db: Session = Depends(get_db),
+) -> EditorChatResponse:
+    ip = _get_client_ip(raw_request)
+    user_id = current_user.id if current_user else None
+
+    allowed = True
+    remaining = None
+    is_guest_limit = False
+    try:
+        allowed, remaining, is_guest_limit = _check_and_increment(
+            db,
+            user_id,
+            ip,
+            payload.context_tag or f"online-editor:{payload.language}:{payload.starter_pack}",
+        )
+    except Exception as exc:  # pragma: no cover - defensive fail-open
+        logger.error("Editor chat rate limit DB error (non-fatal): %s", exc)
+
+    if not allowed:
+        if is_guest_limit:
+            return EditorChatResponse(reply=None, remaining=0, requires_auth=True)
+        return EditorChatResponse(
+            reply="Bugunlik AI so'rov limiti tugadi. Ertaga yana urinib ko'ring.",
+            remaining=0,
+            requires_auth=False,
+        )
+
+    history = [
+        {"role": msg.role, "content": msg.content}
+        for msg in payload.conversation_history[-10:]
+    ]
+
+    try:
+        reply = await editor_ai_service.get_editor_chat_response(
+            user_message=payload.user_message,
+            conversation_history=history,
+            language=payload.language,
+            code=payload.code,
+            starter_pack=payload.starter_pack,
+            selected_text=payload.selected_text,
+            output_text=payload.output_text,
+            cursor_line=payload.cursor_line,
+            cursor_column=payload.cursor_column,
+            line_count=payload.line_count,
+            is_dark_mode=payload.is_dark_mode,
+        )
+    except Exception as exc:
+        logger.error("Editor chat get_editor_chat_response error: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI javob berishda xatolik: {str(exc)}",
+        )
+
+    return EditorChatResponse(reply=reply, remaining=remaining, requires_auth=False)
 
 
 @router.post("/run", response_model=EditorRunResponse)
