@@ -332,8 +332,9 @@
       <button type="button" class="editor-ai-trigger" aria-label="AI yordamchi">
         <span class="editor-ai-trigger-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 12c0 3.87-3.58 7-8 7a9.7 9.7 0 0 1-2.2-.25L5 20l1.3-3.4A6.7 6.7 0 0 1 4 12c0-3.87 3.58-7 8-7s8 3.13 8 7Z"/>
-            <path d="M9 11h.01M12 11h.01M15 11h.01"/>
+            <path d="M7 18.5H6.5A2.5 2.5 0 0 1 4 16V9.5A4.5 4.5 0 0 1 8.5 5h7A4.5 4.5 0 0 1 20 9.5V16a2.5 2.5 0 0 1-2.5 2.5H13L8.5 21v-2.5Z"/>
+            <path d="M10 11h.01M14 11h.01"/>
+            <path d="M9 15h6"/>
           </svg>
         </span>
       </button>

@@ -2216,6 +2216,116 @@ function getPointerIndent(column, maxWidth = 88) {
     return " ".repeat(Math.min(maxWidth, Math.max(0, col - 1)));
 }
 
+function extractLikelyErrorToken(text) {
+    const normalized = normalizeErrorText(text);
+    const patterns = [
+        /cannot find symbol[\s\S]*?symbol:\s*(?:variable|method|class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)/i,
+        /symbol:\s*(?:variable|method|class|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)/i,
+        /'([^']+)' was not declared in this scope/i,
+        /undefined:\s*([A-Za-z_][A-Za-z0-9_]*)/i,
+        /([A-Za-z_][A-Za-z0-9_]*) is not defined/i,
+        /referenceerror:\s*([A-Za-z_][A-Za-z0-9_]*) is not defined/i,
+        /unexpected token\s+['"`]?([^\s'"`]+)['"`]?/i,
+        /unexpected identifier\s+['"`]?([^\s'"`]+)['"`]?/i,
+        /missing initializer in const declaration/i,
+        /non-static method\s+([A-Za-z_][A-Za-z0-9_]*)/i,
+        /variable\s+([A-Za-z_][A-Za-z0-9_]*)\s+might not have been initialized/i,
+    ];
+
+    for (const pattern of patterns) {
+        const match = normalized.match(pattern);
+        if (match && match[1]) {
+            return String(match[1]).trim();
+        }
+    }
+
+    return "";
+}
+
+function inferRemoteErrorColumn(language, verdict, rawText, codeLine, location = {}) {
+    if (Number.isFinite(location.column) && location.column > 0) {
+        return location.column;
+    }
+
+    const normalizedCodeLine = normalizeErrorText(codeLine);
+    if (!normalizedCodeLine) {
+        return null;
+    }
+
+    const normalizedText = normalizeErrorText(rawText);
+    const lower = normalizedText.toLowerCase();
+    const token = extractLikelyErrorToken(normalizedText);
+
+    if (token) {
+        const exactIndex = normalizedCodeLine.indexOf(token);
+        if (exactIndex >= 0) {
+            return exactIndex + 1;
+        }
+        const lowerIndex = normalizedCodeLine.toLowerCase().indexOf(token.toLowerCase());
+        if (lowerIndex >= 0) {
+            return lowerIndex + 1;
+        }
+    }
+
+    const endColumn = normalizedCodeLine.length + 1;
+    if (verdict === "Compilation Error") {
+        if (
+            lower.includes("expected ';'") ||
+            lower.includes("';' expected") ||
+            lower.includes("missing ';'") ||
+            lower.includes("unexpected token") ||
+            lower.includes("missing ) after argument list") ||
+            lower.includes("unexpected end of input") ||
+            lower.includes("reached end of file while parsing") ||
+            lower.includes("illegal start of expression") ||
+            lower.includes("unclosed string literal") ||
+            lower.includes("unterminated string") ||
+            lower.includes("missing terminating \" character")
+        ) {
+            return endColumn;
+        }
+
+        if (lower.includes("class, interface, or enum expected")) {
+            return 1;
+        }
+
+        if (
+            lower.includes("cannot find symbol") ||
+            lower.includes("was not declared in this scope") ||
+            lower.includes("is not defined")
+        ) {
+            return endColumn;
+        }
+    }
+
+    if (verdict === "Runtime Error") {
+        if (
+            lower.includes("index out of range") ||
+            lower.includes("out of bounds") ||
+            lower.includes("division by zero") ||
+            lower.includes("panic:") ||
+            lower.includes("null pointer") ||
+            lower.includes("segmentation fault") ||
+            lower.includes("invalid memory address")
+        ) {
+            return endColumn;
+        }
+    }
+
+    return endColumn;
+}
+
+function getRemoteErrorDisplayLocation(language, verdict, rawText, code) {
+    const location = extractErrorLocationFromText(rawText);
+    const codeLine = location.line ? getCodeLineAt(code, location.line) : "";
+    const column = inferRemoteErrorColumn(language, verdict, rawText, codeLine, location);
+    return {
+        line: location.line,
+        column,
+        codeLine,
+    };
+}
+
 function buildCompactErrorMessage({
     title,
     summary,
@@ -2285,15 +2395,15 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
             },
             {
                 match: ["expected ';'", "missing ';'"],
-                summary: "Nuqta-vergul `;` yetishmayapti.",
+                summary: "Bu qator oxiriga `;` yetishmayapti.",
                 tips: [
-                    "Har bir buyruq satrining oxirini tekshiring.",
-                    "Ayniqsa `return`, `int`, `cout`, `if` atrofini ko'ring.",
+                    "Masalan: `cout << \"Salom\" << endl;`",
+                    "Har bir buyruq satrini `;` bilan tugating.",
                 ],
             },
             {
                 match: ["was not declared in this scope"],
-                summary: "Bu nom bu joyda e'lon qilinmagan.",
+                summary: "Bu nom bu joyda e'lon qilinmagan yoki yozuvi xato.",
                 tips: [
                     "O'zgaruvchi yoki funksiya ishlatilishdan oldin e'lon qilinganini tekshiring.",
                     "Nomni yozishda xatolik yo'qligiga ishonch hosil qiling.",
@@ -2331,11 +2441,34 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                     "E'lon kodini blokdan tashqariga chiqarmaganingizga qarang.",
                 ],
             },
+            {
+                match: ["no member named"],
+                summary: "Bu obyekt ichida bunday nom yo'q.",
+                tips: [
+                    "Metod yoki property yozuvini tekshiring.",
+                ],
+            },
+            {
+                match: ["no match for 'operator<<'"],
+                summary: "Chiqarish operatorida tur mos kelmadi.",
+                tips: [
+                    "Omborxona emas, `cout`ga yuborayotgan qiymat turini tekshiring.",
+                    "Matn va sonlarni aralashtirayotgan joyni ko'ring.",
+                ],
+            },
         ],
         java: [
             {
+                match: ["';' expected", "expected ';'", "missing ';'"],
+                summary: "Bu qator oxiriga `;` yetishmayapti.",
+                tips: [
+                    "Masalan: `System.out.println(\"Hello\");`",
+                    "Har bir statement oxirini `;` bilan yoping.",
+                ],
+            },
+            {
                 match: ["cannot find symbol"],
-                summary: "Java bu nomni topmadi.",
+                summary: "Java bu nomni topmadi. E'lon yoki yozuvni tekshiring.",
                 tips: [
                     "O'zgaruvchi, funksiya yoki class nomini tekshiring.",
                     "Kerakli importlar qo'shilganini ko'ring.",
@@ -2351,7 +2484,7 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
             },
             {
                 match: ["class, interface, or enum expected"],
-                summary: "Kod sinf tanasidan tashqariga chiqib qolgan yoki qavs yopilmagan.",
+                summary: "Kod sinf tanasidan tashqariga chiqib qolgan yoki ortiqcha `}` bor.",
                 tips: [
                     "Har bir `{` uchun `}` borligini tekshiring.",
                     "Metodlar class ichida joylashganiga ishonch hosil qiling.",
@@ -2379,11 +2512,40 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                     "Obyekt yarating yoki metodni `static` qiling.",
                 ],
             },
+            {
+                match: ["illegal start of expression"],
+                summary: "Bu joyda sintaksis buzilgan. Ko'pincha `;`, `{` yoki `)` yetishmaydi.",
+                tips: [
+                    "Qator oxirini tekshiring.",
+                    "Oldingi qatorlarda ochilgan qavslar yopilganini ko'ring.",
+                ],
+            },
+            {
+                match: ["unclosed string literal"],
+                summary: "Matn qatori yopilmagan.",
+                tips: [
+                    "Ochilgan qo'shtirnoqni yoping.",
+                ],
+            },
+            {
+                match: ["variable ", " might not have been initialized"],
+                summary: "O'zgaruvchi qiymatsiz ishlatilgan bo'lishi mumkin.",
+                tips: [
+                    "O'zgaruvchiga ishlatishdan oldin qiymat bering.",
+                ],
+            },
+            {
+                match: ["cannot be resolved to a variable"],
+                summary: "Bu o'zgaruvchi topilmadi.",
+                tips: [
+                    "Nomni tekshiring va oldin e'lon qilinganiga ishonch hosil qiling.",
+                ],
+            },
         ],
         javascript: [
             {
                 match: ["unexpected token"],
-                summary: "JS kutilmagan belgi yoki operator topdi.",
+                summary: "Kutilmagan belgi topildi. Qavs, vergul yoki `;` yetishmayotgan bo'lishi mumkin.",
                 tips: [
                     "Qavslar, vergullar va operatorlarni tekshiring.",
                     "Yopilmagan `{`, `(` yoki matn qatori yo'qligiga qarang.",
@@ -2404,6 +2566,13 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 ],
             },
             {
+                match: ["missing ; before statement", "missing semicolon"],
+                summary: "Bu qator oxiriga `;` yetishmayapti.",
+                tips: [
+                    "Masalan: `console.log(\"Salom\");`",
+                ],
+            },
+            {
                 match: ["missing initializer in const declaration"],
                 summary: "`const` o'zgaruvchisi qiymatsiz e'lon qilingan.",
                 tips: [
@@ -2417,6 +2586,22 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                     "Har bir `(`, `{`, `[` uchun mos yopuvchi belgi borligini tekshiring.",
                 ],
             },
+            {
+                match: ["is not defined"],
+                summary: "Bu nom topilmadi yoki e'lon qilinmagan.",
+                tips: [
+                    "O'zgaruvchi yoki funksiya oldin e'lon qilinganini tekshiring.",
+                ],
+            },
+            {
+                match: ["cannot read properties of undefined", "cannot read property of undefined"],
+                all: false,
+                summary: "Undefined ustida property o'qilyapti.",
+                tips: [
+                    "Obyekt mavjudligini tekshiring.",
+                    "Kerak bo'lsa optional chaining ishlating.",
+                ],
+            },
         ],
         go: [
             {
@@ -2424,6 +2609,13 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 summary: "Go sintaksisida kutilmagan belgi bor.",
                 tips: [
                     "Qavslar, `:=`, `,` va `}` joylashuvini tekshiring.",
+                ],
+            },
+            {
+                match: ["expected ';'"],
+                summary: "Bu qator atrofida sintaksis buzilgan. Qavs yoki operatorni tekshiring.",
+                tips: [
+                    "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'ladi.",
                 ],
             },
             {
@@ -2459,6 +2651,13 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 summary: "Import qilingan paket ishlatilmagan.",
                 tips: [
                     "Keraksiz importni o'chiring yoki paketdan foydalaning.",
+                ],
+            },
+            {
+                match: ["too many errors"],
+                summary: "Xatolar juda ko'p. Avval birinchi xatoni tuzating.",
+                tips: [
+                    "Ko'pincha birinchi syntax xatosi qolganlarini ham keltirib chiqaradi.",
                 ],
             },
         ],
@@ -2716,8 +2915,10 @@ function translatePythonError(errorType, errorMessage) {
 
 function translateRemoteError(language, verdict, text) {
     const lang = getLanguageLabel(language);
+    const normalizedLanguage = normalizeLanguage(language);
     const normalizedText = normalizeErrorText(text);
     const lower = normalizedText.toLowerCase();
+    const token = extractLikelyErrorToken(normalizedText);
     const baseTitle = verdict === "Compilation Error"
         ? `${lang} kompilyatsiya xatosi`
         : verdict === "Runtime Error"
@@ -2726,6 +2927,222 @@ function translateRemoteError(language, verdict, text) {
 
     if (verdict === "Accepted") {
         return { title: `${lang} muvaffaqiyatli`, summary: "", tips: [] };
+    }
+
+    if (verdict === "Compilation Error") {
+        if (normalizedLanguage === "java") {
+            if (lower.includes("';' expected") || lower.includes("expected ';'") || lower.includes("missing ';'")) {
+                return {
+                    title: baseTitle,
+                    summary: "Bu satr oxiriga `;` yetishmayapti.",
+                    tips: [
+                        "Masalan: `System.out.println(...);`",
+                        "Har bir statement oxirini `;` bilan tugating.",
+                    ],
+                };
+            }
+            if (lower.includes("cannot find symbol")) {
+                return {
+                    title: baseTitle,
+                    summary: token ? `\`${token}\` nomi topilmadi.` : "Java bu nomni topmadi. E'lon yoki yozuvni tekshiring.",
+                    tips: [
+                        token ? `\`${token}\` yozuvi aynan shu joyda to'g'ri ekanini tekshiring.` : "O'zgaruvchi, funksiya yoki class nomini tekshiring.",
+                        "Kerakli importlar qo'shilganini ko'ring.",
+                    ],
+                };
+            }
+            if (lower.includes("reached end of file while parsing") || lower.includes("expected '}'") || lower.includes("expected }")) {
+                return {
+                    title: baseTitle,
+                    summary: "Fayl oxirida blok yopilmay qolgan.",
+                    tips: [
+                        "Oxirgi `}` larni tekshiring.",
+                        "String yoki bracket yopilganini ko'ring.",
+                    ],
+                };
+            }
+            if (lower.includes("illegal start of expression")) {
+                return {
+                    title: baseTitle,
+                    summary: "Bu joyda sintaksis buzilgan. Ko'pincha `;`, `{` yoki `)` yetishmaydi.",
+                    tips: [
+                        "Qator oxirini tekshiring.",
+                        "Oldingi qatorlarda ochilgan qavslar yopilganini ko'ring.",
+                    ],
+                };
+            }
+            if (lower.includes("unclosed string literal")) {
+                return {
+                    title: baseTitle,
+                    summary: "Matn qatori yopilmagan.",
+                    tips: [
+                        "Ochilgan qo'shtirnoqni yoping.",
+                        "Ichki qo'shtirnoqlarni escape qiling.",
+                    ],
+                };
+            }
+            if (lower.includes("non-static method")) {
+                return {
+                    title: baseTitle,
+                    summary: "Non-static metod static `main` ichidan noto'g'ri chaqirilgan.",
+                    tips: [
+                        "Obyekt yarating yoki metodni `static` qiling.",
+                    ],
+                };
+            }
+            if (lower.includes("might not have been initialized")) {
+                return {
+                    title: baseTitle,
+                    summary: "O'zgaruvchi qiymatsiz ishlatilgan bo'lishi mumkin.",
+                    tips: [
+                        "O'zgaruvchiga ishlatishdan oldin qiymat bering.",
+                    ],
+                };
+            }
+            if (lower.includes("cannot be resolved to a variable")) {
+                return {
+                    title: baseTitle,
+                    summary: "Bu o'zgaruvchi topilmadi.",
+                    tips: [
+                        "Nomni tekshiring va oldin e'lon qilinganiga ishonch hosil qiling.",
+                    ],
+                };
+            }
+        }
+
+        if (normalizedLanguage === "javascript") {
+            if (lower.includes("unexpected token")) {
+                return {
+                    title: baseTitle,
+                    summary: token ? `Bu joyda \`${token}\` belgisi noto'g'ri.` : "Kutilmagan belgi topildi. Qavs, vergul yoki `;` yetishmayotgan bo'lishi mumkin.",
+                    tips: [
+                        "Qavslar, vergullar va operatorlarni tekshiring.",
+                        "Yopilmagan `{`, `(` yoki matn qatori yo'qligiga qarang.",
+                    ],
+                };
+            }
+            if (lower.includes("unexpected identifier")) {
+                return {
+                    title: baseTitle,
+                    summary: "Nom noto'g'ri joyda ishlatilgan.",
+                    tips: [
+                        "O'zgaruvchi yoki funksiya yozilish tartibini ko'ring.",
+                    ],
+                };
+            }
+            if (lower.includes("missing ) after argument list")) {
+                return {
+                    title: baseTitle,
+                    summary: "Yopuvchi qavs `)` yetishmayapti.",
+                    tips: [
+                        "Funksiya chaqiruvlaridagi qavslarni tekshiring.",
+                    ],
+                };
+            }
+            if (lower.includes("missing ; before statement") || lower.includes("missing semicolon")) {
+                return {
+                    title: baseTitle,
+                    summary: "Bu qator oxiriga `;` yetishmayapti.",
+                    tips: [
+                        "Masalan: `console.log(\"Salom\");`",
+                    ],
+                };
+            }
+            if (lower.includes("missing initializer in const declaration")) {
+                return {
+                    title: baseTitle,
+                    summary: "`const` uchun qiymat yozilmagan.",
+                    tips: [
+                        "Masalan: `const x = 10;`",
+                    ],
+                };
+            }
+            if (lower.includes("unexpected end of input")) {
+                return {
+                    title: baseTitle,
+                    summary: "Kod oxirida qavs yoki blok yopilmay qolgan.",
+                    tips: [
+                        "Oxirgi `}`, `)` va `]` larni tekshiring.",
+                    ],
+                };
+            }
+            if (lower.includes("is not defined") || lower.includes("referenceerror")) {
+                return {
+                    title: baseTitle,
+                    summary: token ? `\`${token}\` nomi topilmadi.` : "Nom topilmadi. O'zgaruvchi yoki funksiya e'lon qilinganini tekshiring.",
+                    tips: [
+                        "O'zgaruvchi yoki funksiya oldin e'lon qilinganini tekshiring.",
+                    ],
+                };
+            }
+            if (lower.includes("cannot read properties of undefined") || lower.includes("cannot read property of undefined")) {
+                return {
+                    title: baseTitle,
+                    summary: "Undefined ustida property o'qilyapti.",
+                    tips: [
+                        "Obyekt mavjudligini tekshiring.",
+                        "Kerak bo'lsa optional chaining ishlating.",
+                    ],
+                };
+            }
+        }
+
+        if (normalizedLanguage === "go") {
+            if (lower.includes("syntax error: unexpected")) {
+                return {
+                    title: baseTitle,
+                    summary: "Go sintaksisida kutilmagan belgi bor.",
+                    tips: [
+                        "Qavslar, `:=`, `,` va `}` joylashuvini tekshiring.",
+                    ],
+                };
+            }
+            if (lower.includes("expected ';'")) {
+                return {
+                    title: baseTitle,
+                    summary: "Bu qator atrofida sintaksis buzilgan. Qavs yoki operatorni tekshiring.",
+                    tips: [
+                        "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'ladi.",
+                    ],
+                };
+            }
+            if (lower.includes("undefined:")) {
+                return {
+                    title: baseTitle,
+                    summary: token ? `\`${token}\` nomi topilmadi.` : "Bu nom topilmadi yoki import yetishmaydi.",
+                    tips: [
+                        "Nom yozilishi va importlar to'g'riligini tekshiring.",
+                    ],
+                };
+            }
+            if (lower.includes("declared and not used")) {
+                return {
+                    title: baseTitle,
+                    summary: "O'zgaruvchi e'lon qilingan, lekin ishlatilmagan.",
+                    tips: [
+                        "Keraksiz o'zgaruvchini olib tashlang yoki uni ishlating.",
+                    ],
+                };
+            }
+            if (lower.includes("missing return")) {
+                return {
+                    title: baseTitle,
+                    summary: "Funksiya barcha yo'llarda `return` qilmayapti.",
+                    tips: [
+                        "Har bir shartli yo'l oxirida return borligini tekshiring.",
+                    ],
+                };
+            }
+            if (lower.includes("imported and not used")) {
+                return {
+                    title: baseTitle,
+                    summary: "Import qilingan paket ishlatilmagan.",
+                    tips: [
+                        "Keraksiz importni o'chiring yoki paketdan foydalaning.",
+                    ],
+                };
+            }
+        }
     }
 
     const languageAdvice = getLanguageSpecificErrorAdvice(language, verdict, lower);
@@ -2907,6 +3324,7 @@ function buildSpecificFixTips(language, verdict, rawText, codeLine, line, column
     const lowerText = normalizeErrorText(rawText).toLowerCase();
     const lowerCodeLine = normalizeErrorText(codeLine).toLowerCase();
     const normalizedLanguage = normalizeLanguage(language);
+    const token = extractLikelyErrorToken(rawText);
 
     if (normalizedLanguage === "cpp") {
         if (lowerCodeLine.includes("<<end") && !lowerCodeLine.includes("<<endl")) {
@@ -2916,11 +3334,84 @@ function buildSpecificFixTips(language, verdict, rawText, codeLine, line, column
         if ((lowerText.includes("expected '}'") || lowerText.includes("expected }")) && line) {
             tips.push("Agar `{` ochilgan bo'lsa, shu blokni `}` bilan yoping.");
         }
+        if (lowerText.includes("was not declared in this scope") && token) {
+            tips.push(`\`${token}\` nomi bu joyda topilmadi yoki yozuvi xato.`);
+        }
+        if (lowerText.includes("expected ';'") || lowerText.includes("missing ';'")) {
+            tips.push("Satr oxiriga `;` qo'ying.");
+        }
     }
 
     if (normalizedLanguage === "javascript" && verdict === "Compilation Error") {
         if (lowerText.includes("unexpected token")) {
+            if (token) {
+                tips.push(`\`${token}\` belgisi bu joyda noto'g'ri.`);
+            }
             tips.push("Bu qatorni tekshiring: qavs, vergul yoki nuqta-vergul yetishmayotgan bo'lishi mumkin.");
+        }
+        if (lowerText.includes("missing ) after argument list")) {
+            tips.push("Funksiya chaqiruvini tekshiring, `)` yopilmagan.");
+        }
+        if (lowerText.includes("missing initializer in const declaration")) {
+            tips.push("`const` uchun qiymat yozing: `const x = 10;`");
+        }
+        if (lowerText.includes("unexpected end of input")) {
+            tips.push("Kod oxirida `{`, `(` yoki `[` yopilmay qolgan bo'lishi mumkin.");
+        }
+        if ((lowerText.includes("is not defined") || lowerText.includes("referenceerror")) && token) {
+            tips.push(`\`${token}\` e'lon qilinmagan.`);
+        }
+    }
+
+    if (normalizedLanguage === "java") {
+        if (lowerText.includes("';' expected") || lowerText.includes("expected ';'") || lowerText.includes("missing ';'")) {
+            tips.push("Bu satr oxiriga `;` qo'ying.");
+            tips.push("Masalan: `System.out.println(...);`");
+        }
+        if (lowerText.includes("cannot find symbol")) {
+            if (token) {
+                tips.push(`\`${token}\` nomi topilmadi. Bu yozuvni aynan shu joyda tekshiring.`);
+            }
+            tips.push("O'zgaruvchi, metod yoki class avval e'lon qilinganini va importlar to'g'riligini ko'ring.");
+        }
+        if (lowerText.includes("reached end of file while parsing") || lowerText.includes("expected '}'") || lowerText.includes("expected }")) {
+            tips.push("Ochilgan `{` lar uchun mos `}` qo'shing.");
+        }
+        if (lowerText.includes("unclosed string literal")) {
+            tips.push("Ochilgan qo'shtirnoqni yoping va ichki `\"` belgilarini tekshiring.");
+        }
+        if (lowerText.includes("non-static method")) {
+            tips.push("Static bo'lmagan metodni `main` dan chaqirishdan oldin obyekt yarating yoki metodni `static` qiling.");
+        }
+        if (lowerText.includes("might not have been initialized")) {
+            tips.push("O'zgaruvchiga ishlatishdan oldin qiymat bering.");
+        }
+        if (lowerText.includes("cannot be resolved to a variable")) {
+            tips.push("Nomni tekshiring va oldin e'lon qilinganiga ishonch hosil qiling.");
+        }
+    }
+
+    if (normalizedLanguage === "go") {
+        if (lowerText.includes("syntax error: unexpected")) {
+            tips.push("Bu joyda belgi yoki blok tartibi buzilgan. `(`, `)`, `{`, `}` va `:=` ni tekshiring.");
+        }
+        if (lowerText.includes("expected ';'")) {
+            tips.push("Go sintaksisida bu joyda ifoda to'liq emas yoki oldingi qism yopilmagan.");
+        }
+        if (lowerText.includes("undefined:")) {
+            if (token) {
+                tips.push(`\`${token}\` nomi topilmadi.`);
+            }
+            tips.push("Nom yozilishi va importlar to'g'riligini tekshiring.");
+        }
+        if (lowerText.includes("declared and not used")) {
+            tips.push("O'zgaruvchini ishlating yoki olib tashlang. Go ishlatilmagan o'zgaruvchini yoqtirmaydi.");
+        }
+        if (lowerText.includes("missing return")) {
+            tips.push("Funksiya barcha yo'llarda `return` qilsin.");
+        }
+        if (lowerText.includes("imported and not used")) {
+            tips.push("Keraksiz importni o'chiring yoki undan foydalaning.");
         }
     }
 
@@ -2936,14 +3427,14 @@ function buildSpecificFixTips(language, verdict, rawText, codeLine, line, column
     return [...new Set(tips)];
 }
 
-function buildRemoteOutputMessage(result, durationSeconds, code) {
+function buildRemoteOutputMessage(result, durationSeconds, code, language = currentLanguage) {
     const verdict = result.verdict || "Runtime Error";
     const stdout = normalizeErrorText(result.stdout);
     const compileOutput = normalizeErrorText(result.compile_output);
     const stderr = normalizeErrorText(result.stderr);
     const error = normalizeErrorText(result.error || result.message || result.status);
     const rawText = [compileOutput, stderr, error].filter(Boolean).join("\n\n");
-    const location = extractErrorLocationFromText(rawText);
+    const location = getRemoteErrorDisplayLocation(language, verdict, rawText, code);
     const errorLine = location.line;
 
     if (verdict === "Accepted") {
@@ -2951,9 +3442,9 @@ function buildRemoteOutputMessage(result, durationSeconds, code) {
         return `${body}\n\nVaqt: ${durationSeconds}s`;
     }
 
-    const friendly = translateRemoteError(currentLanguage, verdict, rawText);
-    const codeLine = errorLine ? getCodeLineAt(code, errorLine) : "";
-    const specificTips = buildSpecificFixTips(currentLanguage, verdict, rawText, codeLine, errorLine, location.column);
+    const friendly = translateRemoteError(language, verdict, rawText);
+    const codeLine = location.codeLine || (errorLine ? getCodeLineAt(code, errorLine) : "");
+    const specificTips = buildSpecificFixTips(language, verdict, rawText, codeLine, errorLine, location.column);
     return buildCompactErrorMessage({
         title: friendly.title,
         summary: friendly.summary,
@@ -3030,11 +3521,11 @@ async function runRemoteExecution(language, code, stdinText) {
         const elapsed = ((performance.now() - startedAt) / 1000).toFixed(3);
         const verdict = result.verdict || "Runtime Error";
         const remoteText = [result.compile_output, result.stderr, result.error, result.message].filter(Boolean).join("\n\n");
-        const location = extractErrorLocationFromText(remoteText);
+        const location = getRemoteErrorDisplayLocation(language, verdict, remoteText, code);
         if (location.line) {
             highlightEditorError(location.line, location.column || 1);
         }
-        const message = buildRemoteOutputMessage(result, elapsed, code);
+        const message = buildRemoteOutputMessage(result, elapsed, code, language);
         showOutput(message, verdict === "Accepted" ? "success" : "error");
     } catch (error) {
         showOutput(`Ulanishda xatolik: ${error.message}`, "error");

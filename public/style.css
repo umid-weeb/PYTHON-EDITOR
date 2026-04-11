@@ -1339,8 +1339,8 @@ body.dark-mode .debug-range-body-line {
 
 .editor-ai-widget {
   position: fixed;
-  right: 10px;
-  bottom: 10px;
+  right: 6px;
+  bottom: 6px;
   z-index: 2147483647;
   font-family: "IBM Plex Sans", sans-serif;
   pointer-events: none;
@@ -1897,8 +1897,8 @@ body .iubenda-cs-preferences-button {
   }
 
   .editor-ai-widget {
-    right: 12px;
-    bottom: 12px;
+    right: 8px;
+    bottom: 8px;
   }
 
   .editor-ai-panel {
