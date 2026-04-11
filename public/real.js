@@ -76,22 +76,22 @@ const LANGUAGE_BRAND_ICONS = {
         title: "Python",
     },
     javascript: {
-        src: "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/javascript/javascript-original.svg",
+        src: "https://www.citypng.com/public/uploads/preview/js-javascript-round-logo-icon-png-7017516947717339mnyf7eumy.png",
         alt: "JavaScript logo",
         title: "JavaScript",
     },
     cpp: {
-        src: "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/cplusplus/cplusplus-original.svg",
+        src: "https://p7.hiclipart.com/preview/605/134/542/eclipse-c-integrated-development-environment-arduino-linux-c-png-transparent-images.jpg",
         alt: "C plus plus logo",
         title: "C++",
     },
     java: {
-        src: "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/java/java-original.svg",
+        src: "https://www.citypng.com/public/uploads/preview/hd-java-logo-transparent-background-701751694771845zainlxmlfo.png",
         alt: "Java logo",
         title: "Java",
     },
     go: {
-        src: "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/go/go-original.svg",
+        src: "https://go.dev/blog/go-brand/Go-Logo/PNG/Go-Logo_Blue.png",
         alt: "Go logo",
         title: "Go",
     },
