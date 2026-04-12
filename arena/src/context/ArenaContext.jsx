@@ -14,6 +14,20 @@ import {
 } from "../lib/storage.js";
 
 const DEFAULT_CODE = `class Solution:\n    def solve(self):\n        pass\n`;
+const SQL_TAGS = new Set(["sql", "postgresql", "basic-joins", "aggregation", "grouping", "subqueries"]);
+
+function isSqlProblem(problem) {
+  if (!problem) return false;
+  const slug = String(problem.slug || "").toLowerCase();
+  if (slug.startsWith("sql-")) return true;
+  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+  return tags.some((tag) => SQL_TAGS.has(String(tag || "").toLowerCase()));
+}
+
+function resolveProblemLanguage(problem, currentLanguage, fallbackLanguage = "python") {
+  if (isSqlProblem(problem)) return "sql";
+  return String(currentLanguage || "").toLowerCase() === "sql" ? fallbackLanguage : currentLanguage;
+}
 
 const ArenaContext = createContext(null);
 
@@ -42,6 +56,8 @@ export function ArenaProvider({ children }) {
   const [pendingRetry, setPendingRetry] = useState(null); // { type: 'run' | 'submit', token?: string }
   
   const cacheRef = useRef(new Map());
+  const initialLanguage = String(readLanguage() || "python");
+  const lastNonSqlLanguageRef = useRef(initialLanguage.toLowerCase() === "sql" ? "python" : initialLanguage);
 
   const { token } = useAuth();
 
@@ -86,6 +102,14 @@ export function ArenaProvider({ children }) {
       setSelectedProblem(cached);
       setCode(readDraft(problemId, cached.starter_code || DEFAULT_CODE));
       setActiveCaseIndex(0);
+      const nextLanguage = resolveProblemLanguage(cached, language, lastNonSqlLanguageRef.current || "python");
+      if (nextLanguage !== language) {
+        setLanguageState(nextLanguage);
+        if (String(nextLanguage || "").toLowerCase() !== "sql") {
+          lastNonSqlLanguageRef.current = nextLanguage;
+        }
+        writeLanguage(nextLanguage);
+      }
       setResult({
         tone: "info",
         chip: "Tayyor",
@@ -102,6 +126,14 @@ export function ArenaProvider({ children }) {
       setSelectedProblem(payload);
       setCode(readDraft(problemId, payload.starter_code || DEFAULT_CODE));
       setActiveCaseIndex(0);
+      const nextLanguage = resolveProblemLanguage(payload, language, lastNonSqlLanguageRef.current || "python");
+      if (nextLanguage !== language) {
+        setLanguageState(nextLanguage);
+        if (String(nextLanguage || "").toLowerCase() !== "sql") {
+          lastNonSqlLanguageRef.current = nextLanguage;
+        }
+        writeLanguage(nextLanguage);
+      }
       setResult({
         tone: "info",
         chip: "Tayyor",
@@ -120,7 +152,7 @@ export function ArenaProvider({ children }) {
       });
       throw error;
     }
-  }, []);
+  }, [language]);
 
 
   const persistDraft = useCallback(
@@ -132,9 +164,17 @@ export function ArenaProvider({ children }) {
   );
 
   const setLanguage = useCallback((nextLanguage) => {
-    setLanguageState(nextLanguage);
-    writeLanguage(nextLanguage);
-  }, []);
+    const resolvedLanguage = resolveProblemLanguage(
+      selectedProblem,
+      nextLanguage,
+      lastNonSqlLanguageRef.current || "python"
+    );
+    setLanguageState(resolvedLanguage);
+    if (String(resolvedLanguage || "").toLowerCase() !== "sql") {
+      lastNonSqlLanguageRef.current = resolvedLanguage;
+    }
+    writeLanguage(resolvedLanguage);
+  }, [selectedProblem]);
 
   const runCode = useCallback(async (isExtended = false) => {
     const submissionProblemKey = getSubmissionProblemKey();
@@ -161,7 +201,12 @@ export function ArenaProvider({ children }) {
     });
 
     try {
-      const submission = await arenaApi.runSolution(submissionProblemKey, code, language, isExtended);
+      const submissionLanguage = resolveProblemLanguage(
+        selectedProblem,
+        language,
+        lastNonSqlLanguageRef.current || "python"
+      );
+      const submission = await arenaApi.runSolution(submissionProblemKey, code, submissionLanguage, isExtended);
       if (!submission) {
         throw new Error("Serverdan javob kelmadi.");
       }
@@ -196,7 +241,7 @@ export function ArenaProvider({ children }) {
     } finally {
       setIsRunning(false);
     }
-  }, [code, getSubmissionProblemKey, isRunning, language, persistDraft]);
+  }, [code, getSubmissionProblemKey, isRunning, language, persistDraft, selectedProblem]);
 
   const submitCode = useCallback(
     async (token, isExtended = false) => {
@@ -230,7 +275,12 @@ export function ArenaProvider({ children }) {
       });
 
       try {
-        const submission = await arenaApi.submitSolution(submissionProblemKey, code, language, isExtended);
+        const submissionLanguage = resolveProblemLanguage(
+          selectedProblem,
+          language,
+          lastNonSqlLanguageRef.current || "python"
+        );
+        const submission = await arenaApi.submitSolution(submissionProblemKey, code, submissionLanguage, isExtended);
         if (!submission) {
           throw new Error("Serverdan javob kelmadi.");
         }
@@ -305,7 +355,7 @@ export function ArenaProvider({ children }) {
         setIsSubmitting(false);
       }
     },
-    [code, getSubmissionProblemKey, isSubmitting, language, persistDraft, selectedProblem?.id, selectedProblem?.slug, selectedProblemId]
+    [code, getSubmissionProblemKey, isSubmitting, language, persistDraft, selectedProblem, selectedProblemId]
   );
 
   const handleContinueExecution = useCallback(() => {
