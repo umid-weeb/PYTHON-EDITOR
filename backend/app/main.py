@@ -23,6 +23,7 @@ from app.database import Base, engine
 from app.database import SessionLocal
 from app import models as _models  # noqa: F401
 from app.services.problem_catalog import ensure_problem_catalog_seeded
+from app.services.sql_problem_catalog import ensure_sql_problem_catalog_seeded
 from app.services.db_bootstrap import run_startup_migrations
 from app.services.engagement_service import engagement_service
 from app.services.submission_service import get_submission_service
@@ -68,6 +69,7 @@ async def lifespan(_: FastAPI):
             logger.info("Background catalog sync starting...")
             with SessionLocal() as db:
                 ensure_problem_catalog_seeded(db)
+                ensure_sql_problem_catalog_seeded(db)
                 engagement_service.ensure_upcoming_daily_challenges(db)
                 db.commit()
             logger.info("Background catalog sync completed.")
