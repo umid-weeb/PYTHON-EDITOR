@@ -556,7 +556,9 @@ def run_startup_migrations(engine: Engine) -> None:
         try:
             connection.execute(text("SET lock_timeout = '3s'"))
             connection.execute(text("SET statement_timeout = '10s'"))
+            connection.commit()
         except Exception as exc:
+            connection.rollback()
             logger.warning("Could not configure startup migration timeouts: %s", exc)
 
         for i, statement in enumerate(POSTGRES_BOOTSTRAP_SQL):
