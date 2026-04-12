@@ -19,6 +19,18 @@ from app.services.problem_catalog import build_problem_order_map
 from app.services.sql_problem_catalog import build_sql_problem_order_map
 
 
+_DIFFICULTY_SORT_ORDER = {"easy": 0, "medium": 1, "hard": 2}
+_SQL_MARKER_TAGS = {"sql", "postgresql"}
+
+
+def _problem_summary_sort_key(item: ProblemSummary) -> tuple[int, int, int, str]:
+    tags = {str(tag).strip().lower() for tag in item.tags}
+    is_sql = str(item.slug).startswith("sql-") or bool(tags & _SQL_MARKER_TAGS)
+    difficulty_rank = _DIFFICULTY_SORT_ORDER.get(str(item.difficulty or "").lower(), 99)
+    order_index = item.order_index if item.order_index is not None else 10**9
+    return (1 if is_sql else 0, difficulty_rank, order_index, str(item.slug))
+
+
 class ProblemNotFoundError(Exception):
     """Raised when a problem cannot be located."""
 
@@ -64,7 +76,9 @@ class ProblemService:
                 isinstance(item, dict) and item.get("slug") and item.get("order_index") is not None
                 for item in cached
             ) and len(cached) == len(order_map):
-                return [ProblemSummary.model_validate(item) for item in cached]
+                cached_items = [ProblemSummary.model_validate(item) for item in cached]
+                cached_items.sort(key=_problem_summary_sort_key)
+                return cached_items
 
         with SessionLocal() as db:
             problems = db.query(Problem).filter(Problem.slug.in_(visible_slugs)).all()
@@ -72,6 +86,7 @@ class ProblemService:
         problems.sort(key=lambda problem: (order_map.get(problem.slug, 10**9), str(problem.slug)))
 
         items = [self._build_summary(problem) for problem in problems]
+        items.sort(key=_problem_summary_sort_key)
         if self._catalog_ready():
             self.cache.save_index([item.model_dump() for item in items])
         return items
