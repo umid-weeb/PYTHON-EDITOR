@@ -553,6 +553,12 @@ def run_startup_migrations(engine: Engine) -> None:
     # Execute each statement in its own transaction so one failure doesn't block others
     # and we don't crash the whole app on a timeout.
     with engine.connect() as connection:
+        try:
+            connection.execute(text("SET lock_timeout = '3s'"))
+            connection.execute(text("SET statement_timeout = '10s'"))
+        except Exception as exc:
+            logger.warning("Could not configure startup migration timeouts: %s", exc)
+
         for i, statement in enumerate(POSTGRES_BOOTSTRAP_SQL):
             stmt_trimmed = statement.strip()
             if not stmt_trimmed:

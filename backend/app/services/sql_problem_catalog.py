@@ -7,6 +7,7 @@ from functools import lru_cache
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import engine
@@ -812,7 +813,37 @@ def build_sql_problem_catalog() -> list[ProblemSeed]:
     return [_sql_problem_seed(spec) for spec in SQL_PROBLEM_SPECS]
 
 
+def _existing_sql_catalog_is_complete(db: Session) -> bool:
+    expected_problem_count = len(SQL_PROBLEM_SPECS)
+    expected_case_count = expected_problem_count * (SQL_VISIBLE_CASE_COUNT + SQL_HIDDEN_CASE_COUNT)
+    existing_problem_count = (
+        db.query(func.count(Problem.id))
+        .filter(Problem.slug.like("sql-%"))
+        .scalar()
+        or 0
+    )
+    if int(existing_problem_count) < expected_problem_count:
+        return False
+
+    existing_case_count = (
+        db.query(func.count(TestCase.id))
+        .join(Problem, TestCase.problem_id == Problem.id)
+        .filter(Problem.slug.like("sql-%"))
+        .scalar()
+        or 0
+    )
+    return int(existing_case_count) >= expected_case_count
+
+
 def seed_sql_problem_catalog(db: Session, *, force: bool = False) -> SeedSummary:
+    if not force and _existing_sql_catalog_is_complete(db):
+        return SeedSummary(
+            total_count=len(SQL_PROBLEM_SPECS),
+            inserted_count=0,
+            skipped_count=len(SQL_PROBLEM_SPECS),
+            forced=False,
+        )
+
     catalog = build_sql_problem_catalog()
 
     if force:
@@ -929,8 +960,8 @@ def ensure_sql_problem_catalog_seeded(db: Session) -> SeedSummary:
 @lru_cache(maxsize=1)
 def build_sql_problem_order_map() -> dict[str, int]:
     return {
-        problem_seed.slug: SQL_ORDER_OFFSET + index
-        for index, problem_seed in enumerate(build_sql_problem_catalog(), start=1)
+        spec.slug: SQL_ORDER_OFFSET + index
+        for index, spec in enumerate(SQL_PROBLEM_SPECS, start=1)
     }
 
 SQL_PROBLEM_SPECS.extend(
