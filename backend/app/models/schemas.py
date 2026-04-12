@@ -56,7 +56,7 @@ class ProblemListResponse(BaseModel):
 class SubmissionRequest(BaseModel):
     problem_id: str
     code: str
-    language: Literal["python", "javascript", "cpp"] = "python"
+    language: Literal["python", "javascript", "cpp", "sql"] = "python"
     contest_id: str | None = None
     is_extended: bool = False
 

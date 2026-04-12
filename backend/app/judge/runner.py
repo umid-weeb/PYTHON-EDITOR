@@ -12,6 +12,7 @@ from app.core.config import Settings, get_settings
 from app.judge.comparator import compare_expected_to_actual, stringify_value
 from app.judge.parser import parse_arguments
 from app.judge.judge0_client import Judge0Client, get_judge0_settings
+from app.judge.sql_runner import get_sql_judge
 
 
 HARNESS_CODE = """\
@@ -276,7 +277,7 @@ class JudgeRunner:
                 "actual_output": execution.get("actual_output"),
                 "stdout": execution.get("stdout"),
                 "hidden": is_hidden,
-                "error": execution.get("error"),
+                "error": execution.get("message") or execution.get("error"),
             }
             case_results.append(case_result)
 
@@ -285,7 +286,7 @@ class JudgeRunner:
                 continue
 
             verdict = execution["verdict"]
-            error_text = execution.get("error")
+            error_text = execution.get("message") or execution.get("error")
             if mode == "submit":
                 break
 
@@ -306,10 +307,13 @@ class JudgeRunner:
         testcase: dict[str, Any],
         is_extended: bool = False,
     ) -> dict[str, Any]:
-        # For now, only Python uses the local harness. Other languages are
-        # routed through Judge0 when it is configured; otherwise we return a
-        # friendly runtime error explaining that the language is disabled.
-        language = problem.get("language", "python")
+        language = str(problem.get("language", "python") or "python").strip().lower()
+        if language == "sql":
+            return self._execute_sql_case(problem, code, testcase, is_extended=is_extended)
+
+        # Python keeps the local harness. Other languages are routed through
+        # Judge0 when it is configured; otherwise we return a friendly runtime
+        # error explaining that the language is disabled.
         if language != "python":
             settings = get_judge0_settings()
             if not settings.enabled:
@@ -443,6 +447,39 @@ class JudgeRunner:
             testcase=testcase,
             execution_result=result,
         )
+
+    def _execute_sql_case(
+        self,
+        problem: dict[str, Any],
+        code: str,
+        testcase: dict[str, Any],
+        is_extended: bool = False,
+    ) -> dict[str, Any]:
+        judge = get_sql_judge()
+        time_limit = 5.0 if is_extended else float(problem.get("time_limit_seconds", 2.0))
+
+        try:
+            payload = judge.run_case(
+                testcase=testcase,
+                code=code,
+                time_limit_seconds=time_limit,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            return {
+                "verdict": "Runtime Error",
+                "passed": False,
+                "runtime_ms": 0,
+                "memory_kb": 0,
+                "actual_output": "",
+                "stdout": "",
+                "error": str(exc),
+                "message": "SQL bajarishda xatolik yuz berdi.",
+                "execution_mode": "SQL",
+            }
+
+        payload.setdefault("stdout", payload.get("actual_output") or "")
+        payload.setdefault("execution_mode", "SQL")
+        return payload
 
     def _invoke_runner(
         self,
