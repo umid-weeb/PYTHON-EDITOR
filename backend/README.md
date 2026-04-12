@@ -185,6 +185,18 @@ Windows shortcut:
 ./start-api.ps1
 ```
 
+Linux/PM2 shortcut:
+
+```bash
+bash start-api.sh
+```
+
+PM2 ecosystem shortcut:
+
+```bash
+pm2 start ../ecosystem.config.cjs --only pyzone-backend
+```
+
 7. In development, frontend can talk to backend directly by setting `VITE_ARENA_API_BASE`. The React app defaults to:
 
 ```js
