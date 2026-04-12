@@ -9,6 +9,7 @@ let activeDebugStepIndex = 0;
 let activeDebugLineNumber = null;
 let pendingRemoteRun = null;
 let pendingBrowserLocalRun = null;
+let selectionToolbarStatusTimer = null;
 let currentLanguage = "python";
 let currentStarterPack = "array";
 let currentEditorRuntimeMode = "LOCAL";
@@ -2030,6 +2031,456 @@ function setEditorLanguage(language, options = {}) {
     scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
 }
 
+function getSelectionToolbarElement() {
+    return document.getElementById("editor-selection-toolbar");
+}
+
+function getSelectionToolbarStatusElement() {
+    return document.getElementById("editor-selection-status");
+}
+
+function hideSelectionToolbar() {
+    const toolbar = getSelectionToolbarElement();
+    if (toolbar) {
+        toolbar.hidden = true;
+    }
+    const status = getSelectionToolbarStatusElement();
+    if (status) {
+        status.textContent = "";
+        status.removeAttribute("data-tone");
+    }
+    if (selectionToolbarStatusTimer !== null) {
+        clearTimeout(selectionToolbarStatusTimer);
+        selectionToolbarStatusTimer = null;
+    }
+}
+
+function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
+    const status = getSelectionToolbarStatusElement();
+    if (!status) return;
+    status.textContent = message;
+    if (tone) {
+        status.setAttribute("data-tone", tone);
+    } else {
+        status.removeAttribute("data-tone");
+    }
+
+    if (selectionToolbarStatusTimer !== null) {
+        clearTimeout(selectionToolbarStatusTimer);
+        selectionToolbarStatusTimer = null;
+    }
+
+    if (autoRestore) {
+        selectionToolbarStatusTimer = setTimeout(() => {
+            selectionToolbarStatusTimer = null;
+            refreshSelectionToolbar();
+        }, 1400);
+    }
+}
+
+function getSelectionToolbarSelection() {
+    if (!editor || !editor.somethingSelected()) return null;
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const text = editor.getSelection("\n");
+    if (!text || !text.trim()) return null;
+
+    return {
+        from,
+        to,
+        text,
+        lineCount: Math.max(1, to.line - from.line + 1),
+    };
+}
+
+function getSelectionToolbarAnchor(range) {
+    const fromCoords = editor.charCoords(range.from, "page");
+    const toCoords = editor.charCoords(range.to, "page");
+    const left = Math.min(fromCoords.left, toCoords.left) - window.pageXOffset;
+    const right = Math.max(fromCoords.right, toCoords.right) - window.pageXOffset;
+    const top = Math.min(fromCoords.top, toCoords.top) - window.pageYOffset;
+    const bottom = Math.max(fromCoords.bottom, toCoords.bottom) - window.pageYOffset;
+    return {
+        left: (left + right) / 2,
+        top,
+        bottom,
+    };
+}
+
+function positionSelectionToolbar(toolbar, anchorLeft, anchorTop, anchorBottom) {
+    if (!toolbar) return;
+    const margin = 12;
+    const rect = toolbar.getBoundingClientRect();
+    const width = rect.width || 280;
+    const height = rect.height || 52;
+    let left = Math.round(anchorLeft - width / 2);
+    left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
+
+    let top = Math.round(anchorTop - height - 12);
+    if (top < margin) {
+        top = Math.round((Number(anchorBottom) || anchorTop) + 12);
+    }
+    if (top + height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - height - margin);
+    }
+
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+}
+
+function refreshSelectionToolbar(positionOverride = null) {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar) return false;
+
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        hideSelectionToolbar();
+        return false;
+    }
+
+    toolbar.hidden = false;
+    const statusText = `${range.lineCount} qator • ${range.text.length} belgi`;
+    setSelectionToolbarStatus(statusText, "", false);
+
+    const anchor = positionOverride || getSelectionToolbarAnchor(range);
+    positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
+    return true;
+}
+
+function showSelectionToolbarAtPoint(clientX, clientY) {
+    const toolbar = getSelectionToolbarElement();
+    const range = getSelectionToolbarSelection();
+    if (!toolbar || !range) return false;
+
+    toolbar.hidden = false;
+    setSelectionToolbarStatus(`${range.lineCount} qator • ${range.text.length} belgi`, "", false);
+    positionSelectionToolbar(toolbar, clientX, clientY, clientY);
+    return true;
+}
+
+function getSelectionSnapshotThemeColors() {
+    const root = getComputedStyle(document.documentElement);
+    return {
+        surface: root.getPropertyValue("--surface").trim() || "#ffffff",
+        surfaceMuted: root.getPropertyValue("--surface-muted").trim() || "#f6f8fb",
+        border: root.getPropertyValue("--border").trim() || "#d8e1ec",
+        textMain: root.getPropertyValue("--text-main").trim() || "#132033",
+        textMuted: root.getPropertyValue("--text-muted").trim() || "#5f6f82",
+        codeKeyword: root.getPropertyValue("--code-keyword").trim() || "#2153d6",
+        codeDef: root.getPropertyValue("--code-def").trim() || "#0f766e",
+        codeString: root.getPropertyValue("--code-string").trim() || "#b45309",
+        codeNumber: root.getPropertyValue("--code-number").trim() || "#b42318",
+        codeComment: root.getPropertyValue("--code-comment").trim() || "#6b7280",
+        codeAtom: root.getPropertyValue("--code-atom").trim() || "#7c3aed",
+        codeProperty: root.getPropertyValue("--code-property").trim() || "#0b6b7a",
+        codeVariable: root.getPropertyValue("--code-variable").trim() || "#0f172a",
+        codeOperator: root.getPropertyValue("--code-operator").trim() || "#6d28d9",
+        primary: root.getPropertyValue("--primary").trim() || "#2353d7",
+        primaryHover: root.getPropertyValue("--primary-hover").trim() || "#1b43ac",
+        danger: root.getPropertyValue("--danger").trim() || "#b9384a",
+        success: root.getPropertyValue("--success").trim() || "#0f766e",
+    };
+}
+
+function getSelectionSnapshotTokenColor(tokenType, colors) {
+    const type = String(tokenType || "");
+    if (type.includes("comment")) return colors.codeComment;
+    if (type.includes("string")) return colors.codeString;
+    if (type.includes("number")) return colors.codeNumber;
+    if (type.includes("keyword")) return colors.codeKeyword;
+    if (type.includes("def")) return colors.codeDef;
+    if (type.includes("atom")) return colors.codeAtom;
+    if (type.includes("property")) return colors.codeProperty;
+    if (type.includes("operator")) return colors.codeOperator;
+    if (type.includes("builtin")) return colors.codeAtom;
+    return colors.codeVariable;
+}
+
+function getSelectionSnapshotSegments(lineNo, startCh, endCh) {
+    const lineText = editor.getLine(lineNo) || "";
+    const segments = [];
+    let cursor = Math.max(0, startCh);
+    const safeEnd = Math.max(cursor, Math.min(endCh, lineText.length));
+
+    if (cursor >= safeEnd) {
+        return [{ text: "", type: "" }];
+    }
+
+    while (cursor < safeEnd) {
+        const probe = Math.min(Math.max(cursor, 0), Math.max(0, lineText.length - 1));
+        const token = editor.getTokenAt({ line: lineNo, ch: probe });
+        let tokenStart = Math.max(cursor, Number(token.start) || 0);
+        let tokenEnd = Math.min(safeEnd, Number(token.end) || (cursor + 1));
+
+        if (tokenEnd <= tokenStart) {
+            tokenEnd = Math.min(safeEnd, cursor + 1);
+        }
+
+        segments.push({
+            text: lineText.slice(tokenStart, tokenEnd),
+            type: token.type || "",
+        });
+        cursor = tokenEnd;
+    }
+
+    return segments;
+}
+
+function measureSelectionSnapshotLineWidth(ctx, segments) {
+    return segments.reduce((total, segment) => total + ctx.measureText(segment.text || "").width, 0);
+}
+
+function roundRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+async function createSelectionSnapshotBlob(range) {
+    if (!editor || !range) return null;
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {}
+    }
+
+    const colors = getSelectionSnapshotThemeColors();
+    const editorWrapper = editor.getWrapperElement();
+    const computed = getComputedStyle(editorWrapper);
+    const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
+    const fontSize = Math.max(14, Math.min(20, Math.round(parseFloat(computed.fontSize) || 14)));
+    const lineHeight = Math.round(fontSize * 1.72);
+    const topBarHeight = 52;
+    const paddingX = 26;
+    const paddingTop = 22;
+    const paddingBottom = 24;
+    const lineGap = 14;
+    const codeFont = `${fontSize}px ${fontFamily}`;
+    const ctxMeasure = document.createElement("canvas").getContext("2d");
+    if (!ctxMeasure) return null;
+    ctxMeasure.font = codeFont;
+
+    const snapshotLines = [];
+    for (let lineNo = range.from.line; lineNo <= range.to.line; lineNo += 1) {
+        const startCh = lineNo === range.from.line ? range.from.ch : 0;
+        const originalLine = editor.getLine(lineNo) || "";
+        const endCh = lineNo === range.to.line ? range.to.ch : originalLine.length;
+        const segments = getSelectionSnapshotSegments(lineNo, startCh, endCh);
+        snapshotLines.push({
+            lineNumber: lineNo + 1,
+            segments,
+            width: measureSelectionSnapshotLineWidth(ctxMeasure, segments),
+        });
+    }
+
+    const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
+    const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
+    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 18;
+    const contentWidth = Math.max(280, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
+    const width = Math.ceil(paddingX * 2 + lineNumberWidth + 18 + contentWidth);
+    const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = colors.surfaceMuted;
+    ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 12;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 22);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+
+    ctx.fillStyle = colors.surface;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 22);
+    ctx.fill();
+
+    ctx.fillStyle = colors.surfaceMuted;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 22);
+    ctx.fill();
+
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0.5, topBarHeight + 0.5);
+    ctx.lineTo(width - 0.5, topBarHeight + 0.5);
+    ctx.stroke();
+
+    const dotY = 24;
+    const dotX = 26;
+    const dots = [colors.danger, "#ffbf3c", "#31c55e"];
+    dots.forEach((color, index) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(dotX + index * 24, dotY, 7, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    const title = `${getLanguageLabel()} • Code Snap`;
+    ctx.fillStyle = colors.textMain;
+    ctx.font = `600 14px ${fontFamily}`;
+    ctx.fillText(title, 104, 28);
+
+    const metaText = `${snapshotLines.length} qator`;
+    const metaWidth = ctx.measureText(metaText).width;
+    const pillWidth = metaWidth + 22;
+    const pillX = Math.max(104, width - pillWidth - 22);
+    ctx.fillStyle = colors.primary;
+    ctx.beginPath();
+    roundRectPath(ctx, pillX, 14, pillWidth, 24, 12);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = `600 12px ${fontFamily}`;
+    ctx.fillText(metaText, pillX + 11, 31);
+
+    const codeTop = topBarHeight + paddingTop + 6;
+    const codeLeft = paddingX + lineNumberWidth + 18;
+
+    snapshotLines.forEach((line, index) => {
+        const y = codeTop + (index * lineHeight) + fontSize;
+        const lineNumberText = String(line.lineNumber);
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = colors.textMuted;
+        ctx.textAlign = "right";
+        ctx.fillText(lineNumberText, paddingX + lineNumberWidth - 2, y);
+        ctx.textAlign = "left";
+
+        let x = codeLeft;
+        line.segments.forEach((segment) => {
+            const segmentText = segment.text || "";
+            const segmentType = segment.type || "";
+            ctx.fillStyle = getSelectionSnapshotTokenColor(segmentType, colors);
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            ctx.fillText(segmentText, x, y);
+            x += ctx.measureText(segmentText).width;
+        });
+    });
+
+    return await new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+}
+
+async function copySelectionSnapshotToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        setSelectionToolbarStatus("Avval kodni belgilang", "error", true);
+        return false;
+    }
+
+    const blob = await createSelectionSnapshotBlob(range);
+    if (!blob) {
+        setSelectionToolbarStatus("Snapshot tayyorlanmadi", "error", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type || "image/png"]: blob,
+                }),
+            ]);
+            setSelectionToolbarStatus("Code snap clipboard'ga nusxalandi", "success", true);
+            return true;
+        }
+    } catch (error) {
+        // Fall through to text copy fallback.
+    }
+
+    const copiedText = await copySelectionTextToClipboard();
+    if (copiedText) {
+        setSelectionToolbarStatus("Clipboard image qo'llanmadi, matn nusxalandi", "warning", true);
+        return true;
+    }
+
+    setSelectionToolbarStatus("Copy qilib bo'lmadi", "error", true);
+    return false;
+}
+
+async function copySelectionTextToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) return false;
+    const text = range.text;
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (error) {
+        // Fallback below.
+    }
+
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    fallback.setAttribute("readonly", "readonly");
+    fallback.style.position = "fixed";
+    fallback.style.opacity = "0";
+    fallback.style.left = "-9999px";
+    fallback.style.top = "-9999px";
+    document.body.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    let success = false;
+    try {
+        success = document.execCommand("copy");
+    } catch (_) {
+        success = false;
+    }
+    document.body.removeChild(fallback);
+    return success;
+}
+
+function bindSelectionToolbarEvents() {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar || toolbar.dataset.bound === "1") return;
+
+    toolbar.dataset.bound = "1";
+    toolbar.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+    });
+
+    toolbar.addEventListener("click", async (event) => {
+        const button = event.target instanceof Element
+            ? event.target.closest("[data-selection-action]")
+            : null;
+        if (!button) return;
+
+        const action = button.getAttribute("data-selection-action");
+        if (action === "copy-text") {
+            const copied = await copySelectionTextToClipboard();
+            if (copied) {
+                setSelectionToolbarStatus("Tanlangan matn nusxalandi", "success", true);
+            } else {
+                setSelectionToolbarStatus("Matn nusxalanmadi", "error", true);
+            }
+            return;
+        }
+
+        if (action === "copy-snap") {
+            await copySelectionSnapshotToClipboard();
+        }
+    });
+}
+
 function setupEditor() {
     const textArea = document.getElementById("code-editor");
     if (!textArea) return;
@@ -2053,6 +2504,8 @@ function setupEditor() {
         extraKeys: {
             "Ctrl-Enter": runCode,
             "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
             "Enter": "newlineAndIndent",
             "Ctrl-S": saveCode,
             "Ctrl-Shift-F": formatEditorCode,
@@ -2071,12 +2524,25 @@ function setupEditor() {
     });
     editor.addOverlay(createIdentifierOverlay(), { combine: true });
 
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
+
     editor.on("inputRead", onEditorInputRead);
-    editor.on("cursorActivity", updateEditorStatus);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
     editor.on("change", () => {
         updateEditorStatus();
         autoSaveCode();
         dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
     });
 
     setupLanguageSelector();
@@ -2093,6 +2559,8 @@ function setupEditor() {
     scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
     warmServerLocalRuntimeCatalog();
     clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
 }
 
 function updateEditorStatus() {

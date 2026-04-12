@@ -233,5 +233,30 @@
             </div>
         </div>
     </div>
+
+    <div id="editor-selection-toolbar" class="editor-selection-toolbar" hidden aria-label="Kod tanlovi uchun tezkor amallar">
+        <button type="button" class="editor-selection-action editor-selection-action--ghost" data-selection-action="copy-text" title="Tanlangan matnni nusxalash">
+            <span class="editor-selection-action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 9h8v10H9z"></path>
+                    <path d="M7 5h8v2H7z"></path>
+                    <path d="M5 7h2v10h2"></path>
+                </svg>
+            </span>
+            <span class="editor-selection-action-label">Copy text</span>
+        </button>
+        <button type="button" class="editor-selection-action editor-selection-action--primary" data-selection-action="copy-snap" title="Tanlangan kodni rasm sifatida clipboard'ga nusxalash">
+            <span class="editor-selection-action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M8 7h8"></path>
+                    <path d="M8 11h8"></path>
+                    <path d="M8 15h4"></path>
+                    <path d="M5 5h14v14H5z"></path>
+                </svg>
+            </span>
+            <span class="editor-selection-action-label">Copy snap</span>
+        </button>
+        <div id="editor-selection-status" class="editor-selection-status" aria-live="polite"></div>
+    </div>
 </body>
 </html>
