@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import hashlib
 import os
 import re
@@ -9,6 +10,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+try:
+    import quickjs
+except Exception:  # pragma: no cover - optional dependency
+    quickjs = None
 
 
 _JAVA_PACKAGE_RE = re.compile(r"^\s*package\s+([A-Za-z_][\w.]*)\s*;", re.MULTILINE)
@@ -127,6 +133,171 @@ class EditorRuntimeService:
                 "stderr": exc.stderr or "",
             }
 
+    def _quickjs_bootstrap(self, stdin: str) -> str:
+        stdin_json = json.dumps(stdin)
+        return f"""
+globalThis.__pyzone_stdout = [];
+globalThis.__pyzone_stderr = [];
+globalThis.__pyzone_stdin = {stdin_json};
+globalThis.__pyzone_exit_code = 0;
+
+function __pyzone_to_text(value) {{
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean" || value === null || value === undefined) {{
+        return String(value);
+    }}
+    try {{
+        return JSON.stringify(value);
+    }} catch (_) {{
+        return String(value);
+    }}
+}}
+
+globalThis.console = {{
+    log: (...args) => __pyzone_stdout.push(args.map(__pyzone_to_text).join(" ")),
+    info: (...args) => __pyzone_stdout.push(args.map(__pyzone_to_text).join(" ")),
+    warn: (...args) => __pyzone_stderr.push(args.map(__pyzone_to_text).join(" ")),
+    error: (...args) => __pyzone_stderr.push(args.map(__pyzone_to_text).join(" ")),
+}};
+
+globalThis.require = (name) => {{
+    if (name !== "fs") {{
+        throw new Error("Module not available: " + name);
+    }}
+    return {{
+        readFileSync: (fd, encoding) => {{
+            if (fd === 0 || fd === "0") return __pyzone_stdin;
+            throw new Error("Hozircha faqat stdin (fd=0) qo'llab-quvvatlanadi.");
+        }},
+    }};
+}};
+
+globalThis.process = {{
+    stdin: {{
+        read: () => __pyzone_stdin,
+        toString: () => __pyzone_stdin,
+    }},
+    stdout: {{
+        write: (value) => __pyzone_stdout.push(__pyzone_to_text(value)),
+    }},
+    stderr: {{
+        write: (value) => __pyzone_stderr.push(__pyzone_to_text(value)),
+    }},
+    argv: [],
+    env: {{}},
+    exit: (code = 0) => {{
+        __pyzone_exit_code = code;
+        throw new Error("__PYZONE_EXIT__:" + code);
+    }},
+}};
+
+globalThis.global = globalThis;
+"""
+
+    def _quickjs_output(self, ctx: Any, name: str) -> str:
+        raw = ctx.eval(f"JSON.stringify({name})")
+        if not raw:
+            return ""
+
+        try:
+            values = json.loads(raw)
+        except Exception:
+            return str(raw)
+
+        if isinstance(values, list):
+            return "\n".join(str(value) for value in values if value is not None).rstrip()
+        if values in {None, ""}:
+            return ""
+        return str(values)
+
+    def _quickjs_exit_code(self, error_text: str) -> int | None:
+        match = re.search(r"__PYZONE_EXIT__:(-?\d+)", error_text)
+        if not match:
+            return None
+        try:
+            return int(match.group(1))
+        except Exception:
+            return None
+
+    def _run_javascript_quickjs(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
+        if quickjs is None:
+            return None
+
+        try:
+            ctx = quickjs.Context()
+            ctx.set_memory_limit(32 * 1024 * 1024)
+            ctx.eval(self._quickjs_bootstrap(stdin))
+            ctx.set_time_limit(max(1.0, time_limit_seconds))
+
+            started = time.perf_counter()
+            try:
+                ctx.eval(code)
+            except Exception as exc:
+                elapsed = time.perf_counter() - started
+                error_text = str(exc).strip()
+                stdout_text = self._quickjs_output(ctx, "__pyzone_stdout")
+                stderr_text = self._quickjs_output(ctx, "__pyzone_stderr")
+
+                exit_code = self._quickjs_exit_code(error_text)
+                if exit_code is not None:
+                    if exit_code == 0:
+                        return self._result_payload(
+                            status_description="Accepted",
+                            stdout=stdout_text,
+                            stderr=stderr_text,
+                            elapsed=elapsed,
+                            execution_mode="LOCAL",
+                        )
+                    return self._result_payload(
+                        status_description="Runtime Error",
+                        stdout=stdout_text,
+                        stderr=stderr_text or f"JavaScript process.exit({exit_code}) bilan tugadi.",
+                        elapsed=elapsed,
+                        message="JavaScript bajarishda xatolik yuz berdi.",
+                        execution_mode="LOCAL",
+                    )
+
+                lowered = error_text.lower()
+                if "syntaxerror" in lowered:
+                    return self._result_payload(
+                        status_description="Compilation Error",
+                        stdout=stdout_text,
+                        compile_output=error_text,
+                        elapsed=elapsed,
+                        message="JavaScript sintaksis xatoligi topildi.",
+                        execution_mode="LOCAL",
+                    )
+                if "interrupted" in lowered or "time limit" in lowered:
+                    return self._result_payload(
+                        status_description="Time Limit Exceeded",
+                        stdout=stdout_text,
+                        stderr=stderr_text or error_text,
+                        elapsed=elapsed,
+                        message="JavaScript bajarilishi vaqt limitidan oshdi.",
+                        execution_mode="LOCAL",
+                    )
+                return self._result_payload(
+                    status_description="Runtime Error",
+                    stdout=stdout_text,
+                    stderr=stderr_text or error_text,
+                    elapsed=elapsed,
+                    message="JavaScript bajarishda xatolik yuz berdi.",
+                    execution_mode="LOCAL",
+                )
+
+            elapsed = time.perf_counter() - started
+            stdout_text = self._quickjs_output(ctx, "__pyzone_stdout")
+            stderr_text = self._quickjs_output(ctx, "__pyzone_stderr")
+            return self._result_payload(
+                status_description="Accepted",
+                stdout=stdout_text,
+                stderr=stderr_text,
+                elapsed=elapsed,
+                execution_mode="LOCAL",
+            )
+        except Exception:
+            return None
+
     def _result_payload(
         self,
         *,
@@ -215,6 +386,10 @@ class EditorRuntimeService:
         )
 
     def _run_javascript(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
+        quickjs_result = self._run_javascript_quickjs(code=code, stdin=stdin, time_limit_seconds=time_limit_seconds)
+        if quickjs_result is not None:
+            return quickjs_result
+
         node_bin = self.toolchain.node
         if not node_bin:
             return None
