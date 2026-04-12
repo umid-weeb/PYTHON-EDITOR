@@ -2139,8 +2139,6 @@ function refreshSelectionToolbar(positionOverride = null) {
     }
 
     toolbar.hidden = false;
-    const statusText = `${range.lineCount} qator`;
-    setSelectionToolbarStatus(statusText, "", false);
 
     const anchor = positionOverride || getSelectionToolbarAnchor(range);
     positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
@@ -2153,7 +2151,6 @@ function showSelectionToolbarAtPoint(clientX, clientY) {
     if (!toolbar || !range) return false;
 
     toolbar.hidden = false;
-    setSelectionToolbarStatus(`${range.lineCount} qator`, "", false);
     positionSelectionToolbar(toolbar, clientX, clientY, clientY);
     return true;
 }
@@ -2293,9 +2290,7 @@ async function createSelectionSnapshotBlob(range) {
     const languageChipWidth = Math.ceil(ctxMeasure.measureText(headerLanguage).width) + 18;
     ctxMeasure.font = `600 11px ${fontFamily}`;
     const titleWidth = Math.ceil(ctxMeasure.measureText(headerTitle).width);
-    const metaText = `${snapshotLines.length} qator`;
-    const metaWidth = Math.ceil(ctxMeasure.measureText(metaText).width) + 20;
-    const headerWidth = Math.ceil(104 + languageChipWidth + 10 + titleWidth + 20 + metaWidth + 22);
+    const headerWidth = Math.ceil(104 + languageChipWidth + 10 + titleWidth + 22);
     const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
     const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
     const scale = Math.min(window.devicePixelRatio || 1, 2);
@@ -2364,15 +2359,6 @@ async function createSelectionSnapshotBlob(range) {
     ctx.fillStyle = colors.textMuted;
     ctx.font = `600 11px ${fontFamily}`;
     ctx.fillText(headerTitle, titleX + languageChipWidth + 12, titleY);
-
-    const metaChipWidth = metaWidth;
-    const metaChipX = width - metaChipWidth - 22;
-    ctx.fillStyle = colors.primary;
-    roundRectPath(ctx, metaChipX, languageChipY, metaChipWidth, chipHeight, 11);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = `600 11px ${fontFamily}`;
-    ctx.fillText(metaText, metaChipX + 10, 28);
 
     const codeTop = topBarHeight + paddingTop + 4;
     const codeLeft = paddingX + lineNumberWidth + 16;
