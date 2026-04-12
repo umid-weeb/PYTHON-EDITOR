@@ -88,12 +88,19 @@ def _build_setup_sql(
     dialect_name: str | None = None,
 ) -> str:
     statements: list[str] = []
-    drop_suffix = " CASCADE" if str(dialect_name or "").lower() == "postgresql" else ""
+    dialect = str(dialect_name or "").lower()
     for table in tables:
-        statements.append(f"DROP TABLE IF EXISTS {table.name}{drop_suffix}")
+        if dialect == "postgresql":
+            statements.append(f"DROP TABLE IF EXISTS pg_temp.{table.name}")
+        elif dialect == "sqlite":
+            statements.append(f"DROP TABLE IF EXISTS temp.{table.name}")
+        else:
+            statements.append(f"DROP TABLE IF EXISTS {table.name}")
     for table in tables:
         columns_sql = ", ".join(f"{column.name} {column.sql_type}" for column in table.columns)
-        statements.append(f"CREATE TABLE {table.name} ({columns_sql})")
+        create_prefix = "CREATE TEMP TABLE" if dialect in {"postgresql", "sqlite"} else "CREATE TABLE"
+        on_commit = " ON COMMIT DROP" if dialect == "postgresql" else ""
+        statements.append(f"{create_prefix} {table.name} ({columns_sql}){on_commit}")
     for table in tables:
         table_rows = rows_by_table.get(table.name, [])
         if not table_rows:
