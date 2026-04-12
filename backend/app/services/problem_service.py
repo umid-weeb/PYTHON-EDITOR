@@ -23,9 +23,15 @@ _DIFFICULTY_SORT_ORDER = {"easy": 0, "medium": 1, "hard": 2}
 _SQL_MARKER_TAGS = {"sql", "postgresql"}
 
 
+def problem_language_from_slug_and_tags(slug: str | None, tags: list[str] | None) -> str:
+    normalized_slug = str(slug or "").strip().lower()
+    normalized_tags = {str(tag).strip().lower() for tag in (tags or [])}
+    is_sql = normalized_slug.startswith("sql-") or bool(normalized_tags & _SQL_MARKER_TAGS)
+    return "sql" if is_sql else "python"
+
+
 def _problem_summary_sort_key(item: ProblemSummary) -> tuple[int, int, int, str]:
-    tags = {str(tag).strip().lower() for tag in item.tags}
-    is_sql = str(item.slug).startswith("sql-") or bool(tags & _SQL_MARKER_TAGS)
+    is_sql = problem_language_from_slug_and_tags(item.slug, item.tags) == "sql"
     difficulty_rank = _DIFFICULTY_SORT_ORDER.get(str(item.difficulty or "").lower(), 99)
     order_index = item.order_index if item.order_index is not None else 10**9
     return (1 if is_sql else 0, difficulty_rank, order_index, str(item.slug))
@@ -337,6 +343,7 @@ class ProblemService:
             is_solved=False,
             time_limit_seconds=2.0,
             memory_limit_mb=256,
+            language=problem_language_from_slug_and_tags(problem.slug, tags),
         )
 
     def _build_problem_bundle(self, problem: Problem) -> dict[str, Any]:
@@ -372,6 +379,7 @@ class ProblemService:
             "output_format": problem.output_format,
             "constraints": constraints,
             "tags": tags,
+            "language": problem_language_from_slug_and_tags(problem.slug, tags),
             "time_limit_seconds": 2.0,
             "memory_limit_mb": 256,
             "visible_testcases": visible_testcases,
@@ -454,7 +462,8 @@ class ProblemService:
             is_solved=False,
             time_limit_seconds=2.0,
             memory_limit_mb=256,
-            language_code=translation["language_code"]
+            language_code=translation["language_code"],
+            language=problem_language_from_slug_and_tags(problem.slug, tags),
         )
 
     def _build_problem_bundle_multilingual(self, problem: Problem, language_code: str = "uz") -> dict[str, Any]:
@@ -492,6 +501,7 @@ class ProblemService:
             "output_format": translation["output_format"],
             "constraints": constraints,
             "tags": tags,
+            "language": problem_language_from_slug_and_tags(problem.slug, tags),
             "time_limit_seconds": 2.0,
             "memory_limit_mb": 256,
             "visible_testcases": visible_testcases,

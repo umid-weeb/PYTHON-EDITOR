@@ -14,7 +14,7 @@ from app.models.contest import ContestEntry, ContestSubmission
 from app.models.schemas import SubmissionRequest
 from app.repositories.submission_tracking import submission_tracking_repository
 from app.services.engagement_service import engagement_service
-from app.services.problem_service import ProblemService, get_problem_service
+from app.services.problem_service import ProblemService, get_problem_service, problem_language_from_slug_and_tags
 from app.services.profile_service import profile_service
 from app.services.rating_service import rating_service
 from app.services.user_stats_service import user_stats_service
@@ -53,12 +53,14 @@ class SubmissionService:
                 except Exception as e:
                     self.logger.warning("submission.auto_heal_failed id=%s user=%s error=%s", payload.problem_id, user_id, str(e))
 
+            effective_language = self._resolve_problem_language(problem, payload.language)
+
             submission = self.repository.create_submission(
                 db,
                 user_id=user_id,
                 problem_id=problem.id,
                 code=payload.code,
-                language=payload.language,
+                language=effective_language,
                 mode=mode,
                 is_extended=payload.is_extended,
             )
@@ -145,7 +147,7 @@ class SubmissionService:
                         self.problem_service.get_problem_bundle(payload["problem_id"], force_refresh=True)
                     )
             
-            problem_bundle["language"] = payload["language"]
+            problem_bundle["language"] = self._resolve_bundle_language(problem_bundle, payload["language"])
 
             # PRE-FLIGHT CHECK: Verify test cases exist to avoid "silent" failures
             all_cases = problem_bundle.get("visible_testcases", []) + problem_bundle.get("hidden_testcases", [])
@@ -222,6 +224,27 @@ class SubmissionService:
             }
             db.commit()
             return payload
+
+    def _resolve_problem_language(self, problem: Any, requested_language: str | None) -> str:
+        requested = self._normalize_language(requested_language)
+        tags = self.problem_service._load_tags(getattr(problem, "tags_json", None))
+        catalog_language = problem_language_from_slug_and_tags(getattr(problem, "slug", None), tags)
+        return "sql" if catalog_language == "sql" else requested
+
+    def _resolve_bundle_language(self, problem_bundle: dict[str, Any], requested_language: str | None) -> str:
+        requested = self._normalize_language(requested_language)
+        bundle_language = self._normalize_language(problem_bundle.get("language"))
+        catalog_language = problem_language_from_slug_and_tags(
+            problem_bundle.get("slug"),
+            list(problem_bundle.get("tags") or []),
+        )
+        if bundle_language == "sql" or catalog_language == "sql":
+            return "sql"
+        return requested
+
+    def _normalize_language(self, value: str | None) -> str:
+        language = str(value or "python").strip().lower()
+        return language if language in {"python", "javascript", "cpp", "sql"} else "python"
 
     def recover_stale_submissions(
         self,
