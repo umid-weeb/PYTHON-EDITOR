@@ -200,6 +200,7 @@ export default function ProblemsPage() {
 
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [total, setTotal] = useState(0);
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallengePayload | null>(null);
   const [streak, setStreak] = useState<StreakPayload | null>(null);
@@ -233,6 +234,9 @@ export default function ProblemsPage() {
 
   const fetchProblems = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
     try {
       const params = new URLSearchParams();
       params.set("page", String(currentPage));
@@ -245,7 +249,13 @@ export default function ProblemsPage() {
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      const response = await fetch(`${API_BASE_URL}/api/problems?${params.toString()}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/api/problems?${params.toString()}`, {
+        headers,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
       const data: PaginatedResponse = await response.json();
       setProblems(data.items || []);
       setTotal(data.total || 0);
@@ -253,7 +263,9 @@ export default function ProblemsPage() {
       console.error("Failed to fetch problems:", error);
       setProblems([]);
       setTotal(0);
+      setLoadError("Masalalarni yuklab bo'lmadi. Sahifani yangilang yoki birozdan keyin qayta urining.");
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [currentPage, difficultyFilter, perPage, searchQuery, selectedTags]);
@@ -489,6 +501,12 @@ export default function ProblemsPage() {
                 <tr>
                   <td className="px-4 py-10 text-center text-[12px] text-[var(--text-secondary)]" colSpan={5}>
                     Masalalar yuklanmoqda...
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td className="px-4 py-10 text-center text-[12px] text-[var(--danger)]" colSpan={5}>
+                    {loadError}
                   </td>
                 </tr>
               ) : filteredProblems.length === 0 ? (
