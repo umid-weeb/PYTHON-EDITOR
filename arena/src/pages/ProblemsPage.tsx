@@ -49,6 +49,12 @@ type StreakPayload = {
   today_solved: boolean;
 };
 
+const SQL_SECTION_TAGS = new Set(["sql", "postgresql", "basic-joins", "aggregation", "grouping", "subqueries"]);
+
+function isSqlProblem(problem: Problem): boolean {
+  return (problem.tags || []).some((tag) => SQL_SECTION_TAGS.has(tag.toLowerCase()));
+}
+
 function DifficultyBadge({ difficulty }: { difficulty: string }) {
   const normalized = String(difficulty || "").toLowerCase();
   let styles = "bg-[var(--bg-subtle)] text-[var(--text-secondary)]";
@@ -312,6 +318,7 @@ export default function ProblemsPage() {
 
   const totalPages = Math.ceil(total / perPage);
   const hasActiveFilters = Boolean(searchQuery || difficultyFilter || statusFilter || selectedTags.length > 0);
+  let sqlSectionInserted = false;
   
   return (
     <div className="flex h-[calc(100vh-var(--h-navbar))] flex-col overflow-hidden lg:flex-row">
@@ -397,8 +404,9 @@ export default function ProblemsPage() {
               {[
                 { label: "Asosiy", tags: ["array", "hashmap", "sorting", "math", "bit-manipulation"] },
                 { label: "Algoritmlar", tags: ["two-pointers", "sliding-window", "binary-search", "recursion", "backtracking", "greedy"] },
-                { label: "Ma'lumot Tuzilmalari", tags: ["stack", "linked-list", "Trees", "Graphs", "heap / priority queue"] },
-                { label: "Murakkab", tags: ["dynamic-programming", "Tries", "Intervals"] }
+                { label: "SQL", tags: ["sql", "postgresql", "basic-joins", "aggregation", "grouping", "subqueries"] },
+                { label: "Ma'lumot Tuzilmalari", tags: ["stack", "linked-list", "trees", "graphs", "heap / priority queue"] },
+                { label: "Murakkab", tags: ["dynamic-programming", "tries", "intervals"] }
               ].map((category) => (
                 <div key={category.label} className="space-y-2">
                   <div className="text-[10px] font-semibold text-[var(--text-muted)]">{category.label}</div>
@@ -490,58 +498,77 @@ export default function ProblemsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredProblems.map((problem) => (
-                  <tr
-                    key={problem.id || problem.slug}
-                    className="h-[var(--h-table-row)] cursor-pointer border-b border-[color:var(--border)] transition hover:bg-[var(--bg-overlay)]"
-                    onClick={() => navigate(`/problems/${problem.slug}`)}
-                  >
-                    <td className="pl-4 text-center">
-                      <StatusIcon attempted={problem.is_attempted} solved={problem.is_solved} />
-                    </td>
-                    <td className="pr-3">
-                      <div className="flex items-center gap-2">
-                        <div className="min-w-0 truncate text-[13px] text-[var(--text-primary)]">
-                          <HighlightedText query={searchQuery} text={formatProblemTitle(problem)} />
-                        </div>
-                        <StatusPill attempted={problem.is_attempted} solved={problem.is_solved} />
-                      </div>
-                    </td>
-                    <td className="pr-3">
-                      <DifficultyBadge difficulty={problem.difficulty} />
-                    </td>
-                    <td
-                      className={[
-                        "pr-3 text-[12px] tabular-nums",
-                        (problem.solvers_count || 0) > 10
-                          ? "text-[var(--success)]"
-                          : (problem.solvers_count || 0) > 0
-                            ? "text-[var(--text-primary)]"
-                            : "text-[var(--text-secondary)]",
-                      ].join(" ")}
-                    >
-                      {problem.solvers_count != null ? (
-                        <div className="flex items-center gap-1.5">
-                          <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-                            <circle cx="8.5" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-                          </svg>
-                          <span>{problem.solvers_count}</span>
-                        </div>
-                      ) : "--"}
-                    </td>
-                    <td className="pr-4">
-                      <div className="flex items-center gap-1 overflow-hidden">
-                        {(problem.tags || []).slice(0, 2).map((tag) => (
-                          <TagChip key={tag} label={localizeTagLabel(tag)} />
-                        ))}
-                        {(problem.tags || []).length > 2 ? (
-                          <span className="shrink-0 text-[11px] text-[var(--text-muted)]">+{(problem.tags || []).length - 2}</span>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredProblems.map((problem) => {
+                  const shouldShowSqlHeader = isSqlProblem(problem) && !sqlSectionInserted;
+                  if (shouldShowSqlHeader) {
+                    sqlSectionInserted = true;
+                  }
+
+                  return (
+                    <Fragment key={problem.id || problem.slug}>
+                      {shouldShowSqlHeader ? (
+                        <tr>
+                          <td className="border-b border-[color:var(--border)] bg-[var(--bg-overlay)]/30 px-4 py-2" colSpan={5}>
+                            <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                              <span className="h-px flex-1 bg-[color:var(--border)]" />
+                              <span className="whitespace-nowrap">SQL Masalalari</span>
+                              <span className="h-px flex-1 bg-[color:var(--border)]" />
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                      <tr
+                        className="h-[var(--h-table-row)] cursor-pointer border-b border-[color:var(--border)] transition hover:bg-[var(--bg-overlay)]"
+                        onClick={() => navigate(`/problems/${problem.slug}`)}
+                      >
+                        <td className="pl-4 text-center">
+                          <StatusIcon attempted={problem.is_attempted} solved={problem.is_solved} />
+                        </td>
+                        <td className="pr-3">
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 truncate text-[13px] text-[var(--text-primary)]">
+                              <HighlightedText query={searchQuery} text={formatProblemTitle(problem)} />
+                            </div>
+                            <StatusPill attempted={problem.is_attempted} solved={problem.is_solved} />
+                          </div>
+                        </td>
+                        <td className="pr-3">
+                          <DifficultyBadge difficulty={problem.difficulty} />
+                        </td>
+                        <td
+                          className={[
+                            "pr-3 text-[12px] tabular-nums",
+                            (problem.solvers_count || 0) > 10
+                              ? "text-[var(--success)]"
+                              : (problem.solvers_count || 0) > 0
+                                ? "text-[var(--text-primary)]"
+                                : "text-[var(--text-secondary)]",
+                          ].join(" ")}
+                        >
+                          {problem.solvers_count != null ? (
+                            <div className="flex items-center gap-1.5">
+                              <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                                <circle cx="8.5" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+                              </svg>
+                              <span>{problem.solvers_count}</span>
+                            </div>
+                          ) : "--"}
+                        </td>
+                        <td className="pr-4">
+                          <div className="flex items-center gap-1 overflow-hidden">
+                            {(problem.tags || []).slice(0, 2).map((tag) => (
+                              <TagChip key={tag} label={localizeTagLabel(tag)} />
+                            ))}
+                            {(problem.tags || []).length > 2 ? (
+                              <span className="shrink-0 text-[11px] text-[var(--text-muted)]">+{(problem.tags || []).length - 2}</span>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>

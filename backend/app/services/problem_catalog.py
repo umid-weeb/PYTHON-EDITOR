@@ -20,6 +20,12 @@ VISIBLE_CASE_COUNT = 3
 HIDDEN_CASE_COUNT = 3
 logger = logging.getLogger(__name__)
 
+HIDDEN_BASE_PROBLEM_SLUGS = (
+    {f"divisible-sum-{variation:02d}" for variation in range(2, 11)}
+    | {f"pattern-char-count-{variation:02d}" for variation in range(2, 11)}
+    | {"distinct-sort-01", "find-pivot-index-01"}
+)
+
 
 @dataclass(frozen=True)
 class TestCaseSeed:
@@ -73,6 +79,8 @@ def build_problem_catalog() -> list[ProblemSeed]:
     for template in _templates():
         for variation_index in range(template.variations):
             slug = f"{template.slug_prefix}-{variation_index + 1:02d}"
+            if slug in HIDDEN_BASE_PROBLEM_SLUGS:
+                continue
             catalog.append(
                 ProblemSeed(
                     id=str(uuid5(NAMESPACE_URL, f"https://pyzone.uz/problems/{slug}")),

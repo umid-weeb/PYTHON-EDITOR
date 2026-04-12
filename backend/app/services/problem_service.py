@@ -16,6 +16,7 @@ from app.models.schemas import ProblemDetail, ProblemSummary
 from app.models.submission import SolvedProblem, Submission
 from app.services.problem_cache import ProblemCache
 from app.services.problem_catalog import build_problem_order_map
+from app.services.sql_problem_catalog import build_sql_problem_order_map
 
 
 class ProblemNotFoundError(Exception):
@@ -41,27 +42,38 @@ class ProblemService:
         )
         self._source_label = "database"
 
+    def _catalog_ready(self) -> bool:
+        try:
+            from app.main import catalog_ready  # noqa: PLC0415
+
+            return bool(catalog_ready.is_set())
+        except Exception:
+            return False
+
     @property
     def source_label(self) -> str:
         return self._source_label
 
     async def list_problems(self, force_refresh: bool = False) -> list[ProblemSummary]:
-        if not force_refresh:
+        order_map = build_combined_problem_order_map()
+        visible_slugs = set(order_map)
+
+        if not force_refresh and self._catalog_ready():
             cached = self.cache.load_index()
             if cached is not None and all(
                 isinstance(item, dict) and item.get("slug") and item.get("order_index") is not None
                 for item in cached
-            ):
+            ) and len(cached) == len(order_map):
                 return [ProblemSummary.model_validate(item) for item in cached]
 
-        order_map = build_problem_order_map()
         with SessionLocal() as db:
-            problems = db.query(Problem).all()
+            problems = db.query(Problem).filter(Problem.slug.in_(visible_slugs)).all()
 
         problems.sort(key=lambda problem: (order_map.get(problem.slug, 10**9), str(problem.slug)))
 
         items = [self._build_summary(problem) for problem in problems]
-        self.cache.save_index([item.model_dump() for item in items])
+        if self._catalog_ready():
+            self.cache.save_index([item.model_dump() for item in items])
         return items
 
     async def list_problem_page(
@@ -262,9 +274,15 @@ class ProblemService:
         return ProblemDetail.model_validate(public_payload)
 
     async def get_problem_bundle(self, problem_key: str, force_refresh: bool = False) -> dict[str, Any]:
-        if not force_refresh:
+        order_map = build_combined_problem_order_map()
+
+        if not force_refresh and self._catalog_ready():
             cached = self.cache.load_problem(problem_key)
-            if cached is not None and cached.get("slug") and cached.get("order_index") is not None:
+            if (
+                cached is not None
+                and cached.get("slug") in order_map
+                and cached.get("order_index") is not None
+            ):
                 return cached
 
         with SessionLocal() as db:
@@ -275,17 +293,18 @@ class ProblemService:
                 .first()
             )
 
-        if problem is None:
+        if problem is None or problem.slug not in order_map:
             raise ProblemNotFoundError(problem_key)
 
         bundle = self._build_problem_bundle(problem)
-        self.cache.save_problem(problem.slug, bundle)
-        if problem.slug != problem_key:
-            self.cache.save_problem(problem_key, bundle)
+        if self._catalog_ready():
+            self.cache.save_problem(problem.slug, bundle)
+            if problem.slug != problem_key:
+                self.cache.save_problem(problem_key, bundle)
         return bundle
 
     def _build_summary(self, problem: Problem) -> ProblemSummary:
-        order_map = build_problem_order_map()
+        order_map = build_combined_problem_order_map()
         constraints = self._split_constraints(problem.constraints_text)
         tags = self._load_tags(problem.tags_json)
         preview = constraints[0] if constraints else (problem.input_format or None)
@@ -306,7 +325,7 @@ class ProblemService:
         )
 
     def _build_problem_bundle(self, problem: Problem) -> dict[str, Any]:
-        order_map = build_problem_order_map()
+        order_map = build_combined_problem_order_map()
         visible_testcases = []
         hidden_testcases = []
 
@@ -401,7 +420,7 @@ class ProblemService:
 
     def _build_summary_multilingual(self, problem: Problem, language_code: str = "uz") -> ProblemSummary:
         """Build problem summary with multilingual support."""
-        order_map = build_problem_order_map()
+        order_map = build_combined_problem_order_map()
         translation = self._get_problem_translation(problem, language_code)
         constraints = self._split_constraints(translation["constraints"])
         tags = self._load_tags(problem.tags_json)
@@ -425,7 +444,7 @@ class ProblemService:
 
     def _build_problem_bundle_multilingual(self, problem: Problem, language_code: str = "uz") -> dict[str, Any]:
         """Build problem bundle with multilingual support."""
-        order_map = build_problem_order_map()
+        order_map = build_combined_problem_order_map()
         translation = self._get_problem_translation(problem, language_code)
         visible_testcases = []
         hidden_testcases = []
@@ -465,6 +484,13 @@ class ProblemService:
             "hidden_testcase_count": len(hidden_testcases),
             "language_code": translation["language_code"]
         }
+
+
+@lru_cache(maxsize=1)
+def build_combined_problem_order_map() -> dict[str, int]:
+    combined = dict(build_problem_order_map())
+    combined.update(build_sql_problem_order_map())
+    return combined
 
 
 @lru_cache(maxsize=1)
