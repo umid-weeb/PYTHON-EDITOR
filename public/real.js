@@ -8,6 +8,7 @@ let activeDebugSteps = [];
 let activeDebugStepIndex = 0;
 let activeDebugLineNumber = null;
 let pendingRemoteRun = null;
+let pendingBrowserLocalRun = null;
 let currentLanguage = "python";
 let currentStarterPack = "array";
 let currentEditorRuntimeMode = "LOCAL";
@@ -207,6 +208,7 @@ main();
         inputHelp: "Bu starter stdin'dagi barcha sonlarni o'qiydi. JavaScript da ular bir qatorda ham, ko'p qatorda ham bo'lishi mumkin.",
         inputPlaceholder: "Masalan: 1 2 3 4 5",
         outputPlaceholder: "Natija shu yerda: avval yig'indi, keyin maksimum.",
+        supportsBrowserLocalRun: true,
         supportsLocalRun: false,
         supportsRemoteRun: true,
         supportsFormat: false,
@@ -468,7 +470,8 @@ function getLanguageOutputPlaceholder(language = currentLanguage, pack = current
 }
 
 function getLanguageRunModeLabel(language = currentLanguage) {
-    return getLanguageConfig(language).supportsLocalRun ? "LOCAL" : "REMOTE";
+    const config = getLanguageConfig(language);
+    return config.supportsLocalRun || config.supportsBrowserLocalRun ? "LOCAL" : "REMOTE";
 }
 
 const STARTER_PACK_CONFIGS = {
@@ -2088,6 +2091,7 @@ function setupEditor() {
     syncStarterPackSelector();
     updateHeaderLanguageBranding(currentLanguage);
     scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
     clearOutput({ preserveInput: false });
 }
 
@@ -3559,6 +3563,219 @@ async function executeRemoteCode(language, code, stdin) {
     return data;
 }
 
+function getBrowserJavaScriptWorkerSource() {
+    return `
+"use strict";
+
+const toText = (value) => {
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean" || value === null || value === undefined) {
+        return String(value);
+    }
+    try {
+        return JSON.stringify(value);
+    } catch (_) {
+        return String(value);
+    }
+};
+
+const joinOutput = (buffer) => buffer.map((item) => String(item)).filter((item) => item !== "").join("\\n").trimEnd();
+
+self.onmessage = (event) => {
+    const payload = event.data || {};
+    const code = String(payload.code || "");
+    const stdin = String(payload.stdin || "");
+    const stdout = [];
+    const stderr = [];
+    const startedAt = performance.now ? performance.now() : Date.now();
+    let exitCode = 0;
+
+    const consoleShim = {
+        log: (...args) => stdout.push(args.map(toText).join(" ")),
+        info: (...args) => stdout.push(args.map(toText).join(" ")),
+        warn: (...args) => stderr.push(args.map(toText).join(" ")),
+        error: (...args) => stderr.push(args.map(toText).join(" ")),
+    };
+
+    const requireShim = (name) => {
+        if (name !== "fs") {
+            throw new Error("Module not available: " + name);
+        }
+        return {
+            readFileSync: (fd, encoding) => {
+                if (fd === 0 || fd === "0") {
+                    return stdin;
+                }
+                throw new Error("Hozircha faqat stdin (fd=0) qo'llab-quvvatlanadi.");
+            },
+        };
+    };
+
+    const processShim = {
+        stdin: {
+            read: () => stdin,
+            toString: () => stdin,
+        },
+        stdout: {
+            write: (value) => stdout.push(toText(value)),
+        },
+        stderr: {
+            write: (value) => stderr.push(toText(value)),
+        },
+        argv: [],
+        env: {},
+        exit: (code = 0) => {
+            exitCode = code;
+            const error = new Error("__PYZONE_EXIT__:" + code);
+            error.name = "ProcessExitError";
+            throw error;
+        },
+    };
+
+    try {
+        const require = requireShim;
+        const console = consoleShim;
+        const process = processShim;
+        const module = { exports: {} };
+        const exports = module.exports;
+        const global = self;
+
+        eval(code + "\\n//# sourceURL=main.js");
+
+        const elapsed = (performance.now ? performance.now() : Date.now()) - startedAt;
+        self.postMessage({
+            ok: true,
+            verdict: "Accepted",
+            stdout: joinOutput(stdout),
+            stderr: joinOutput(stderr),
+            compile_output: "",
+            error: "",
+            message: "",
+            time: (elapsed / 1000).toFixed(6),
+            memory: 0,
+            execution_mode: "LOCAL",
+            status: "Accepted",
+        });
+    } catch (error) {
+        const elapsed = (performance.now ? performance.now() : Date.now()) - startedAt;
+        const errorText = String(error && error.stack ? error.stack : error && error.message ? error.message : error || "");
+        const exitMatch = errorText.match(/__PYZONE_EXIT__:(-?\\d+)/);
+        const hasSyntaxError = (error && error.name === "SyntaxError") || errorText.toLowerCase().includes("syntaxerror");
+        const hasTimeout = errorText.toLowerCase().includes("time limit") || errorText.toLowerCase().includes("exceeded");
+        let verdict = "Runtime Error";
+        if (exitMatch) {
+            verdict = Number(exitMatch[1]) === 0 ? "Accepted" : "Runtime Error";
+        } else if (hasSyntaxError) {
+            verdict = "Compilation Error";
+        } else if (hasTimeout) {
+            verdict = "Time Limit Exceeded";
+        }
+
+        self.postMessage({
+            ok: verdict === "Accepted",
+            verdict,
+            stdout: joinOutput(stdout),
+            stderr: joinOutput(stderr),
+            compile_output: verdict === "Compilation Error" ? errorText : "",
+            error: verdict === "Compilation Error" ? errorText : errorText,
+            message: verdict === "Compilation Error"
+                ? "JavaScript sintaksis xatoligi topildi."
+                : verdict === "Time Limit Exceeded"
+                    ? "JavaScript bajarilishi vaqt limitidan oshdi."
+                    : "JavaScript bajarishda xatolik yuz berdi.",
+            time: (elapsed / 1000).toFixed(6),
+            memory: 0,
+            execution_mode: "LOCAL",
+            status: verdict,
+        });
+    }
+};
+`;
+}
+
+async function executeBrowserLocalJavaScript(code, stdin, timeLimitSeconds = 20) {
+    if (typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+        return null;
+    }
+
+    let worker;
+    let workerUrl = null;
+
+    try {
+        workerUrl = URL.createObjectURL(new Blob([getBrowserJavaScriptWorkerSource()], { type: "text/javascript" }));
+        worker = new Worker(workerUrl);
+    } catch (error) {
+        if (workerUrl) {
+            try {
+                URL.revokeObjectURL(workerUrl);
+            } catch (_) {}
+        }
+        return null;
+    }
+
+    const timeoutMs = Math.max(1000, Math.floor(Number(timeLimitSeconds) * 1000) || 20000);
+
+    return await new Promise((resolve) => {
+        let settled = false;
+        let timeoutId = null;
+
+        const cleanup = () => {
+            if (settled) return;
+            settled = true;
+            if (timeoutId !== null) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            try {
+                worker.terminate();
+            } catch (_) {}
+            if (workerUrl) {
+                try {
+                    URL.revokeObjectURL(workerUrl);
+                } catch (_) {}
+            }
+        };
+
+        worker.onmessage = (event) => {
+            cleanup();
+            resolve(event.data || null);
+        };
+
+        worker.onerror = () => {
+            cleanup();
+            resolve(null);
+        };
+
+        timeoutId = setTimeout(() => {
+            cleanup();
+            resolve({
+                ok: false,
+                verdict: "Time Limit Exceeded",
+                stdout: "",
+                stderr: "",
+                compile_output: "",
+                error: "JavaScript bajarilishi vaqt limitidan oshdi.",
+                message: "JavaScript bajarilishi vaqt limitidan oshdi.",
+                time: (timeoutMs / 1000).toFixed(6),
+                memory: 0,
+                execution_mode: "LOCAL",
+                status: "Time Limit Exceeded",
+            });
+        }, timeoutMs);
+
+        try {
+            worker.postMessage({
+                code,
+                stdin,
+                timeLimitSeconds,
+            });
+        } catch (error) {
+            cleanup();
+            resolve(null);
+        }
+    });
+}
+
 function clearEditorRuntimeWarmupTimers() {
     for (const timer of editorRuntimeWarmupTimers.values()) {
         clearTimeout(timer);
@@ -3569,7 +3786,8 @@ function clearEditorRuntimeWarmupTimers() {
 function scheduleEditorRuntimeWarmup(language, pack, code) {
     const normalizedLanguage = normalizeLanguage(language);
     const normalizedPack = normalizeStarterPack(pack);
-    if (normalizedLanguage === "python") return;
+    const config = getLanguageConfig(normalizedLanguage);
+    if (normalizedLanguage === "python" || config.supportsBrowserLocalRun) return;
 
     const starterCode = getStarterCode(normalizedLanguage, normalizedPack);
     if (String(code || "") !== starterCode) return;
@@ -3609,6 +3827,26 @@ async function warmEditorRuntime(language, code) {
         });
     } catch (error) {
         // Fire-and-forget warmup only.
+    }
+}
+
+function warmServerLocalRuntimeCatalog() {
+    const warmLanguages = ["cpp", "java", "go"];
+    let delay = 100;
+
+    for (const language of warmLanguages) {
+        if (normalizeLanguage(language) === currentLanguage) {
+            continue;
+        }
+
+        const starterCode = getStarterCode(language, currentStarterPack);
+        setTimeout(() => {
+            if (!editor) return;
+            if (normalizeLanguage(language) !== currentLanguage) {
+                void warmEditorRuntime(language, starterCode);
+            }
+        }, delay);
+        delay += 450;
     }
 }
 
@@ -3662,6 +3900,30 @@ async function runRemoteExecution(language, code, stdinText) {
     }
 }
 
+async function runBrowserLocalJavaScript(language, code, stdinText) {
+    const config = getLanguageConfig(language);
+    if (!config.supportsBrowserLocalRun) return null;
+
+    showOutput(`${config.label} bajarilmoqda...`, "");
+    const startedAt = performance.now();
+    const result = await executeBrowserLocalJavaScript(code, stdinText, 20);
+    if (!result) return null;
+
+    const verdict = result.verdict || "Runtime Error";
+    const durationSeconds = ((performance.now() - startedAt) / 1000).toFixed(3);
+    const rawText = [result.compile_output, result.stderr, result.error, result.message].filter(Boolean).join("\n\n");
+    const location = getRemoteErrorDisplayLocation(language, verdict, rawText, code);
+
+    setEditorRuntimeMode(result.execution_mode || "LOCAL");
+    if (location.line) {
+        highlightEditorError(location.line, location.column || 1);
+    }
+
+    const message = buildRemoteOutputMessage(result, durationSeconds, code, language);
+    showOutput(message, verdict === "Accepted" ? "success" : "error");
+    return result;
+}
+
 async function runCode() {
     const config = getLanguageConfig(currentLanguage);
     const code = editor.getValue();
@@ -3669,10 +3931,26 @@ async function runCode() {
 
     clearDebugState();
     clearEditorDiagnostics();
+    pendingBrowserLocalRun = null;
+    pendingRemoteRun = null;
+    const stdinText = getInputPanelValue() || readInputDraft(currentLanguage, currentStarterPack) || "";
+
+    if (config.supportsBrowserLocalRun) {
+        if (!stdinText.trim() && looksLikeInputRequired(currentLanguage, code)) {
+            pendingBrowserLocalRun = { language: currentLanguage, code };
+            showOutput(`${config.label} uchun input kerak.`, "");
+            renderOutputPanelInput("stdin", 0);
+            return;
+        }
+
+        const browserResult = await runBrowserLocalJavaScript(currentLanguage, code, stdinText);
+        if (browserResult) {
+            return;
+        }
+    }
 
     if (config.supportsLocalRun) {
         if (!pyodide) return showOutput("Python yuklanmoqda...", "error");
-        const stdinText = getInputPanelValue() || readInputDraft(currentLanguage, currentStarterPack) || "";
         activeRunSession = { code, inputValues: splitInputLines(stdinText) };
         setEditorRuntimeMode("LOCAL");
         showOutput("Bajarilmoqda...", "");
@@ -3681,7 +3959,6 @@ async function runCode() {
     }
 
     if (config.supportsRemoteRun) {
-        const stdinText = getInputPanelValue() || readInputDraft(currentLanguage, currentStarterPack) || "";
         if (!stdinText.trim() && looksLikeInputRequired(currentLanguage, code)) {
             pendingRemoteRun = { language: currentLanguage, code };
             showOutput(`${config.label} uchun input kerak.`, "");
@@ -3751,6 +4028,15 @@ function renderOutputPanelInput(prompt, index) {
         submitOnEnter: true,
         onSubmit: () => {
             const value = getInputPanelValue();
+            if (pendingBrowserLocalRun) {
+                const queued = pendingBrowserLocalRun;
+                pendingBrowserLocalRun = null;
+                setInputPanelValue("");
+                clearInputDraft(queued.language, currentStarterPack);
+                clearOutputInputHost({ preserveValue: false });
+                void runBrowserLocalJavaScript(queued.language, queued.code, value);
+                return;
+            }
             if (pendingRemoteRun) {
                 const queued = pendingRemoteRun;
                 pendingRemoteRun = null;

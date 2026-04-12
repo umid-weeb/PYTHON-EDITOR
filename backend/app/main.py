@@ -26,6 +26,7 @@ from app.services.problem_catalog import ensure_problem_catalog_seeded
 from app.services.db_bootstrap import run_startup_migrations
 from app.services.engagement_service import engagement_service
 from app.services.submission_service import get_submission_service
+from app.services.editor_runtime_service import get_editor_runtime_service
 
 
 settings = get_settings()
@@ -159,6 +160,16 @@ async def lifespan(_: FastAPI):
 
     threading.Thread(target=_automated_engagement_loop, daemon=True, name="engagement-agent").start()
     threading.Thread(target=_daily_maintenance_loop, daemon=True, name="daily-maintenance").start()
+
+    def _warm_editor_runtimes() -> None:
+        try:
+            logger.info("Editor runtime warmup starting...")
+            get_editor_runtime_service().warm_default_runtimes()
+            logger.info("Editor runtime warmup completed.")
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Editor runtime warmup failed: %s", exc)
+
+    threading.Thread(target=_warm_editor_runtimes, daemon=True, name="editor-runtime-warmup").start()
 
     try:
         yield

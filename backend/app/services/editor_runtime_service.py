@@ -557,6 +557,38 @@ globalThis.global = globalThis;
             elapsed=run_process["elapsed"],
         )
 
+    def warm_default_runtimes(self) -> None:
+        starter_codes = {
+            "cpp": """#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    cout << "Salom, C++ tiliga xush kelibsiz" << '\\n';
+    return 0;
+}
+""",
+            "java": """public class Main {
+    public static void main(String[] args) {
+        System.out.println("Salom, Java tiliga xush kelibsiz");
+    }
+}
+""",
+            "go": """package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Salom, Go tiliga xush kelibsiz")
+}
+""",
+        }
+
+        for language, code in starter_codes.items():
+            try:
+                self.run(language=language, code=code, stdin="", time_limit_seconds=10.0)
+            except Exception:
+                continue
+
 
 _editor_runtime_service: EditorRuntimeService | None = None
 
