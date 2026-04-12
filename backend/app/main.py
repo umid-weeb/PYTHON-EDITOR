@@ -52,19 +52,29 @@ migrations_complete = False
 async def lifespan(_: FastAPI):
     global migrations_complete
     # DB schema migrations (fast — DDL only)
-    Base.metadata.create_all(bind=engine)
-    run_startup_migrations(engine)
-    Base.metadata.create_all(bind=engine)
-    migrations_complete = True
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Initial DB schema check failed: %s", exc)
 
     # Start submission recovery loop
     submission_service = get_submission_service()
     submission_service.start_recovery_loop()
 
-    # Run the heavy catalog seed in a background thread so the health
+    # Run DB maintenance and the heavy catalog seed in a background thread so the health
     # check endpoint is reachable immediately and Render doesn't mark
     # the service as DOWN during startup.
     def _background_sync() -> None:
+        global migrations_complete
+        try:
+            logger.info("Background DB maintenance starting...")
+            run_startup_migrations(engine)
+            Base.metadata.create_all(bind=engine)
+            migrations_complete = True
+            logger.info("Background DB maintenance completed.")
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Background DB maintenance failed: %s", exc)
+
         try:
             logger.info("Background catalog sync starting...")
             with SessionLocal() as db:
