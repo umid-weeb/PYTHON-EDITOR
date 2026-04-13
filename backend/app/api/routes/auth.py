@@ -75,6 +75,17 @@ def get_optional_user(
         return query.filter(User.id == int(user_id)).first()
     return query.filter(User.username == username).first()
 
+
+def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    """Faqat is_admin=True bo'lgan foydalanuvchilarga ruxsat beradi."""
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin huquqi talab qilinadi.",
+        )
+    return current_user
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -199,6 +210,7 @@ class MeResponse(BaseModel):
     problem_bank_easy: int = 0
     problem_bank_medium: int = 0
     problem_bank_hard: int = 0
+    is_admin: bool = False
 
 
 class PublicProfileResponse(BaseModel):
@@ -242,6 +254,7 @@ def create_access_token(user: User) -> str:
         "sub": str(user.id),
         "user_id": user.id,
         "username": user.username,
+        "is_admin": bool(getattr(user, "is_admin", False)),
         "exp": expire,
     }
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -643,6 +656,7 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)) ->
         longest_streak=int(getattr(user, "longest_streak", 0) or 0),
         streak_freeze=int(getattr(user, "streak_freeze", 0) or 0),
         timezone=getattr(user, "timezone", None) or "Asia/Tashkent",
+        is_admin=bool(getattr(user, "is_admin", False)),
     )
 
 

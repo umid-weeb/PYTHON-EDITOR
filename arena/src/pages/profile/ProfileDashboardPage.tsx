@@ -190,7 +190,7 @@ function FeedTabButton({
 
 export default function ProfileDashboardPage() {
   const { username = "" } = useParams();
-  const { user: authedUser } = useAuth();
+  const { user: authedUser, isAdmin } = useAuth();
   const isOwnProfile = Boolean(authedUser?.username && authedUser.username === username);
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -334,6 +334,14 @@ export default function ProfileDashboardPage() {
               to="/profile/settings"
             >
               Edit profile
+            </Link>
+          ) : null}
+          {isOwnProfile && isAdmin ? (
+            <Link
+              className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-900/20 px-4 py-2 text-sm font-medium text-purple-300 hover:bg-purple-800/30 hover:border-purple-400/60 transition-colors"
+              to="/admin/problems"
+            >
+              ⚙ Admin Panel
             </Link>
           ) : null}
         </div>

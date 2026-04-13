@@ -18,6 +18,8 @@ from app.api.routes.editor import router as editor_router
 from app.api.routes.contests import router as contest_router, ws_router as contest_ws_router
 from app.api.routes.engagement import router as engagement_router
 from app.api.routes.ai import router as ai_router
+from app.api.routes.admin import router as admin_router
+from app.api.routes.admin_ai import router as admin_ai_router
 from app.core.config import get_settings
 from app.database import Base, engine
 from app.database import SessionLocal
@@ -224,6 +226,8 @@ app.include_router(health_router)
 app.include_router(user_router, prefix=settings.api_prefix)
 app.include_router(account_router, prefix=settings.api_prefix)
 app.include_router(auth_router, prefix=settings.api_prefix)
+app.include_router(admin_router)
+app.include_router(admin_ai_router)
 
 # Serve uploaded avatars
 uploads_root = settings.backend_root / "uploads"

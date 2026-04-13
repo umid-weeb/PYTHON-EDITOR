@@ -21,36 +21,61 @@ _GROQ_MODEL = "llama-3.3-70b-versatile"
 # --------------------------------------------------------------------------- #
 #  System prompt for the AI tutor chatbot                                      #
 # --------------------------------------------------------------------------- #
-_CHAT_SYSTEM_PROMPT = """Sen "Pyzone Arena" platformasining AI Ustozi — algoritmlar va ma'lumot strukturalari bo'yicha tajribali o'qituvchisan.
+_CHAT_SYSTEM_PROMPT = """Sen "Pyzone Arena" platformasining AI Ustozi — algoritmlar bo'yicha o'qituvchisan.
 
-HECH QACHON BUZILMAYDIGAN QOIDALAR:
-1. TO'LIQ YECHIM KODI YOZMA — hech qachon, hech qanday sababda. Faqat PSEUDOCODE ruxsat.
-2. Faqat O'ZBEK tilida javob ber.
-3. Javob QISQA: 2-4 jumla. Ortiqcha tushuntirma keraksiz.
-4. Foydalanuvchini O'YLASHGA undovchi savol ber, javobni berma.
+!!! MUTLAQ TAQIQ — BUZILMAYDI !!!
+KOD YOZMA. Hech qachon. Hech qanday sharoitda.
+`def`, `class`, `for`, `while`, `return`, ` = ` kabi Python sintaksisini YOZMA.
+Kod bloki (``` yoki `...`) YOZMA.
+Faqat SO'Z bilan tushuntir. Faqat PSEUDOCODE (ingliz/o'zbek so'zlari bilan algoritm tavsifi).
 
-RUXSAT ETILGAN MAVZULAR:
-- Algoritmlar (sorting, searching, two-pointer, sliding window, greedy, DP, backtracking, BFS/DFS)
-- Ma'lumot strukturalari (array, stack, queue, tree, graph, hashmap, set)
-- Vaqt va xotira murakkabligi (Big O)
-- Masala mantiqiy tahlili, yo'nalish berish, debugging maslahat
+AGAR FOYDALANUVCHI "KOD YOZ" / "YECHIM BER" / "TO'G'RI KOD" SO'RASA:
+Faqat nima xato ekanini SO'Z bilan ayt. Masalan:
+  YOMON: `if mid > target: right = mid - 1`
+  YAXSHI: "mid indeksidagi qiymat targetdan katta bo'lsa, o'ng chegarani mid-1 ga o'zgartir"
 
-TAQIQLANGAN MAVZULAR:
-- To'liq yechim kodi (hatto "faqat bir qism" bo'lsa ham)
-- Hayot, ta'lim, siyosat, umumiy suhbat
-- Boshqa fanlar yoki algoritmdan tashqari mavzular
+JAVOB FORMATI:
+- Faqat O'ZBEK tilida
+- 3-5 jumla, qisqa
+- Xatoni toping, yo'nalish bering, savol bering
 
-MAVZUDAN CHIQQANDA, qat'iy tarzda de:
-"Uzr, bu savolga javob bera olmayman. Keling, masalaga qaytaylik!"
-
-AGAR FOYDALANUVCHI "KOD YOZ" DESA:
-"Kodni to'g'ridan-to'g'ri bermayman — o'zing yechsang, intervyuda ham bajara olasan! Bir yo'nalish bersam..."
+RUXSAT: algoritmlar, Big O, masala mantiqiy tahlili, debugging (faqat so'z bilan)
+TAQIQ: to'liq kod, hayotiy suhbat, boshqa fanlar
 
 MASALA KONTEKSTI:
 {problem_context}
 
-FOYDALANUVCHI HOZIRGI KODI ({language}):
+FOYDALANUVCHI KODI ({language}):
 {code}
+"""
+
+_EDITOR_CHAT_SYSTEM_PROMPT = """Sen Pyzone online editor uchun aqlli kod yordamchisan.
+
+MAQSAD:
+- Foydalanuvchi yozayotgan kod, tanlangan matn, til, starter pack, natija paneli va kursor joylashuviga qarab aniq yordam ber.
+- Foydalanuvchi nimani maqsad qilganini tushunib, unga eng qisqa va foydali yo'lni ko'rsat.
+- Kodning maqsadini bir jumlada ayt: masalan, massivni yig'ish, satrni parse qilish, shartni tekshirish yoki formatlangan output chiqarish.
+
+JAVOB QOIDALARI:
+- Faqat o'zbek tilida javob ber.
+- Xatoni aniq top: qaysi qator, qaysi qism va nima uchun xato ekanini sodda ayt.
+- Agar foydalanuvchi yechim so'rasa, minimal va ishlaydigan snippet berishing mumkin.
+- Agar faqat tushuntirish so'rasa, ortiqcha kod yozma.
+- Javob qisqa, amaliy va muloyim bo'lsin.
+- Agar savol noaniq bo'lsa, bitta aniqlashtiruvchi savol ber.
+- Kodni copy-paste qilishga qulay tarzda tartibli yoz.
+
+EDITOR KONTEKSTI:
+{editor_context}
+
+TANLANGAN MATN:
+{selected_text}
+
+JORIY KOD:
+{code}
+
+NATIJA PANELI:
+{output_text}
 """
 
 
@@ -84,15 +109,18 @@ class AIService:
     #  Gemini via direct REST (bypasses v1beta SDK issue)                      #
     # ----------------------------------------------------------------------- #
     async def _gemini_generate(self, model: str, prompt: str) -> str:
+        return await self._gemini_generate_ext(model, prompt, max_tokens=512)
+
+    async def _gemini_generate_ext(self, model: str, prompt: str, max_tokens: int = 1024) -> str:
         url = f"{_GEMINI_REST_BASE}/{model}:generateContent"
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "maxOutputTokens": 512,
-                "temperature": 0.7,
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.3,
             },
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=45.0) as client:
             resp = await client.post(
                 url,
                 json=payload,
@@ -265,6 +293,103 @@ Return STRICT JSON only (no markdown):
             except Exception as e:
                 err = str(e)
                 logger.warning(f"OpenAI Chat: {err}")
+                errors.append(f"OpenAI: {err}")
+
+        return f"Texnik xatolik: AI bilan bog'lanib bo'lmadi ({'; '.join(errors)}). Keyinroq qayta urining."
+
+    # ----------------------------------------------------------------------- #
+    #  Online editor chat                                                      #
+    # ----------------------------------------------------------------------- #
+    async def get_editor_chat_response(
+        self,
+        user_message: str,
+        conversation_history: List[Dict[str, str]],
+        language: str,
+        code: str,
+        starter_pack: str,
+        selected_text: str = "",
+        output_text: str = "",
+        cursor_line: int = 1,
+        cursor_column: int = 1,
+        line_count: int = 0,
+        is_dark_mode: bool = False,
+    ) -> str:
+        def trim(value: str, limit: int) -> str:
+            text = (value or "").strip()
+            if len(text) <= limit:
+                return text
+            return text[:limit].rstrip() + "..."
+
+        normalized_code = trim(code, 7000) or "(Hali kod yozilmagan)"
+        normalized_selected = trim(selected_text, 1800) or "(Tanlangan matn yo'q)"
+        normalized_output = trim(output_text, 1800) or "(Natija paneli hozircha bo'sh)"
+        editor_context = (
+            f"Til: {language}\n"
+            f"Starter pack: {starter_pack or 'default'}\n"
+            f"Kursor: satr {max(1, int(cursor_line or 1))}, ustun {max(1, int(cursor_column or 1))}\n"
+            f"Satrlar soni: {max(0, int(line_count or 0))}\n"
+            f"Tema: {'dark' if is_dark_mode else 'light'}\n"
+            f"Foydalanuvchi savoli: {trim(user_message, 1000)}"
+        )
+
+        system_prompt = _EDITOR_CHAT_SYSTEM_PROMPT.format(
+            editor_context=editor_context,
+            selected_text=normalized_selected,
+            code=normalized_code,
+            output_text=normalized_output,
+        )
+
+        history_lines = [system_prompt, ""]
+        for msg in conversation_history:
+            label = "Foydalanuvchi" if msg["role"] == "user" else "AI Yordamchi"
+            history_lines.append(f"{label}: {msg['content']}")
+        history_lines.append(f"Foydalanuvchi: {user_message}")
+        history_lines.append("AI Yordamchi:")
+        full_prompt = "\n".join(history_lines)
+
+        def build_messages() -> list:
+            msgs = [{"role": "system", "content": system_prompt}]
+            for msg in conversation_history:
+                msgs.append({"role": msg["role"], "content": msg["content"]})
+            msgs.append({"role": "user", "content": user_message})
+            return msgs
+
+        errors: list[str] = []
+
+        if self.groq_client:
+            try:
+                resp = self.groq_client.chat.completions.create(
+                    model=_GROQ_MODEL,
+                    messages=build_messages(),
+                    max_tokens=420,
+                )
+                return resp.choices[0].message.content.strip()
+            except Exception as e:
+                err = str(e)
+                logger.warning(f"Groq Editor Chat: {err}")
+                errors.append(f"Groq: {err}")
+
+        if self.api_key:
+            for model in _GEMINI_MODELS:
+                try:
+                    return await self._gemini_generate(model, full_prompt)
+                except Exception as e:
+                    err = str(e)
+                    logger.warning(f"Gemini Editor Chat {model}: {err}")
+                    errors.append(f"{model}: {err}")
+                    continue
+
+        if self.openai_client:
+            try:
+                resp = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=build_messages(),
+                    max_tokens=420,
+                )
+                return resp.choices[0].message.content.strip()
+            except Exception as e:
+                err = str(e)
+                logger.warning(f"OpenAI Editor Chat: {err}")
                 errors.append(f"OpenAI: {err}")
 
         return f"Texnik xatolik: AI bilan bog'lanib bo'lmadi ({'; '.join(errors)}). Keyinroq qayta urining."

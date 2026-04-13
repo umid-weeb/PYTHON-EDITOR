@@ -1,6 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppFrame from "./components/layout/AppFrame.jsx";
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
+import AdminRoute from "./components/common/AdminRoute.jsx";
+import AdminProblemsListPage from "./pages/admin/AdminProblemsListPage.jsx";
+import AdminProblemFormPage from "./pages/admin/AdminProblemFormPage.jsx";
 import ArenaPage from "./pages/ArenaPage.jsx";
 import OnlineEditorPage from "./pages/OnlineEditorPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
@@ -126,6 +129,41 @@ export default function App() {
           }
         />
         <Route path="/rating" element={<Navigate to="/leaderboard" replace />} />
+
+        {/* Admin routes */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <Navigate to="/admin/problems" replace />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/problems"
+          element={
+            <AdminRoute>
+              <AdminProblemsListPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/problems/new"
+          element={
+            <AdminRoute>
+              <AdminProblemFormPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/problems/:problemId/edit"
+          element={
+            <AdminRoute>
+              <AdminProblemFormPage />
+            </AdminRoute>
+          }
+        />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppFrame>
