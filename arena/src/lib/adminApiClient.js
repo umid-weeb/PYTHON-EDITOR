@@ -21,7 +21,7 @@ async function adminRequest(path, options = {}) {
     body: options.body,
   });
 
-  if (response.status === 204 || response.status === 200 && !response.headers.get("content-type")) return null;
+  if (response.status === 204) return null;
 
   const raw = await response.text();
   let data = null;
