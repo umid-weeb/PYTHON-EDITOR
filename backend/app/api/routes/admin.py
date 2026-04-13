@@ -366,7 +366,17 @@ def list_admin_problems(
         tc_count_sub, Problem.id == tc_count_sub.c.problem_id
     )
     if q:
-        query = query.filter(Problem.title.ilike(f"%{q}%"))
+        from sqlalchemy import or_ as _or
+        q_stripped = q.strip()
+        if q_stripped.isdigit():
+            query = query.filter(
+                _or(
+                    Problem.title.ilike(f"%{q_stripped}%"),
+                    Problem.leetcode_id == int(q_stripped),
+                )
+            )
+        else:
+            query = query.filter(Problem.title.ilike(f"%{q_stripped}%"))
     if difficulty:
         query = query.filter(Problem.difficulty == difficulty.lower())
 

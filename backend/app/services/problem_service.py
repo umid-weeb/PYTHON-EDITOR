@@ -118,6 +118,7 @@ class ProblemService:
             haystack = " ".join(
                 [
                     str(item.order_index or ""),
+                    str(item.leetcode_id or ""),
                     item.id,
                     item.slug,
                     item.title,
@@ -344,6 +345,7 @@ class ProblemService:
             time_limit_seconds=2.0,
             memory_limit_mb=256,
             language=problem_language_from_slug_and_tags(problem.slug, tags),
+            leetcode_id=problem.leetcode_id,
         )
 
     def _build_problem_bundle(self, problem: Problem) -> dict[str, Any]:
@@ -464,6 +466,7 @@ class ProblemService:
             memory_limit_mb=256,
             language_code=translation["language_code"],
             language=problem_language_from_slug_and_tags(problem.slug, tags),
+            leetcode_id=problem.leetcode_id,
         )
 
     def _build_problem_bundle_multilingual(self, problem: Problem, language_code: str = "uz") -> dict[str, Any]:

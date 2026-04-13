@@ -21,7 +21,8 @@ class ProblemSummary(BaseModel):
     time_limit_seconds: float | None = None
     memory_limit_mb: int | None = None
     language: Literal["python", "javascript", "cpp", "sql"] = "python"
-    language_code: str = "en"  # Add language code to summary
+    language_code: str = "en"
+    leetcode_id: int | None = None
 
 
 class VisibleTestcase(BaseModel):
