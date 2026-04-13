@@ -115,24 +115,58 @@ async def _search_leetcode(keywords: str) -> list:
 async def _find_leetcode_slug(query: str) -> str | None:
     """
     Masala nomidan yoki raqamidan slug topish.
-    Masalan: "1" → "two-sum", "Two Sum" → "two-sum", "add two" → "add-two-numbers"
+    Qo'llab-quvvatlanadigan formatlar:
+      "1"             → raqam bo'yicha
+      "1."            → raqam bo'yicha
+      "2.Add Two Numbers"  → raqam + nom
+      "2. Add Two Numbers" → raqam + nom (bo'sh joy bilan)
+      "Two Sum"       → nom bo'yicha
+      "two-sum"       → slug sifatida to'g'ridan
     """
     query_clean = query.strip()
     query_lower = query_clean.lower()
 
-    # --- Raqam bo'yicha qidirish ---
-    if query_clean.isdigit():
-        questions = await _search_leetcode(query_clean)
-        # Aniq raqam bo'yicha moslik
+    # --- "2.Add Two Numbers" yoki "2. Add Two Numbers" formatini aniqlash ---
+    # LeetCode muammolar ro'yxatida ko'pincha shunday ko'rsatiladi
+    num_prefix_m = re.match(r'^(\d+)[.\s]+(.*)$', query_clean)
+    if num_prefix_m:
+        num_part = num_prefix_m.group(1)
+        title_part = num_prefix_m.group(2).strip()
+
+        # 1. Raqam bo'yicha maqsadli qidiruv
+        questions = await _search_leetcode(num_part)
         for q in questions:
-            if str(q.get("questionFrontendId", "")) == query_clean:
+            if str(q.get("questionFrontendId", "")) == num_part:
                 return q["titleSlug"]
-        # Topilmadi — 1-natijani olamiz (ko'pincha to'g'ri keladi)
+
+        # 2. Nom bo'yicha qidiruv, lekin raqam mosligini tekshir
+        if title_part:
+            questions2 = await _search_leetcode(title_part)
+            for q in questions2:
+                if str(q.get("questionFrontendId", "")) == num_part:
+                    return q["titleSlug"]
+            # Raqam yo'q bo'lsa nomga mos birini qabul qilamiz
+            title_lower = title_part.lower()
+            for q in questions2:
+                if q.get("title", "").lower() == title_lower:
+                    return q["titleSlug"]
+
+        # 3. Ixtiyoriy: birinchi natija
         if questions:
             return questions[0]["titleSlug"]
         return None
 
-    # --- Nom bo'yicha qidirish ---
+    # --- Faqat raqam ---
+    if query_clean.isdigit():
+        questions = await _search_leetcode(query_clean)
+        for q in questions:
+            if str(q.get("questionFrontendId", "")) == query_clean:
+                return q["titleSlug"]
+        if questions:
+            return questions[0]["titleSlug"]
+        return None
+
+    # --- Nom yoki slug bo'yicha qidirish ---
     questions = await _search_leetcode(query_clean)
 
     # 1. To'liq mos
@@ -150,10 +184,9 @@ async def _find_leetcode_slug(query: str) -> str | None:
         if query_lower in q.get("title", "").lower():
             return q["titleSlug"]
 
-    # 4. Slug sifatida bevosita ishlatish (masalan "two-sum" kiritilsa)
-    slug_attempt = re.sub(r"[^a-z0-9-]", "-", query_lower).strip("-")
+    # 4. Slug sifatida bevosita sinab ko'rish ("two-sum" kiritilsa)
+    slug_attempt = re.sub(r"[^a-z0-9]+", "-", query_lower).strip("-")
     if slug_attempt:
-        # Tekshirib ko'rish — agar mavjud bo'lsa qaytaramiz
         lc_data = await _fetch_leetcode_by_slug(slug_attempt)
         if lc_data:
             return slug_attempt

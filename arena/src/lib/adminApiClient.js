@@ -139,8 +139,8 @@ export const adminApi = {
       }),
 
     remove: (userId, password) =>
-      adminRequest(`/api/admin/team/${userId}`, {
-        method: "DELETE",
+      adminRequest(`/api/admin/team/${userId}/remove`, {
+        method: "POST",
         body: json({ password }),
       }),
 

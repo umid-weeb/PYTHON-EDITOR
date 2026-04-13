@@ -745,7 +745,7 @@ def update_admin_permissions(
     return {"message": "Ruxsatlar yangilandi.", "member": _user_to_team_member(target).dict()}
 
 
-@router.delete("/team/{user_id}")
+@router.post("/team/{user_id}/remove")
 def remove_admin_member(
     user_id: int,
     data: RemoveAdminRequest,
