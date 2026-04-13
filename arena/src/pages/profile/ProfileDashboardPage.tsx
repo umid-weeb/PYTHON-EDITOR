@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import DashboardShell from "../../components/layout/DashboardShell.jsx";
 import Avatar from "../../components/profile/Avatar";
@@ -190,7 +190,7 @@ function FeedTabButton({
 
 export default function ProfileDashboardPage() {
   const { username = "" } = useParams();
-  const { user: authedUser, isAdmin } = useAuth();
+  const { user: authedUser, isAdmin, isOwner } = useAuth();
   const isOwnProfile = Boolean(authedUser?.username && authedUser.username === username);
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -198,6 +198,43 @@ export default function ProfileDashboardPage() {
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [feedTab, setFeedTab] = useState<FeedTab>("recent-ac");
+
+  // Admin action modal (only visible to owner)
+  const [adminModal, setAdminModal] = useState<"add" | "remove" | null>(null);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminMsg, setAdminMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const adminPassRef = useRef<HTMLInputElement>(null);
+
+  async function handleAdminAction() {
+    if (!adminPassword || !profile) return;
+    setAdminLoading(true);
+    try {
+      const { adminApi } = await import("../../lib/adminApiClient.js");
+      if (adminModal === "add") {
+        await adminApi.team.add({
+          identifier: profile.username,
+          password: adminPassword,
+          permissions: { can_manage_problems: true, can_view_users: true, can_manage_admins: false },
+        });
+        setAdminMsg({ text: `${profile.username} admin qilindi!`, ok: true });
+        setProfile((p) => p ? { ...p, is_admin: true } : p);
+      } else {
+        await adminApi.team.remove(profile.id, adminPassword);
+        setAdminMsg({ text: `${profile.username} admin huquqidan mahrum qilindi.`, ok: true });
+        setProfile((p) => p ? { ...p, is_admin: false, is_owner: false } : p);
+      }
+      setAdminModal(null);
+      setAdminPassword("");
+      setTimeout(() => setAdminMsg(null), 4000);
+    } catch (err: any) {
+      setAdminMsg({ text: err.message || "Xato yuz berdi", ok: false });
+      setTimeout(() => setAdminMsg(null), 4000);
+      setAdminModal(null);
+    } finally {
+      setAdminLoading(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -315,6 +352,8 @@ export default function ProfileDashboardPage() {
     [bestStreak, profile, solvedTotals.easy, solvedTotals.hard, solvedTotals.medium, solvedTotals.total],
   );
 
+  const canManageThisUser = isOwner && !isOwnProfile && !profile?.is_owner;
+
   return (
     <DashboardShell
       eyebrow="Profile"
@@ -322,6 +361,13 @@ export default function ProfileDashboardPage() {
       subtitle={isOwnProfile ? "Track your Arena progress, streaks, and badges." : "Public Arena profile and competitive stats."}
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          {/* Admin toast message */}
+          {adminMsg && (
+            <span className={`text-xs px-3 py-1.5 rounded-full ${adminMsg.ok ? "text-green-400 bg-green-400/10 border border-green-400/20" : "text-red-400 bg-red-400/10 border border-red-400/20"}`}>
+              {adminMsg.text}
+            </span>
+          )}
+
           <Link
             className="inline-flex items-center rounded-full border border-[var(--arena-border)] bg-[var(--arena-surface)] px-4 py-2 text-sm font-medium text-arena-text hover:bg-[var(--arena-surface-strong)]"
             to={`/profile/${encodeURIComponent(username)}/submissions`}
@@ -344,9 +390,60 @@ export default function ProfileDashboardPage() {
               ⚙ Admin Panel
             </Link>
           ) : null}
+
+          {/* Owner: add/remove admin button on other profiles */}
+          {canManageThisUser && status === "ready" ? (
+            profile?.is_admin ? (
+              <button
+                onClick={() => { setAdminModal("remove"); setAdminPassword(""); setTimeout(() => adminPassRef.current?.focus(), 50); }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-900/20 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-800/30 transition-colors"
+              >
+                Admin olib tashlash
+              </button>
+            ) : (
+              <button
+                onClick={() => { setAdminModal("add"); setAdminPassword(""); setTimeout(() => adminPassRef.current?.focus(), 50); }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/40 bg-blue-900/20 px-4 py-2 text-sm font-medium text-blue-300 hover:bg-blue-800/30 transition-colors"
+              >
+                + Admin qilish
+              </button>
+            )
+          ) : null}
         </div>
       }
     >
+      {/* Admin password modal */}
+      {adminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-1">
+              {adminModal === "add" ? `@${profile?.username} ni admin qilish` : `@${profile?.username} dan admin huquqini olish`}
+            </h3>
+            <p className="text-sm text-gray-400 mb-4">Admin panel parolini kiriting</p>
+            <input
+              ref={adminPassRef}
+              type="password"
+              placeholder="Admin panel paroli"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdminAction()}
+              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setAdminModal(null)} className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm transition-colors">
+                Bekor
+              </button>
+              <button
+                onClick={handleAdminAction}
+                disabled={adminLoading || !adminPassword}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 text-white ${adminModal === "add" ? "bg-blue-600 hover:bg-blue-500" : "bg-red-600 hover:bg-red-500"}`}
+              >
+                {adminLoading ? "..." : adminModal === "add" ? "Admin qilish" : "Olib tashlash"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {status === "loading" ? (
         <div className="flex items-center justify-center rounded-2xl border border-[var(--arena-border)] bg-[var(--arena-surface)] p-12 backdrop-blur-md">
           <div className="flex items-center gap-3 text-arena-muted">

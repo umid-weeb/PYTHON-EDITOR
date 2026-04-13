@@ -25,6 +25,8 @@ export type PublicProfile = {
   problem_bank_easy?: number;
   problem_bank_medium?: number;
   problem_bank_hard?: number;
+  is_admin?: boolean;
+  is_owner?: boolean;
 };
 
 export type SubmissionRow = {

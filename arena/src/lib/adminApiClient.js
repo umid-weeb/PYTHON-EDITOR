@@ -126,10 +126,10 @@ export const adminApi = {
   team: {
     list: () => adminRequest("/api/admin/team"),
 
-    add: ({ email, password, permissions }) =>
+    add: ({ identifier, password, permissions }) =>
       adminRequest("/api/admin/team/add", {
         method: "POST",
-        body: json({ email, password, permissions }),
+        body: json({ identifier, password, permissions }),
       }),
 
     updatePermissions: (userId, permissions) =>

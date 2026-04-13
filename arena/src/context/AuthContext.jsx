@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
       status,
       isAuthenticated: Boolean(token),
       isAdmin: Boolean(user?.is_admin),
+      isOwner: Boolean(user?.is_owner),
       async login(username, password) {
         setStatus("loading");
         try {

@@ -143,7 +143,7 @@ class AdminTeamMember(BaseModel):
 
 
 class AddAdminRequest(BaseModel):
-    email: str
+    identifier: str  # email yoki username
     password: str  # Admin panel paroli
     permissions: AdminPermissions = AdminPermissions()
 
@@ -701,10 +701,14 @@ def add_admin_member(
     if not _verify_admin_password(db, data.password):
         raise HTTPException(status_code=403, detail="Parol noto'g'ri.")
 
-    # Foydalanuvchini topish
-    user = db.query(User).filter(User.email == data.email).first()
+    # Foydalanuvchini email yoki username bo'yicha topish
+    ident = data.identifier.strip()
+    if "@" in ident:
+        user = db.query(User).filter(User.email == ident).first()
+    else:
+        user = db.query(User).filter(User.username == ident).first()
     if not user:
-        raise HTTPException(status_code=404, detail=f"Foydalanuvchi topilmadi: {data.email}")
+        raise HTTPException(status_code=404, detail=f"Foydalanuvchi topilmadi: {ident}")
     if user.is_admin:
         raise HTTPException(status_code=400, detail="Bu foydalanuvchi allaqachon admin.")
 

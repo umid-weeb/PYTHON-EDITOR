@@ -234,6 +234,8 @@ class PublicProfileResponse(BaseModel):
     problem_bank_easy: int = 0
     problem_bank_medium: int = 0
     problem_bank_hard: int = 0
+    is_admin: bool = False
+    is_owner: bool = False
 
 
 def get_password_hash(password: str) -> str:
@@ -729,6 +731,8 @@ def get_public_user_profile(username: str, db: Session = Depends(get_db)):
         level=getattr(user, "level", None),
         streak=int(getattr(user, "streak", 0) or 0),
         longest_streak=int(getattr(user, "longest_streak", 0) or 0),
+        is_admin=bool(getattr(user, "is_admin", False)),
+        is_owner=bool(getattr(user, "is_owner", False)),
         **stats
     )
 

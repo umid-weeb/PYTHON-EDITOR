@@ -148,7 +148,7 @@ export default function AdminTeamPage() {
 
   // Modal states
   const [addModal, setAddModal] = useState(false);
-  const [addEmail, setAddEmail] = useState("");
+  const [addIdentifier, setAddIdentifier] = useState(""); // email yoki username
   const [addPerms, setAddPerms] = useState({ can_manage_problems: true, can_view_users: true, can_manage_admins: false });
   const [addLoading, setAddLoading] = useState(false);
 
@@ -206,12 +206,12 @@ export default function AdminTeamPage() {
 
   // --- Add admin ---
   async function handleAddAdmin(password) {
-    if (!addEmail.trim()) return;
+    if (!addIdentifier.trim()) return;
     setAddLoading(true);
     try {
-      await adminApi.team.add({ email: addEmail.trim(), password, permissions: addPerms });
+      await adminApi.team.add({ identifier: addIdentifier.trim(), password, permissions: addPerms });
       setAddModal(false);
-      setAddEmail("");
+      setAddIdentifier("");
       flash("Admin muvaffaqiyatli qo'shildi!");
       load();
     } catch (err) {
@@ -280,10 +280,10 @@ export default function AdminTeamPage() {
           extra={
             <div className="mb-4 space-y-3">
               <input
-                type="email"
-                placeholder="Email manzil"
-                value={addEmail}
-                onChange={(e) => setAddEmail(e.target.value)}
+                type="text"
+                placeholder="Username yoki email"
+                value={addIdentifier}
+                onChange={(e) => setAddIdentifier(e.target.value)}
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
               />
               <div className="bg-gray-800 rounded-xl p-2 space-y-1">
