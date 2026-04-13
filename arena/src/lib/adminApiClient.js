@@ -109,7 +109,7 @@ export const adminApi = {
     }),
 
   // ---------------------------------------------------------------------------
-  // Admin management
+  // Admin management (legacy)
   // ---------------------------------------------------------------------------
   setAdmin: (email, isAdmin = true) =>
     adminRequest("/api/admin/set-admin", {
@@ -119,6 +119,43 @@ export const adminApi = {
 
   activateSelf: () =>
     adminRequest("/api/admin/activate-self", { method: "POST" }),
+
+  // ---------------------------------------------------------------------------
+  // Team management
+  // ---------------------------------------------------------------------------
+  team: {
+    list: () => adminRequest("/api/admin/team"),
+
+    add: ({ email, password, permissions }) =>
+      adminRequest("/api/admin/team/add", {
+        method: "POST",
+        body: json({ email, password, permissions }),
+      }),
+
+    updatePermissions: (userId, permissions) =>
+      adminRequest(`/api/admin/team/${userId}/permissions`, {
+        method: "PUT",
+        body: json({ permissions }),
+      }),
+
+    remove: (userId, password) =>
+      adminRequest(`/api/admin/team/${userId}`, {
+        method: "DELETE",
+        body: json({ password }),
+      }),
+
+    transferOwnership: ({ target_email, password }) =>
+      adminRequest("/api/admin/team/transfer-ownership", {
+        method: "POST",
+        body: json({ target_email, password }),
+      }),
+
+    changePassword: ({ old_password, new_password }) =>
+      adminRequest("/api/admin/team/password", {
+        method: "PUT",
+        body: json({ old_password, new_password }),
+      }),
+  },
 
   // ---------------------------------------------------------------------------
   // AI endpoints

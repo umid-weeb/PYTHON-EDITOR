@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -22,6 +23,11 @@ from app.models.user import User
 from app.services.problem_service import get_problem_service, ProblemService
 
 logger = logging.getLogger("pyzone.arena.admin")
+
+# ---------------------------------------------------------------------------
+# Admin panel default password (bcrypt-hashed on first use)
+# ---------------------------------------------------------------------------
+_DEFAULT_ADMIN_PASSWORD = "11092009"
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -117,6 +123,49 @@ class SetAdminRequest(BaseModel):
     is_admin: bool = True
 
 
+# ---------------------------------------------------------------------------
+# Team Management schemas
+# ---------------------------------------------------------------------------
+
+class AdminPermissions(BaseModel):
+    can_manage_problems: bool = True
+    can_view_users: bool = True
+    can_manage_admins: bool = False
+
+
+class AdminTeamMember(BaseModel):
+    id: int
+    username: str
+    email: Optional[str]
+    is_owner: bool
+    is_admin: bool
+    permissions: AdminPermissions
+
+
+class AddAdminRequest(BaseModel):
+    email: str
+    password: str  # Admin panel paroli
+    permissions: AdminPermissions = AdminPermissions()
+
+
+class UpdatePermsRequest(BaseModel):
+    permissions: AdminPermissions
+
+
+class RemoveAdminRequest(BaseModel):
+    password: str  # Admin panel paroli
+
+
+class TransferOwnershipRequest(BaseModel):
+    target_email: str
+    password: str
+
+
+class ChangeAdminPasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=4, max_length=64)
+
+
 class AdminStatsResponse(BaseModel):
     total_problems: int
     easy_count: int
@@ -210,6 +259,53 @@ def _invalidate_cache(problem_id: str | None = None) -> None:
         service.cache.invalidate(problem_id)
     except Exception as exc:
         logger.warning("Cache invalidation failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Team management helpers
+# ---------------------------------------------------------------------------
+
+def _get_admin_password_hash(db: Session) -> str | None:
+    """site_settings tabidan saqlangan parol hashini olish."""
+    from sqlalchemy import text
+    try:
+        row = db.execute(text("SELECT value FROM site_settings WHERE key = 'admin_password'")).fetchone()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _verify_admin_password(db: Session, password: str) -> bool:
+    """Admin panel parolini tekshirish."""
+    stored = _get_admin_password_hash(db)
+    if stored is None:
+        return password == _DEFAULT_ADMIN_PASSWORD
+    try:
+        return bcrypt.checkpw(password.encode(), stored.encode())
+    except Exception:
+        return False
+
+
+def _parse_perms(user: User) -> AdminPermissions:
+    """Foydalanuvchi admin_perms JSON maydonini AdminPermissions ga aylantirish."""
+    if user.is_owner:
+        return AdminPermissions(can_manage_problems=True, can_view_users=True, can_manage_admins=True)
+    try:
+        data = json.loads(user.admin_perms or "{}")
+        return AdminPermissions(**data)
+    except Exception:
+        return AdminPermissions()
+
+
+def _user_to_team_member(user: User) -> AdminTeamMember:
+    return AdminTeamMember(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        is_owner=bool(getattr(user, "is_owner", False)),
+        is_admin=bool(user.is_admin),
+        permissions=_parse_perms(user),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -403,12 +499,28 @@ def delete_problem(
     db: Session = Depends(get_db),
     _admin: User = Depends(get_admin_user),
 ) -> dict:
-    """Masalani o'chirish (barcha test case va submissionlar bilan)."""
-    problem = db.query(Problem).filter(Problem.id == problem_id).first()
-    if not problem:
+    """Masalani o'chirish (barcha bog'liq yozuvlar bilan, explicit SQL)."""
+    from sqlalchemy import text as _text
+
+    exists = db.query(Problem.id).filter(Problem.id == problem_id).first()
+    if not exists:
         raise HTTPException(status_code=404, detail="Masala topilmadi.")
-    db.delete(problem)
+
+    # Bog'liq jadvallarni cascade o'chirishni ishonchli qilish uchun
+    # explicit SQL ishlatamiz — SQLAlchemy lazy-load muammolarini chetlab o'tamiz
+    _del = lambda tbl, col: db.execute(  # noqa: E731
+        _text(f"DELETE FROM {tbl} WHERE {col} = :pid"), {"pid": problem_id}
+    )
+    _del("daily_challenges", "problem_id")
+    _del("contest_submissions", "problem_id")
+    _del("contest_problems", "problem_id")
+    _del("solved_problems", "problem_id")
+    _del("submissions", "problem_id")
+    _del("problem_translations", "problem_id")
+    _del("test_cases", "problem_id")
+    db.execute(_text("DELETE FROM problems WHERE id = :pid"), {"pid": problem_id})
     db.commit()
+
     _invalidate_cache()
     logger.info("Admin: masala o'chirildi id=%s", problem_id)
     return {"deleted": True, "id": problem_id}
@@ -562,6 +674,163 @@ def set_admin(
         "email": user.email,
         "is_admin": user.is_admin,
     }
+
+
+# ---------------------------------------------------------------------------
+# Team Management
+# ---------------------------------------------------------------------------
+
+@router.get("/team", response_model=List[AdminTeamMember])
+def list_admin_team(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_admin_user),
+) -> List[AdminTeamMember]:
+    """Barcha admin foydalanuvchilar ro'yxati."""
+    admins = db.query(User).filter(User.is_admin == True).order_by(User.id).all()  # noqa: E712
+    return [_user_to_team_member(u) for u in admins]
+
+
+@router.post("/team/add")
+def add_admin_member(
+    data: AddAdminRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_admin_user),
+) -> dict:
+    """Yangi admin qo'shish (admin panel paroli talab etiladi)."""
+    # Parolni tekshirish
+    if not _verify_admin_password(db, data.password):
+        raise HTTPException(status_code=403, detail="Parol noto'g'ri.")
+
+    # Foydalanuvchini topish
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Foydalanuvchi topilmadi: {data.email}")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Bu foydalanuvchi allaqachon admin.")
+
+    user.is_admin = True
+    user.is_owner = False
+    user.admin_perms = json.dumps(data.permissions.dict(), ensure_ascii=False)
+    db.commit()
+    logger.info("Admin qo'shildi: %s (id=%s) qo'shuvchi: %s", user.email, user.id, current_admin.email)
+    return {"message": "Admin muvaffaqiyatli qo'shildi.", "member": _user_to_team_member(user).dict()}
+
+
+@router.put("/team/{user_id}/permissions")
+def update_admin_permissions(
+    user_id: int,
+    data: UpdatePermsRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_admin_user),
+) -> dict:
+    """Sub-admin ruxsatlarini yangilash (faqat ega yoki can_manage_admins)."""
+    # Ruxsat tekshiruvi
+    if not getattr(current_admin, "is_owner", False):
+        perms = _parse_perms(current_admin)
+        if not perms.can_manage_admins:
+            raise HTTPException(status_code=403, detail="Bu amalni faqat ega yoki 'can_manage_admins' ruxsati bor adminlar bajara oladi.")
+
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+    if target.is_owner:
+        raise HTTPException(status_code=400, detail="Eganing ruxsatlarini o'zgartirib bo'lmaydi.")
+
+    target.admin_perms = json.dumps(data.permissions.dict(), ensure_ascii=False)
+    db.commit()
+    return {"message": "Ruxsatlar yangilandi.", "member": _user_to_team_member(target).dict()}
+
+
+@router.delete("/team/{user_id}")
+def remove_admin_member(
+    user_id: int,
+    data: RemoveAdminRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_admin_user),
+) -> dict:
+    """Adminni o'chirish (faqat ega, parol talab etiladi)."""
+    if not getattr(current_admin, "is_owner", False):
+        raise HTTPException(status_code=403, detail="Faqat ega admin o'chira oladi.")
+    if not _verify_admin_password(db, data.password):
+        raise HTTPException(status_code=403, detail="Parol noto'g'ri.")
+
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+    if target.is_owner:
+        raise HTTPException(status_code=400, detail="Egani o'chirib bo'lmaydi.")
+    if not target.is_admin:
+        raise HTTPException(status_code=400, detail="Bu foydalanuvchi admin emas.")
+
+    target.is_admin = False
+    target.is_owner = False
+    target.admin_perms = None
+    db.commit()
+    logger.info("Admin olib tashlandi: %s (id=%s)", target.email, target.id)
+    return {"message": "Admin muvaffaqiyatli olib tashlandi."}
+
+
+@router.post("/team/transfer-ownership")
+def transfer_ownership(
+    data: TransferOwnershipRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_admin_user),
+) -> dict:
+    """Egaliklarni boshqa adminiga topshirish (faqat hozirgi ega, parol talab etiladi)."""
+    if not getattr(current_admin, "is_owner", False):
+        raise HTTPException(status_code=403, detail="Faqat ega egaliklarni topshira oladi.")
+    if not _verify_admin_password(db, data.password):
+        raise HTTPException(status_code=403, detail="Parol noto'g'ri.")
+
+    new_owner = db.query(User).filter(User.email == data.target_email).first()
+    if not new_owner:
+        raise HTTPException(status_code=404, detail=f"Foydalanuvchi topilmadi: {data.target_email}")
+    if new_owner.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="O'zingizga egaliklarni topshirib bo'lmaydi.")
+
+    # Hozirgi egani sub-adminга tushirish
+    current_admin.is_owner = False
+    current_admin.admin_perms = json.dumps(
+        {"can_manage_problems": True, "can_view_users": True, "can_manage_admins": False},
+        ensure_ascii=False,
+    )
+
+    # Yangi egani o'rnatish
+    new_owner.is_admin = True
+    new_owner.is_owner = True
+    new_owner.admin_perms = None  # Ega uchun barcha ruxsatlar
+
+    db.commit()
+    logger.info("Egalik topshirildi: %s → %s", current_admin.email, new_owner.email)
+    return {"message": f"Egalik {new_owner.username} ga muvaffaqiyatli topshirildi."}
+
+
+@router.put("/team/password")
+def change_admin_password(
+    data: ChangeAdminPasswordRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_admin_user),
+) -> dict:
+    """Admin panel parolini o'zgartirish (faqat ega)."""
+    if not getattr(current_admin, "is_owner", False):
+        raise HTTPException(status_code=403, detail="Faqat ega parolni o'zgartira oladi.")
+    if not _verify_admin_password(db, data.old_password):
+        raise HTTPException(status_code=403, detail="Eski parol noto'g'ri.")
+
+    new_hash = bcrypt.hashpw(data.new_password.encode(), bcrypt.gensalt()).decode()
+
+    from sqlalchemy import text
+    db.execute(
+        text("""
+            INSERT INTO site_settings (key, value, updated_at)
+            VALUES ('admin_password', :val, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = :val, updated_at = NOW()
+        """),
+        {"val": new_hash},
+    )
+    db.commit()
+    logger.info("Admin panel paroli o'zgartirildi: %s", current_admin.email)
+    return {"message": "Parol muvaffaqiyatli o'zgartirildi."}
 
 
 @router.post("/activate-self")

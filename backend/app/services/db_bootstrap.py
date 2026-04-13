@@ -398,6 +398,19 @@ POSTGRES_BOOTSTRAP_SQL = [
     ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
     """,
     """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner BOOLEAN NOT NULL DEFAULT FALSE;
+    """,
+    """
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_perms TEXT;
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key VARCHAR(128) PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
     CREATE TABLE IF NOT EXISTS problems (
       id VARCHAR(36) PRIMARY KEY,
       title VARCHAR(255) NOT NULL,

@@ -55,14 +55,18 @@ query GetProblem($titleSlug: String!) {
 }
 """
 
-_QUERY_PROBLEMS_LIST = """
-{
-  problemsetQuestionList(categorySlug: "", filters: {}, limit: 3000, skip: 0) {
+_QUERY_SEARCH_PROBLEMS = """
+query SearchProblems($keywords: String!) {
+  problemsetQuestionList(
+    categorySlug: ""
+    limit: 50
+    skip: 0
+    filters: { searchKeywords: $keywords }
+  ) {
     questions {
-      frontendQuestionId: questionFrontendId
+      questionFrontendId
       titleSlug
       title
-      difficulty
     }
   }
 }
@@ -85,53 +89,76 @@ async def _fetch_leetcode_by_slug(slug: str) -> dict | None:
         return None
 
 
-async def _find_leetcode_slug(query: str) -> str | None:
-    """
-    Masala nomidan yoki raqamidan slug topish.
-    Masalan: "1" → "two-sum", "Two Sum" → "two-sum"
-    """
-    # Raqam bo'lsa — problems list dan topamiz
+async def _search_leetcode(keywords: str) -> list:
+    """LeetCode GraphQL qidiruvi — faqat kerakli miqdordagi natijalar."""
     try:
-        async with httpx.AsyncClient(timeout=20.0, headers=_LC_HEADERS) as client:
+        async with httpx.AsyncClient(timeout=15.0, headers=_LC_HEADERS) as client:
             resp = await client.post(
                 _LC_GRAPHQL,
-                json={"query": _QUERY_PROBLEMS_LIST},
+                json={
+                    "query": _QUERY_SEARCH_PROBLEMS,
+                    "variables": {"keywords": keywords},
+                },
             )
             resp.raise_for_status()
             data = resp.json()
-            questions = (
+            return (
                 data.get("data", {})
                 .get("problemsetQuestionList", {})
                 .get("questions", [])
             )
-
-        query_clean = query.strip()
-        query_lower = query_clean.lower()
-
-        # 1. Raqam bo'yicha
-        if query_clean.isdigit():
-            num = query_clean
-            for q in questions:
-                if str(q.get("frontendQuestionId", "")) == num:
-                    return q["titleSlug"]
-
-        # 2. To'g'ri mos
-        for q in questions:
-            if q.get("title", "").lower() == query_lower:
-                return q["titleSlug"]
-
-        # 3. Qisman mos
-        for q in questions:
-            if query_lower in q.get("title", "").lower():
-                return q["titleSlug"]
-
-        # 4. Slug sifatida ishlatish (masalan "two-sum" to'g'ridan kiritilsa)
-        slug_attempt = re.sub(r"[^a-z0-9-]", "-", query_lower).strip("-")
-        return slug_attempt or None
-
     except Exception as exc:
-        logger.warning("LeetCode problems list fetch failed: %s", exc)
+        logger.warning("LeetCode search failed (%r): %s", keywords, exc)
+        return []
+
+
+async def _find_leetcode_slug(query: str) -> str | None:
+    """
+    Masala nomidan yoki raqamidan slug topish.
+    Masalan: "1" → "two-sum", "Two Sum" → "two-sum", "add two" → "add-two-numbers"
+    """
+    query_clean = query.strip()
+    query_lower = query_clean.lower()
+
+    # --- Raqam bo'yicha qidirish ---
+    if query_clean.isdigit():
+        questions = await _search_leetcode(query_clean)
+        # Aniq raqam bo'yicha moslik
+        for q in questions:
+            if str(q.get("questionFrontendId", "")) == query_clean:
+                return q["titleSlug"]
+        # Topilmadi — 1-natijani olamiz (ko'pincha to'g'ri keladi)
+        if questions:
+            return questions[0]["titleSlug"]
         return None
+
+    # --- Nom bo'yicha qidirish ---
+    questions = await _search_leetcode(query_clean)
+
+    # 1. To'liq mos
+    for q in questions:
+        if q.get("title", "").lower() == query_lower:
+            return q["titleSlug"]
+
+    # 2. Boshlanishi mos
+    for q in questions:
+        if q.get("title", "").lower().startswith(query_lower):
+            return q["titleSlug"]
+
+    # 3. Qisman mos
+    for q in questions:
+        if query_lower in q.get("title", "").lower():
+            return q["titleSlug"]
+
+    # 4. Slug sifatida bevosita ishlatish (masalan "two-sum" kiritilsa)
+    slug_attempt = re.sub(r"[^a-z0-9-]", "-", query_lower).strip("-")
+    if slug_attempt:
+        # Tekshirib ko'rish — agar mavjud bo'lsa qaytaramiz
+        lc_data = await _fetch_leetcode_by_slug(slug_attempt)
+        if lc_data:
+            return slug_attempt
+
+    return questions[0]["titleSlug"] if questions else None
 
 
 def _html_to_text(html: str) -> str:

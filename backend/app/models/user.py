@@ -25,6 +25,8 @@ class User(Base):
     goal = Column(String(64), nullable=True)
     weekly_hours = Column(String(32), nullable=True)
     is_admin = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_owner = Column(Boolean, nullable=False, default=False, server_default="false")
+    admin_perms = Column(Text, nullable=True, default=None)  # JSON: {"can_manage_problems": true, ...}
     notifications_enabled = Column(Boolean, nullable=False, default=True, server_default="true")
     timezone = Column(String(64), nullable=False, default="Asia/Tashkent", server_default="Asia/Tashkent")
     streak = Column(Integer, nullable=False, default=0, server_default="0")

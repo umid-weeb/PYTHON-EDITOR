@@ -167,12 +167,20 @@ export default function AdminProblemsListPage() {
               <p className="text-sm text-gray-400">Masalalar boshqaruvi</p>
             </div>
           </div>
-          <Link
-            to="/admin/problems/new"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            <span>+</span> Yangi masala
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/admin/team"
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              Jamoa
+            </Link>
+            <Link
+              to="/admin/problems/new"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              <span>+</span> Yangi masala
+            </Link>
+          </div>
         </div>
       </div>
 

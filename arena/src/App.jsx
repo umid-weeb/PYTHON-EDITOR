@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import AdminRoute from "./components/common/AdminRoute.jsx";
 import AdminProblemsListPage from "./pages/admin/AdminProblemsListPage.jsx";
 import AdminProblemFormPage from "./pages/admin/AdminProblemFormPage.jsx";
+import AdminTeamPage from "./pages/admin/AdminTeamPage.jsx";
 import ArenaPage from "./pages/ArenaPage.jsx";
 import OnlineEditorPage from "./pages/OnlineEditorPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
@@ -160,6 +161,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AdminProblemFormPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/team"
+          element={
+            <AdminRoute>
+              <AdminTeamPage />
             </AdminRoute>
           }
         />
