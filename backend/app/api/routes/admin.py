@@ -365,12 +365,12 @@ def update_problem(
     return _problem_to_detail(problem)
 
 
-@router.delete("/problems/{problem_id}", status_code=204)
+@router.delete("/problems/{problem_id}")
 def delete_problem(
     problem_id: str,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_admin_user),
-) -> None:
+) -> dict:
     """Masalani o'chirish (barcha test case va submissionlar bilan)."""
     problem = db.query(Problem).filter(Problem.id == problem_id).first()
     if not problem:
@@ -379,6 +379,7 @@ def delete_problem(
     db.commit()
     _invalidate_cache()
     logger.info("Admin: masala o'chirildi id=%s", problem_id)
+    return {"deleted": True, "id": problem_id}
 
 
 # ---------------------------------------------------------------------------
@@ -446,18 +447,19 @@ def update_test_case(
     )
 
 
-@router.delete("/test-cases/{tc_id}", status_code=204)
+@router.delete("/test-cases/{tc_id}")
 def delete_test_case(
     tc_id: int,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_admin_user),
-) -> None:
+) -> dict:
     """Test case ni o'chirish."""
     tc = db.query(TestCase).filter(TestCase.id == tc_id).first()
     if not tc:
         raise HTTPException(status_code=404, detail="Test case topilmadi.")
     db.delete(tc)
     db.commit()
+    return {"deleted": True, "id": tc_id}
 
 
 @router.post("/problems/{problem_id}/test-cases/bulk", response_model=List[TestCaseOut], status_code=201)
