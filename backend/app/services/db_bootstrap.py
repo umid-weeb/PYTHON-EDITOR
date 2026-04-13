@@ -558,6 +558,31 @@ POSTGRES_BOOTSTRAP_SQL = [
         rating = COALESCE(user_ratings.rating, 1200),
         max_rating = COALESCE(user_ratings.max_rating, 1200);
     """,
+    """
+    CREATE TABLE IF NOT EXISTS problem_comments (
+      id SERIAL PRIMARY KEY,
+      problem_id VARCHAR(36) NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      parent_id INTEGER REFERENCES problem_comments(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      likes INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS comment_likes (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      comment_id INTEGER NOT NULL REFERENCES problem_comments(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, comment_id)
+    );
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_problem_comments_problem ON problem_comments(problem_id);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_problem_comments_parent ON problem_comments(parent_id);
+    """,
 ]
 
 

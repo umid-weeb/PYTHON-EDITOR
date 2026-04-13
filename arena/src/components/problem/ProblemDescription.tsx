@@ -1,5 +1,7 @@
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { formatProblemTitle, localizeDifficultyLabel } from "../../lib/problemPresentation.js";
+import DiscussionTab from "./DiscussionTab.js";
 
 type VisibleTestcase = {
   name?: string;
@@ -10,6 +12,7 @@ type VisibleTestcase = {
 type Problem = {
   title?: string;
   id?: string;
+  slug?: string;
   order_index?: number;
   difficulty?: string;
   description?: string;
@@ -34,7 +37,16 @@ function difficultyStyles(difficulty?: string) {
   return "bg-[var(--bg-subtle)] text-[var(--text-secondary)]";
 }
 
+const TABS = [
+  { id: "description", label: "Tavsif" },
+  { id: "discussion", label: "Muhokama" },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
 export default function ProblemDescription({ problem, loading, embedded = false, siblings, onBack, onNavigate }: Props) {
+  const [activeTab, setActiveTab] = useState<TabId>("description");
+
   if (loading) {
     return (
       <div className="space-y-3 p-4">
@@ -54,6 +66,7 @@ export default function ProblemDescription({ problem, loading, embedded = false,
   }
 
   const examples = (problem.visible_testcases || []).slice(0, 3);
+  const slug = problem.slug || problem.id || "";
 
   return (
     <div
@@ -62,8 +75,9 @@ export default function ProblemDescription({ problem, loading, embedded = false,
         embedded ? "" : "border border-[color:var(--border)]",
       ].join(" ")}
     >
-      <div className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/95 px-4 py-3 backdrop-blur">
-        <div className="flex items-center justify-between gap-4">
+      {/* Header */}
+      <div className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/95 backdrop-blur">
+        <div className="flex items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3 overflow-hidden">
             <button
               onClick={onBack}
@@ -106,7 +120,7 @@ export default function ProblemDescription({ problem, loading, embedded = false,
             <button
               disabled={!siblings?.next}
               onClick={() => siblings?.next && onNavigate?.(siblings.next)}
-              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-overlay)] disabled:cursor-not-allowed"
               title="Keyingi"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -115,76 +129,99 @@ export default function ProblemDescription({ problem, loading, embedded = false,
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="space-y-4">
-          <div className="space-y-3 text-[13px] leading-6 text-[var(--text-secondary)]">
-            <ReactMarkdown
-              components={{
-                h1: ({ children }) => <h2 className="text-[18px] font-semibold text-[var(--text-primary)]">{children}</h2>,
-                h2: ({ children }) => <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">{children}</h3>,
-                h3: ({ children }) => <h4 className="text-[14px] font-semibold text-[var(--text-primary)]">{children}</h4>,
-                p: ({ children }) => <p>{children}</p>,
-                ul: ({ children }) => <ul className="space-y-1 pl-4">{children}</ul>,
-                ol: ({ children }) => <ol className="space-y-1 pl-4">{children}</ol>,
-                li: ({ children }) => <li>{children}</li>,
-                code: ({ children }) => (
-                  <code className="rounded-[var(--radius-xs)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[12px] text-[var(--text-primary)]">
-                    {children}
-                  </code>
-                ),
-                pre: ({ children }) => (
-                  <pre className="overflow-x-auto rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] text-[var(--text-primary)]">
-                    {children}
-                  </pre>
-                ),
-              }}
+        {/* Tab bar */}
+        <div className="flex border-t border-[color:var(--border)] px-4">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={[
+                "px-3 py-2 text-[12px] font-medium transition-colors border-b-2 -mb-px",
+                activeTab === tab.id
+                  ? "border-indigo-500 text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
+              ].join(" ")}
             >
-              {problem.description || "Tavsif hozircha mavjud emas."}
-            </ReactMarkdown>
-          </div>
-
-          {problem.constraints && problem.constraints.length > 0 ? (
-            <section className="rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Cheklovlar</div>
-              <ul className="space-y-1 pl-4 text-[13px] text-[var(--text-secondary)]">
-                {problem.constraints.map((constraint, index) => (
-                  <li key={index}>{constraint}</li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {examples.length > 0 ? (
-            <section className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Misollar</div>
-              {examples.map((example, index) => (
-                <div
-                  key={index}
-                  className="rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3"
-                >
-                  <div className="mb-2 text-[12px] font-semibold text-[var(--text-primary)]">Misol {index + 1}</div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div>
-                      <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Kirish</div>
-                      <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
-                        {example.input || "--"}
-                      </pre>
-                    </div>
-                    <div>
-                      <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Chiqish</div>
-                      <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
-                        {example.expected_output || "--"}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </section>
-          ) : null}
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Tab content */}
+      {activeTab === "description" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="space-y-4">
+            <div className="space-y-3 text-[13px] leading-6 text-[var(--text-secondary)]">
+              <ReactMarkdown
+                components={{
+                  h1: ({ children }) => <h2 className="text-[18px] font-semibold text-[var(--text-primary)]">{children}</h2>,
+                  h2: ({ children }) => <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">{children}</h3>,
+                  h3: ({ children }) => <h4 className="text-[14px] font-semibold text-[var(--text-primary)]">{children}</h4>,
+                  p: ({ children }) => <p>{children}</p>,
+                  ul: ({ children }) => <ul className="space-y-1 pl-4">{children}</ul>,
+                  ol: ({ children }) => <ol className="space-y-1 pl-4">{children}</ol>,
+                  li: ({ children }) => <li>{children}</li>,
+                  code: ({ children }) => (
+                    <code className="rounded-[var(--radius-xs)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[12px] text-[var(--text-primary)]">
+                      {children}
+                    </code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre className="overflow-x-auto rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3 text-[12px] text-[var(--text-primary)]">
+                      {children}
+                    </pre>
+                  ),
+                }}
+              >
+                {problem.description || "Tavsif hozircha mavjud emas."}
+              </ReactMarkdown>
+            </div>
+
+            {problem.constraints && problem.constraints.length > 0 ? (
+              <section className="rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Cheklovlar</div>
+                <ul className="space-y-1 pl-4 text-[13px] text-[var(--text-secondary)]">
+                  {problem.constraints.map((constraint, index) => (
+                    <li key={index}>{constraint}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {examples.length > 0 ? (
+              <section className="space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">Misollar</div>
+                {examples.map((example, index) => (
+                  <div
+                    key={index}
+                    className="rounded-[var(--radius-md)] border border-[color:var(--border)] bg-[var(--bg-subtle)] p-3"
+                  >
+                    <div className="mb-2 text-[12px] font-semibold text-[var(--text-primary)]">Misol {index + 1}</div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div>
+                        <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Kirish</div>
+                        <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
+                          {example.input || "--"}
+                        </pre>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Chiqish</div>
+                        <pre className="m-0 whitespace-pre-wrap break-words text-[12px] text-[var(--text-primary)]">
+                          {example.expected_output || "--"}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <DiscussionTab slug={slug} />
+      )}
     </div>
   );
 }

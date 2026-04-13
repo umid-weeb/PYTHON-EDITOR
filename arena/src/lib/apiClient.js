@@ -285,6 +285,19 @@ export const aiApi = {
   },
 };
 
+export const commentsApi = {
+  getComments: (slug) => request(`/api/problems/${slug}/comments`),
+  createComment: (slug, content, parentId = null) =>
+    request(`/api/problems/${slug}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ content, parent_id: parentId }),
+    }),
+  deleteComment: (commentId) =>
+    request(`/api/comments/${commentId}`, { method: "DELETE" }),
+  toggleLike: (commentId) =>
+    request(`/api/comments/${commentId}/like`, { method: "POST" }),
+};
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
