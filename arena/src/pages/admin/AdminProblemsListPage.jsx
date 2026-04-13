@@ -53,7 +53,7 @@ export default function AdminProblemsListPage() {
   const [search, setSearch] = useState("");
   const [filterDiff, setFilterDiff] = useState("");
 
-  // Inline delete state: { [problemId]: "confirming" | "deleting" }
+  // Inline delete state: { [problemId]: "confirming" | "deleting" | "removing" }
   const [deleteState, setDeleteState] = useState({});
 
   // Search debounce
@@ -125,15 +125,23 @@ export default function AdminProblemsListPage() {
     setDeleteState((prev) => ({ ...prev, [problemId]: "deleting" }));
     try {
       await adminApi.deleteProblem(problemId);
-      // UI dan olib tashlash
-      setProblems((prev) => prev.filter((p) => p.id !== problemId));
-      // Cache ni yangilash (o'chirilgan problemasiz)
-      invalidateCache();
-      setStats((prev) =>
-        prev
-          ? { ...prev, total_problems: Math.max(0, prev.total_problems - 1) }
-          : prev
-      );
+      // Avval "removing" holati — CSS animatsiya ishga tushadi
+      setDeleteState((prev) => ({ ...prev, [problemId]: "removing" }));
+      // 350ms animatsiya tugagandan keyin listdan olib tashlaymiz
+      setTimeout(() => {
+        setProblems((prev) => prev.filter((p) => p.id !== problemId));
+        setDeleteState((prev) => {
+          const next = { ...prev };
+          delete next[problemId];
+          return next;
+        });
+        invalidateCache();
+        setStats((prev) =>
+          prev
+            ? { ...prev, total_problems: Math.max(0, prev.total_problems - 1) }
+            : prev
+        );
+      }, 350);
     } catch (err) {
       setError("O'chirishda xato: " + (err.message || "Noma'lum xato"));
       setDeleteState((prev) => {
@@ -257,14 +265,19 @@ export default function AdminProblemsListPage() {
                   const ds = deleteState[problem.id];
                   const isConfirming = ds === "confirming";
                   const isDeleting = ds === "deleting";
+                  const isRemoving = ds === "removing";
 
                   return (
                     <tr
                       key={problem.id}
-                      className={`transition-colors ${
-                        isConfirming
-                          ? "bg-red-950/20"
-                          : "hover:bg-gray-800/50"
+                      style={{
+                        transition: "opacity 0.35s ease, transform 0.35s ease",
+                        opacity: isRemoving ? 0 : 1,
+                        transform: isRemoving ? "translateX(40px)" : "translateX(0)",
+                        pointerEvents: isRemoving ? "none" : undefined,
+                      }}
+                      className={`${
+                        isConfirming ? "bg-red-950/20" : "hover:bg-gray-800/50"
                       }`}
                     >
                       <td className="px-4 py-3 text-gray-500">{idx + 1}</td>

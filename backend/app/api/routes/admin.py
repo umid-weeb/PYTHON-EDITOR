@@ -253,14 +253,46 @@ def list_admin_problems(
     db: Session = Depends(get_db),
     _admin: User = Depends(get_admin_user),
 ) -> List[ProblemAdminSummary]:
-    """Barcha masalalar ro'yxati (admin uchun to'liq ma'lumot bilan)."""
-    query = db.query(Problem)
+    """Barcha masalalar ro'yxati — bitta query bilan (N+1 yo'q)."""
+    from sqlalchemy import func as sqlfunc, distinct
+
+    # Test case sonini subquery bilan hisoblaymiz — lazy load yo'q
+    tc_count_sub = (
+        db.query(
+            TestCase.problem_id,
+            sqlfunc.count(TestCase.id).label("tc_count"),
+        )
+        .group_by(TestCase.problem_id)
+        .subquery()
+    )
+
+    query = db.query(Problem, tc_count_sub.c.tc_count).outerjoin(
+        tc_count_sub, Problem.id == tc_count_sub.c.problem_id
+    )
     if q:
         query = query.filter(Problem.title.ilike(f"%{q}%"))
     if difficulty:
         query = query.filter(Problem.difficulty == difficulty.lower())
-    problems = query.order_by(Problem.created_at.desc()).all()
-    return [_problem_to_summary(p) for p in problems]
+
+    rows = query.order_by(Problem.created_at.desc()).all()
+
+    result = []
+    for problem, tc_count in rows:
+        try:
+            tags = json.loads(problem.tags_json or "[]")
+        except Exception:
+            tags = []
+        result.append(ProblemAdminSummary(
+            id=problem.id,
+            title=problem.title,
+            slug=problem.slug,
+            difficulty=problem.difficulty,
+            tags=tags,
+            leetcode_id=problem.leetcode_id,
+            test_case_count=int(tc_count or 0),
+            created_at=problem.created_at,
+        ))
+    return result
 
 
 @router.get("/problems/{problem_id}", response_model=ProblemAdminDetail)
