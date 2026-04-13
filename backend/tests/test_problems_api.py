@@ -2,19 +2,24 @@ from pathlib import Path
 import sys
 
 from fastapi.testclient import TestClient
+import pytest
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.main import app
+from app.main import app, catalog_ready
 
 
-client = TestClient(app)
+@pytest.fixture(scope="module")
+def client() -> TestClient:
+    with TestClient(app) as test_client:
+        catalog_ready.wait(120)
+        yield test_client
 
 
-def test_list_problems_supports_pagination_and_query() -> None:
+def test_list_problems_supports_pagination_and_query(client: TestClient) -> None:
     response = client.get(
         "/api/problems",
         params={
@@ -38,21 +43,36 @@ def test_list_problems_supports_pagination_and_query() -> None:
     assert payload["items"][0]["slug"].startswith("divisible-sum-")
 
 
-def test_problem_catalog_contains_expected_distribution() -> None:
+def test_problem_catalog_contains_expected_distribution(client: TestClient) -> None:
     response = client.get("/api/problems", params={"page": 1, "per_page": 200})
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["total"] == 120
+    assert payload["total"] == 146
 
     counts = {"easy": 0, "medium": 0, "hard": 0}
-    for item in payload["items"]:
+    base_items = [item for item in payload["items"] if not str(item["slug"]).startswith("sql-")]
+    for item in base_items:
         counts[item["difficulty"]] += 1
 
     assert counts == {"easy": 50, "medium": 50, "hard": 20}
 
 
-def test_get_problem_returns_detail_without_hidden_tests() -> None:
+def test_sql_problem_catalog_is_seeded(client: TestClient) -> None:
+    response = client.get("/api/problems", params={"page": 1, "per_page": 200})
+
+    assert response.status_code == 200
+    payload = response.json()
+    sql_items = [item for item in payload["items"] if str(item["slug"]).startswith("sql-")]
+
+    assert len(sql_items) == 26
+    assert sql_items[0]["order_index"] == 121
+    assert sql_items[-1]["order_index"] == 146
+    assert any(item["slug"] == "sql-basic-joins-avanslar" for item in sql_items)
+    assert any(item["slug"] == "sql-subqueries-restoran-rivojlanishi" for item in sql_items)
+
+
+def test_get_problem_returns_detail_without_hidden_tests(client: TestClient) -> None:
     response = client.get("/api/problems/divisible-sum-01")
 
     assert response.status_code == 200
@@ -68,7 +88,7 @@ def test_get_problem_returns_detail_without_hidden_tests() -> None:
     assert "2 ga bo'linadigan" in payload["description"].lower()
 
 
-def test_health_endpoints_report_ok() -> None:
+def test_health_endpoints_report_ok(client: TestClient) -> None:
     health = client.get("/health")
     db = client.get("/health/db")
     cache = client.get("/health/cache")

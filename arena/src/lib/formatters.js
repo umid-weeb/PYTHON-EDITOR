@@ -62,6 +62,33 @@ function translateErrorToUzbek(status, errorText = "") {
   const normalizedStatus = String(status || "").toLowerCase();
   const normalizedError = String(errorText || "").toLowerCase();
 
+  if (normalizedError.includes("sql sintaksis xatoligi")) {
+    return errorText;
+  }
+  if (
+    normalizedError.includes("syntax error") ||
+    normalizedError.includes("unterminated") ||
+    normalizedError.includes("parse error") ||
+    normalizedError.includes("expected")
+  ) {
+    return "SQL sintaksis xatoligi topildi. Vergul, qavs yoki JOIN shartini tekshiring.";
+  }
+  if (normalizedError.includes("ambiguous column")) {
+    return "Ustun nomi noaniq. Alias ishlating.";
+  }
+  if (
+    normalizedError.includes("does not exist") ||
+    normalizedError.includes("no such table") ||
+    normalizedError.includes("missing from-clause entry") ||
+    normalizedError.includes("relation") ||
+    normalizedError.includes("column")
+  ) {
+    return "Jadval yoki ustun nomini tekshiring.";
+  }
+  if (normalizedError.includes("group by")) {
+    return "GROUP BY tarkibini tekshiring.";
+  }
+
   if (normalizedStatus.includes("time limit")) {
     return "Kod juda uzoq ishladi. Cheksiz sikl bo'lishi mumkin.";
   }
@@ -70,9 +97,6 @@ function translateErrorToUzbek(status, errorText = "") {
   }
   if (normalizedError.includes("zerodivisionerror")) {
     return "Xato: nolga bo'lish mumkin emas.";
-  }
-  if (normalizedError.includes("syntaxerror") || normalizedStatus.includes("compilation")) {
-    return `Sintaksis xatosi: ${errorText || "kod tuzilmasini tekshiring."}`;
   }
   if (normalizedError.includes("indexerror")) {
     return "Xato: indeks chegaradan tashqarida.";

@@ -32,7 +32,13 @@ class MarketingService:
         """
 
     @staticmethod
-    def _get_silver_template(name: str, rating: int, solved: int, rank: int) -> str:
+    def _get_silver_template(name: str, rating: int, solved: int, rank: int, next_rank_user: str = "") -> str:
+        competitor_text = f"Siz hozirda <b>{rank}-o'rindasiz</b>. Ozgina harakat qilsangiz {rank-1}-o'ringa chiqishingiz mumkin."
+        if rank == 2 and next_rank_user:
+            competitor_text = f"Siz <b>2-o'rindasiz</b>, ozgina harakat qilsangiz <b>{next_rank_user}</b>dan o'tasiz va 1-o'ringa chiqasiz! 🔥"
+        elif next_rank_user:
+             competitor_text = f"Siz hozirda <b>{rank}-o'rindasiz</b>. Ozgina harakat qilsangiz <b>{next_rank_user}</b>dan o'tib {rank-1}-o'ringa ko'tarilasiz!"
+
         return f"""
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #0f172a; color: #f8fafc; border: 2px solid #94a3b8; border-radius: 24px;">
             <div style="text-align: center; margin-bottom: 25px;">
@@ -41,8 +47,8 @@ class MarketingService:
             </div>
             <div style="background: rgba(148,163,184,0.1); padding: 25px; border-radius: 16px; margin-bottom: 25px;">
                 <h2 style="color: #cbd5e1;">Salom, {name}! 🔥</h2>
-                <p style="font-size: 17px; line-height: 1.6;">Siz <b>{rank}-o'rindasiz</b> (Reyting: {rating}). Top 1 likka erishish uchun juda oz qoldi!</p>
-                <p>Siz {solved} ta masala yechgansiz. Birgina g'alaba sizni Qirol darajasiga olib chiqishi mumkin.</p>
+                <p style="font-size: 17px; line-height: 1.6;">{competitor_text}</p>
+                <p>Hozirgi reytingingiz: {rating}. Siz {solved} ta masala yechgansiz. Birgina g'alaba sizni Qirol darajasiga olib chiqishi mumkin.</p>
             </div>
             <div style="text-align: center;">
                 <a href="https://pyzone.uz/zone/problems" style="display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 18px;">Arena-ni zabt etish</a>
@@ -51,15 +57,19 @@ class MarketingService:
         """
 
     @staticmethod
-    def _get_bronze_template(name: str, rating: int, solved: int) -> str:
+    def _get_bronze_template(name: str, rating: int, solved: int, rank: int, next_rank_user: str = "") -> str:
+        competitor_text = f"Siz hozirda <b>{rank}-o'rindasiz</b>. Keyingi marragacha juda oz qoldi."
+        if next_rank_user:
+            competitor_text = f"Siz hozirda <b>{rank}-o'rindasiz</b>. Ozgina harakat qilsangiz <b>{next_rank_user}</b>dan o'tib {rank-1}-o'ringa chiqasiz! 🚀"
+
         return f"""
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background-color: #0f172a; color: #f8fafc; border-radius: 24px; border: 1px solid #1e293b;">
             <div style="text-align: center; margin-bottom: 25px;">
                 <h1 style="color: #10b981; margin: 0; font-size: 26px;">🚀 Yangi marralar sari!</h1>
             </div>
             <div style="background: rgba(16,185,129,0.05); padding: 25px; border-radius: 16px; margin-bottom: 25px;">
-                <p style="font-size: 16px; line-height: 1.6;">Salom {name}! Sizning reytingingiz <b>{rating}</b> va yechilgan masalalar soni <b>{solved}</b> ga yetdi.</p>
-                <p>Top reytingga kirish va bilimingizni oshirish uchun yangi masalalar qo'shildi. O'z salohiyatingizni ko'rsatish vaqti keldi!</p>
+                <p style="font-size: 16px; line-height: 1.6;">Salom {name}! {competitor_text}</p>
+                <p>Sizning reytingingiz <b>{rating}</b> va yechilgan masalalar soni <b>{solved}</b> ga yetdi. Top reytingga kirish va bilimingizni oshirish uchun yangi masalalar qo'shildi!</p>
             </div>
             <div style="text-align: center;">
                 <a href="https://pyzone.uz/zone/problems" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold;">Arena-ni zabt etish</a>
@@ -88,8 +98,14 @@ class MarketingService:
             name = user.display_name or user.username
             solved = solved or 0
             
+            # Identify competitor (the user at rank - 1)
+            next_user_name = ""
+            if i > 0:
+                prev_user, _, _ = results[i-1]
+                next_user_name = prev_user.username # Use username as an identifier
+            
             # Diagnostic Log BEFORE sending
-            logger.info(f"Preparing Rank {rank}: {user.username} (Rating: {rating}, Solved: {solved})")
+            logger.info(f"Preparing Rank {rank}: {user.username} (Rating: {rating}, Solved: {solved}), Next target: {next_user_name}")
             
             subject = "✨ PyZone Arena: Sizni yangi marralar kutmoqda!"
             html_content = ""
@@ -99,9 +115,9 @@ class MarketingService:
                 html_content = self._get_gold_template(name, rating, solved)
             elif rank <= 3:
                 subject = "🔥 PyZone Arena: Cho'qqi juda yaqin!"
-                html_content = self._get_silver_template(name, rating, solved, rank)
+                html_content = self._get_silver_template(name, rating, solved, rank, next_user_name)
             else:
-                html_content = self._get_bronze_template(name, rating, solved)
+                html_content = self._get_bronze_template(name, rating, solved, rank, next_user_name)
                 
             try:
                 # Send asynchronously

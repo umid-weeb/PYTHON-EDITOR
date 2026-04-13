@@ -1,6 +1,6 @@
 import urllib.request as r
 import urllib.error as e
-req = r.Request('https://python-editor-b87c.onrender.com/api/problems/balanced-brackets-lite-02')
+req = r.Request('http://16.16.26.138:5000')
 try:
     r.urlopen(req)
 except e.HTTPError as err:

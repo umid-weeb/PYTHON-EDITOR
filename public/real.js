@@ -9,7 +9,6 @@ let activeDebugStepIndex = 0;
 let activeDebugLineNumber = null;
 let pendingRemoteRun = null;
 let pendingBrowserLocalRun = null;
-let selectionToolbarStatusTimer = null;
 let currentLanguage = "python";
 let currentStarterPack = "array";
 let currentEditorRuntimeMode = "LOCAL";
@@ -2035,47 +2034,17 @@ function getSelectionToolbarElement() {
     return document.getElementById("editor-selection-toolbar");
 }
 
-function getSelectionToolbarStatusElement() {
-    return document.getElementById("editor-selection-status");
-}
-
 function hideSelectionToolbar() {
     const toolbar = getSelectionToolbarElement();
     if (toolbar) {
         toolbar.hidden = true;
     }
-    const status = getSelectionToolbarStatusElement();
-    if (status) {
-        status.textContent = "";
-        status.removeAttribute("data-tone");
-    }
-    if (selectionToolbarStatusTimer !== null) {
-        clearTimeout(selectionToolbarStatusTimer);
-        selectionToolbarStatusTimer = null;
-    }
 }
 
 function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
-    const status = getSelectionToolbarStatusElement();
-    if (!status) return;
-    status.textContent = message;
-    if (tone) {
-        status.setAttribute("data-tone", tone);
-    } else {
-        status.removeAttribute("data-tone");
-    }
-
-    if (selectionToolbarStatusTimer !== null) {
-        clearTimeout(selectionToolbarStatusTimer);
-        selectionToolbarStatusTimer = null;
-    }
-
-    if (autoRestore) {
-        selectionToolbarStatusTimer = setTimeout(() => {
-            selectionToolbarStatusTimer = null;
-            refreshSelectionToolbar();
-        }, 1400);
-    }
+    void message;
+    void tone;
+    void autoRestore;
 }
 
 function getSelectionToolbarSelection() {
@@ -2255,12 +2224,12 @@ async function createSelectionSnapshotBlob(range) {
     const computed = getComputedStyle(editorWrapper);
     const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
     const fontSize = Math.max(13, Math.min(18, Math.round(parseFloat(computed.fontSize) || 14)));
-    const lineHeight = Math.round(fontSize * 1.58);
-    const topBarHeight = 46;
-    const paddingX = 22;
-    const paddingTop = 18;
-    const paddingBottom = 18;
-    const lineGap = 10;
+    const lineHeight = Math.round(fontSize * 1.48);
+    const topBarHeight = 44;
+    const paddingX = 18;
+    const paddingTop = 14;
+    const paddingBottom = 14;
+    const lineGap = 8;
     const codeFont = `${fontSize}px ${fontFamily}`;
     const ctxMeasure = document.createElement("canvas").getContext("2d");
     if (!ctxMeasure) return null;
@@ -2281,16 +2250,15 @@ async function createSelectionSnapshotBlob(range) {
 
     const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
     const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
-    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 14;
+    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 12;
     const contentWidth = Math.max(240, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
-    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 16 + contentWidth);
+    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 14 + contentWidth);
     ctxMeasure.font = `600 13px ${fontFamily}`;
     const headerLanguage = getLanguageLabel();
     const headerTitle = "Code Snap";
-    const languageChipWidth = Math.ceil(ctxMeasure.measureText(headerLanguage).width) + 18;
-    ctxMeasure.font = `600 11px ${fontFamily}`;
-    const titleWidth = Math.ceil(ctxMeasure.measureText(headerTitle).width);
-    const headerWidth = Math.ceil(104 + languageChipWidth + 10 + titleWidth + 22);
+    const headerText = `${headerLanguage} • ${headerTitle}`;
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerWidth = Math.ceil(108 + ctxMeasure.measureText(headerText).width + 22);
     const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
     const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
     const scale = Math.min(window.devicePixelRatio || 1, 2);
@@ -2307,18 +2275,18 @@ async function createSelectionSnapshotBlob(range) {
     ctx.textBaseline = "alphabetic";
     ctx.fillStyle = colors.surfaceMuted;
     ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 12;
-    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 22);
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
     ctx.fill();
     ctx.shadowColor = "transparent";
 
     ctx.fillStyle = colors.surface;
-    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 22);
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
     ctx.fill();
 
     ctx.fillStyle = colors.surfaceMuted;
-    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 22);
+    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 18);
     ctx.fill();
 
     ctx.strokeStyle = colors.border;
@@ -2328,40 +2296,22 @@ async function createSelectionSnapshotBlob(range) {
     ctx.lineTo(width - 0.5, topBarHeight + 0.5);
     ctx.stroke();
 
-    const dotY = 23;
+    const dotY = 22;
     const dotX = 28;
     const dots = [colors.danger, "#ffbf3c", "#31c55e"];
     dots.forEach((color, index) => {
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(dotX + index * 22, dotY, 6.5, 0, Math.PI * 2);
+        ctx.arc(dotX + index * 22, dotY, 6.25, 0, Math.PI * 2);
         ctx.fill();
     });
 
-    const titleX = 104;
-    const titleY = 28;
-    const chipHeight = 22;
-    const languageChipY = 13;
-
-    ctx.fillStyle = colors.surface;
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 1;
-    roundRectPath(ctx, titleX, languageChipY, languageChipWidth, chipHeight, 11);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = colors.primary;
+    ctx.fillStyle = colors.textMain;
     ctx.font = `600 13px ${fontFamily}`;
-    ctx.textAlign = "center";
-    ctx.fillText(headerLanguage, titleX + languageChipWidth / 2, 28);
-    ctx.textAlign = "left";
-
-    ctx.fillStyle = colors.textMuted;
-    ctx.font = `600 11px ${fontFamily}`;
-    ctx.fillText(headerTitle, titleX + languageChipWidth + 12, titleY);
+    ctx.fillText(headerText, 104, 27);
 
     const codeTop = topBarHeight + paddingTop + 4;
-    const codeLeft = paddingX + lineNumberWidth + 16;
+    const codeLeft = paddingX + lineNumberWidth + 14;
 
     snapshotLines.forEach((line, index) => {
         const y = codeTop + (index * lineHeight) + fontSize;
@@ -2475,16 +2425,6 @@ function bindSelectionToolbarEvents() {
         if (!button) return;
 
         const action = button.getAttribute("data-selection-action");
-        if (action === "copy-text") {
-            const copied = await copySelectionTextToClipboard();
-            if (copied) {
-                setSelectionToolbarStatus("Matn nusxalandi", "success", true);
-            } else {
-                setSelectionToolbarStatus("Nusxalash bo'lmadi", "error", true);
-            }
-            return;
-        }
-
         if (action === "copy-snap") {
             await copySelectionSnapshotToClipboard();
         }

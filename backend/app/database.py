@@ -11,16 +11,46 @@ from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Load environment variables from .env if present (useful for local dev)
-load_dotenv()
+
+def _load_env_files() -> None:
+    """
+    Load environment variables from the most common project locations.
+
+    This keeps local development flexible while still allowing production
+    deployments to source DATABASE_URL from the repo root or backend folder.
+    """
+
+    repo_root = Path(__file__).resolve().parents[2]
+    backend_root = repo_root / "backend"
+
+    for env_file in (repo_root / ".env", backend_root / ".env"):
+        if env_file.exists():
+            load_dotenv(env_file, override=False)
+
+    # Fallback to the default search path last so explicit files win.
+    load_dotenv(override=False)
+
+
+_load_env_files()
 
 _default_sqlite_path = Path(__file__).resolve().parents[1] / ".data" / "app.db"
 _default_sqlite_path.parent.mkdir(parents=True, exist_ok=True)
 
-raw_db_url = os.getenv(
-    "DATABASE_URL",
-    f"sqlite:///{_default_sqlite_path.as_posix()}",
-)
+require_db_url = os.getenv("PYZONE_REQUIRE_DATABASE_URL", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+raw_db_url = os.getenv("DATABASE_URL")
+if not raw_db_url:
+    if require_db_url:
+        raise RuntimeError(
+            "DATABASE_URL is required when PYZONE_REQUIRE_DATABASE_URL is enabled. "
+            "Set it to your Supabase/PostgreSQL connection string."
+        )
+    raw_db_url = f"sqlite:///{_default_sqlite_path.as_posix()}"
 
 
 def _sanitize_db_url(url: str) -> str:
