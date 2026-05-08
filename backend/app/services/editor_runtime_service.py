@@ -92,47 +92,6 @@ class EditorRuntimeService:
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir
 
-    def _run_process(
-        self,
-        command: list[str],
-        *,
-        cwd: Path,
-        stdin: str,
-        timeout_seconds: float,
-        env: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        started = time.perf_counter()
-        try:
-            completed = subprocess.run(
-                command,
-                cwd=str(cwd),
-                input=stdin,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout_seconds,
-                check=False,
-                env=env,
-            )
-            elapsed = time.perf_counter() - started
-            return {
-                "timed_out": False,
-                "elapsed": elapsed,
-                "returncode": completed.returncode,
-                "stdout": completed.stdout or "",
-                "stderr": completed.stderr or "",
-            }
-        except subprocess.TimeoutExpired as exc:
-            elapsed = time.perf_counter() - started
-            return {
-                "timed_out": True,
-                "elapsed": elapsed,
-                "returncode": None,
-                "stdout": exc.stdout or "",
-                "stderr": exc.stderr or "",
-            }
-
     def _quickjs_bootstrap(self, stdin: str) -> str:
         stdin_json = json.dumps(stdin)
         return f"""
@@ -320,71 +279,6 @@ globalThis.global = globalThis;
             "execution_mode": execution_mode,
         }
 
-    def _compile_or_run_error(self, *, label: str, process: dict[str, Any], stage: str) -> dict[str, Any]:
-        if process["timed_out"]:
-            return self._result_payload(
-                status_description="Time Limit Exceeded",
-                stdout=process["stdout"],
-                stderr=process["stderr"],
-                elapsed=process["elapsed"],
-                message=f"{label} {stage} bosqichi vaqt chegarasidan oshib ketdi.",
-            )
-
-        stderr = str(process["stderr"] or "").rstrip()
-        if stage == "compile":
-            return self._result_payload(
-                status_description="Compilation Error",
-                stderr="",
-                compile_output=stderr or f"{label} kompilyatsiya xatoligi.",
-                elapsed=process["elapsed"],
-                message=f"{label} kompilyatsiyasi muvaffaqiyatsiz tugadi.",
-            )
-
-        runtime_error = stderr or f"{label} bajarishda xatolik yuz berdi. Chiqish kodi: {process['returncode']}"
-        return self._result_payload(
-            status_description="Runtime Error",
-            stdout=process["stdout"],
-            stderr=runtime_error,
-            elapsed=process["elapsed"],
-            message=f"{label} bajarishda xatolik yuz berdi.",
-        )
-
-    def _run_python(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
-        python_bin = self.toolchain.python
-        if not python_bin:
-            return None
-
-        cache_dir = self._prepare_cache_dir("python", code)
-        source_path = cache_dir / "main.py"
-        source_path.write_text(code, encoding="utf-8")
-
-        process = self._run_process(
-            [python_bin, "-I", str(source_path)],
-            cwd=cache_dir,
-            stdin=stdin,
-            timeout_seconds=max(1.0, time_limit_seconds),
-        )
-        if process["timed_out"]:
-            return self._compile_or_run_error(label="Python", process=process, stage="run")
-
-        stderr = str(process["stderr"] or "").rstrip()
-        if process["returncode"] != 0:
-            lowered = stderr.lower()
-            if "syntaxerror" in lowered or "indentationerror" in lowered or "taberror" in lowered:
-                return self._result_payload(
-                    status_description="Compilation Error",
-                    compile_output=stderr,
-                    elapsed=process["elapsed"],
-                    message="Python sintaksis xatoligi topildi.",
-                )
-            return self._compile_or_run_error(label="Python", process=process, stage="run")
-
-        return self._result_payload(
-            status_description="Accepted",
-            stdout=process["stdout"],
-            elapsed=process["elapsed"],
-        )
-
     def _run_javascript(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
         quickjs_result = self._run_javascript_quickjs(code=code, stdin=stdin, time_limit_seconds=time_limit_seconds)
         # RCE xavfini yopish: Agar QuickJS (xavfsiz muhit) o'rnatilmagan bo'lsa, OS da 
@@ -393,36 +287,7 @@ globalThis.global = globalThis;
         return quickjs_result
 
     def warm_default_runtimes(self) -> None:
-        starter_codes = {
-            "cpp": """#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-    cout << "Salom, C++ tiliga xush kelibsiz" << '\\n';
-    return 0;
-}
-""",
-            "java": """public class Main {
-    public static void main(String[] args) {
-        System.out.println("Salom, Java tiliga xush kelibsiz");
-    }
-}
-""",
-            "go": """package main
-
-import "fmt"
-
-func main() {
-    fmt.Println("Salom, Go tiliga xush kelibsiz")
-}
-""",
-        }
-
-        for language, code in starter_codes.items():
-            try:
-                self.run(language=language, code=code, stdin="", time_limit_seconds=10.0)
-            except Exception:
-                continue
+        pass
 
 
 _editor_runtime_service: EditorRuntimeService | None = None
