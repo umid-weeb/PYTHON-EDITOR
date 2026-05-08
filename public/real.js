@@ -829,13 +829,6 @@ func main() {
     },
 };
 
-function isLegacyStarterCode(language, code) {
-    const normalizedLanguage = normalizeLanguage(language);
-    const normalizedCode = String(code || "").replace(/\r\n/g, "\n");
-    const signatures = LEGACY_STARTER_SIGNATURES[normalizedLanguage] || [];
-    return signatures.length > 0 && signatures.every((fragment) => normalizedCode.includes(fragment));
-}
-
 function getStarterCode(language = currentLanguage, pack = currentStarterPack) {
     const normalizedLanguage = normalizeLanguage(language);
     return getLanguageConfig(normalizedLanguage).defaultCode;
@@ -909,11 +902,11 @@ function getSelectedStarterPackStorageKey() {
 }
 
 function getStoredStarterPack() {
-    return "array";
+    return normalizeStarterPack(localStorage.getItem(getSelectedStarterPackStorageKey()) || "array");
 }
 
 function setStoredStarterPack(pack) {
-    localStorage.setItem(getSelectedStarterPackStorageKey(), "array");
+    localStorage.setItem(getSelectedStarterPackStorageKey(), normalizeStarterPack(pack));
 }
 
 function readAutoSavedCode(language = currentLanguage, pack = currentStarterPack) {
@@ -1297,26 +1290,6 @@ function setupPanelResizer() {
 
 // --- PYTHON ENVIRONMENT ---
 
-async function initPyodide() {
-    const loading = document.getElementById("loading");
-    loading.classList.add("active");
-
-    try {
-        pyodide = await loadPyodide();
-        loading.textContent = "Formatlash vositalari yuklanmoqda...";
-        await ensurePythonRuntimeTools();
-        loading.textContent = "Python ishga tayyorlanmoqda...";
-        await setupSafeExecutionEnvironment();
-        loading.textContent = "Python tayyor!";
-        setTimeout(() => {
-            loading.classList.remove("active");
-        }, 1500);
-    } catch (error) {
-        loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
-        loading.style.background = "#fee2e2";
-        loading.style.color = "#991b1b";
-    }
-}
 
 async function ensurePythonRuntimeTools() {
     try {
@@ -1430,164 +1403,7 @@ def auto_fix_code(code):
 
 // --- CORE FUNCTIONS ---
 
-async function runCode() {
-    if (!pyodide) return showOutput("Python yuklanmoqda...", "error");
-    const code = editor.getValue();
-    if (!code.trim()) return showOutput("Kod kiritilmagan.", "error");
-
-    clearDebugState();
-    activeRunSession = { code, inputValues: [] };
-    showOutput("Bajarilmoqda...", "");
-    await continueRunSession();
-}
-
-async function continueRunSession() {
-    if (!activeRunSession) return;
-    const start = performance.now();
-    try {
-        const res = await pyodide.runPythonAsync(`import json; json.dumps(safe_run(${JSON.stringify(activeRunSession.code)}, ${JSON.stringify(activeRunSession.inputValues)}))`);
-        const result = JSON.parse(res);
-        const time = ((performance.now() - start) / 1000).toFixed(3);
-
-        if (result.awaitingInput) {
-            showOutput(result.output ? result.output + "\n..." : "Input kutilmoqda...", "");
-            renderOutputPanelInput(result.error.prompt, result.error.inputIndex);
-            return;
-        }
-
-        const runCode = activeRunSession ? activeRunSession.code : editor.getValue();
-        activeRunSession = null;
-        if (!result.success) {
-            highlightEditorError(result.error.line, result.error.column || 1);
-            showOutput(buildCompactErrorMessage({
-                title: `${result.error.type}`,
-                summary: normalizeErrorText(result.error.message) || "Python bajarilishida xatolik yuz berdi.",
-                line: result.error.line,
-                codeLine: result.error.codeLine || getCodeLineAt(runCode, result.error.line),
-                column: result.error.column || null,
-                tips: [
-                    "Qator ustidagi kodni aynan shu joyda tekshiring.",
-                    "Agar xato `end` yoki `endl` ga o'xshasa, to'g'ri yozuvni qo'ying.",
-                ],
-                durationSeconds: time,
-            }), "error");
-        } else {
-            clearEditorDiagnostics();
-            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nVaqt: ${time}s`, "success");
-        }
-    } catch (e) {
-        showOutput("Xatolik: " + e.message, "error");
-    }
-}
-
-function renderOutputPanelInput(prompt, index) {
-    const host = document.getElementById("output-input-host");
-    if (!host) return;
-    host.className = "output-input-host active";
-    host.innerHTML = `
-        <div class="output-input-label">${escapeHtml(prompt || "Qiymat kiriting:")}</div>
-        <div class="output-input-row">
-            <input type="text" id="output-panel-input" class="output-input-field" autocomplete="off" />
-            <button id="output-panel-submit" class="output-input-submit">Yuborish</button>
-        </div>`;
-    
-    const input = document.getElementById("output-panel-input");
-    const submitBtn = document.getElementById("output-panel-submit");
-
-    const submit = () => {
-        const val = input.value;
-        if (activeRunSession) activeRunSession.inputValues.push(val);
-        else if (activeDebugSession) activeDebugSession.inputValues.push(val);
-        clearOutputInputHost();
-        if (activeRunSession) continueRunSession();
-        else if (activeDebugSession) continueDebugSession();
-    };
-
-    submitBtn.onclick = submit;
-    input.onkeydown = (e) => { if (e.key === "Enter") submit(); };
-    input.focus();
-    scrollOutputToLatest();
-    dispatchEditorContextUpdate();
-}
-
 // --- EDITOR SETUP ---
-
-function setupEditor() {
-    const textArea = document.getElementById("code-editor");
-    if (!textArea) return;
-
-    editor = CodeMirror.fromTextArea(textArea, {
-        mode: "python",
-        theme: "eclipse",
-        lineNumbers: true,
-        indentUnit: 4,
-        smartIndent: true,
-        indentWithTabs: false,
-        lineWrapping: true,
-        matchBrackets: true,
-        autoCloseBrackets: true,
-        styleActiveLine: true,
-        foldGutter: true,
-        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
-        extraKeys: {
-            "Ctrl-Enter": runCode,
-            "F5": runCode,
-            "Enter": "newlineAndIndent",
-            "Ctrl-S": saveCode,
-            "Ctrl-Shift-F": formatEditorCode,
-            "Tab": (cm) => {
-                if (cm.state.completionActive) return CodeMirror.Pass;
-                if (cm.somethingSelected()) cm.indentSelection("add");
-                else cm.replaceSelection("    ");
-            },
-            "Shift-Tab": (cm) => cm.indentSelection("subtract")
-        },
-        hintOptions: {
-            completeSingle: false,
-            alignWithWord: true,
-            closeOnUnfocus: true
-        }
-    });
-
-    editor.on("inputRead", onEditorInputRead);
-    editor.on("cursorActivity", updateEditorStatus);
-    editor.on("change", () => {
-        updateEditorStatus();
-        autoSaveCode();
-    });
-
-    loadTheme();
-    loadEditorTypographyPreferences();
-    loadAutoSavedCode();
-    setupPanelResizer();
-    updateEditorStatus();
-}
-
-function updateEditorStatus() {
-    const cursor = editor.getCursor();
-    const primary = document.getElementById("editor-status-primary");
-    const secondary = document.getElementById("editor-status-secondary");
-    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
-    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
-}
-
-function highlightEditorError(line, column = 1) {
-    clearEditorDiagnostics();
-    if (!line || line > editor.lineCount()) return;
-    const idx = line - 1;
-    const ch = Math.max(0, (Number(column) || 1) - 1);
-    activeDebugLineNumber = idx; // Reuse variable for simple highlight
-    editor.addLineClass(idx, "background", "error-line");
-    editor.setCursor({ line: idx, ch });
-    editor.scrollIntoView({ line: idx, ch }, 100);
-}
-
-function clearEditorDiagnostics() {
-    if (activeDebugLineNumber !== null) {
-        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
-        activeDebugLineNumber = null;
-    }
-}
 
 // --- THEME & TYPOGRAPHY ---
 
@@ -1597,211 +1413,16 @@ function toggleTheme() {
     loadTheme();
 }
 
-function loadTheme() {
-    const theme = localStorage.getItem("theme") || "light";
-    const isDark = theme === "dark";
-    document.body.classList.toggle("dark-mode", isDark);
-    const btn = document.getElementById("themeBtn");
-    if (btn) btn.querySelector(".button-label").textContent = isDark ? "Light" : "Dark";
-    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
-}
-
-function applyEditorTypography(family, size) {
-    const wrapper = editor.getWrapperElement();
-    wrapper.style.fontFamily = EDITOR_FONT_FAMILIES[family] || family;
-    wrapper.style.fontSize = size;
-    localStorage.setItem("editorFontFamily", family);
-    localStorage.setItem("editorFontSize", size);
-    editor.refresh();
-}
-
-function loadEditorTypographyPreferences() {
-    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
-    const size = localStorage.getItem("editorFontSize") || "14px";
-    
-    const fSelect = document.getElementById("editor-font-family");
-    const sSelect = document.getElementById("editor-font-size");
-    
-    if (fSelect) {
-        fSelect.value = family;
-        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect.value);
-    }
-    if (sSelect) {
-        sSelect.value = size;
-        sSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect.value);
-    }
-    
-    applyEditorTypography(family, size);
-}
 
 // --- FILE OPERATIONS ---
-
-function saveCode() {
-    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
-    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
-    setTimeout(clearOutput, 2000);
-}
-
-function loadCode() {
-    const code = getStoredCode(currentLanguage, currentStarterPack);
-    editor.setValue(code);
-    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
-}
-
-function downloadCode() {
-    const ext = getLanguageFileExtension(currentLanguage);
-    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function uploadFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        editor.setValue(e.target.result);
-        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
-    };
-    reader.readAsText(file);
-}
-
-function autoSaveCode() {
-    localStorage.setItem("pythonAutoSave", JSON.stringify({
-        code: editor.getValue(),
-        lastSaved: Date.now()
-    }));
-}
-
-function loadAutoSavedCode() {
-    const data = localStorage.getItem("pythonAutoSave");
-    if (data) {
-        try {
-            const parsed = JSON.parse(data);
-            if (parsed.code) editor.setValue(parsed.code);
-        } catch(e) {}
-    }
-}
-
-async function formatEditorCode() {
-    if (!pyodide) return showOutput("Python yuklanmagan.", "error");
-    const code = editor.getValue();
-    showOutput("Formatlanmoqda...", "");
-    try {
-        const res = await pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`);
-        const result = JSON.parse(res);
-        if (result.formatterAvailable) {
-            editor.setValue(result.code);
-                showOutput("OK: Kod formatlandi.", "success");
-        } else {
-            showOutput("Formatlash tooli (autopep8) hali yuklanmagan.", "error");
-        }
-        setTimeout(clearOutput, 2000);
-    } catch (e) {
-        showOutput("Xatolik: " + e.message, "error");
-    }
-}
-
-function clearOutput() {
-    const output = document.getElementById("output");
-    if (output) {
-        output.textContent = "Natija bu yerda ko'rsatiladi...";
-        output.className = "output-content";
-    }
-    clearEditorDiagnostics();
-    clearOutputInputHost();
-    dispatchEditorContextUpdate();
-}
-
-function showOutput(text, type) {
-    const output = document.getElementById("output");
-    if (!output) return;
-    output.textContent = text;
-    output.className = type ? "output-content " + type : "output-content";
-    scrollOutputToLatest();
-    dispatchEditorContextUpdate();
-}
 
 function openArena() {
     window.location.href = "/zone";
 }
 
-// Debug placeholders for now
-function debugCode() { showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", ""); }
-function clearDebugState() {
-    activeDebugSession = null;
-    activeDebugSteps = [];
-    activeDebugStepIndex = 0;
-}
-
 function continueDebugSession() {
     showOutput("Debug rejimi hozircha tayyor emas.", "");
     activeDebugSession = null;
-}
-
-// --- AUTOCOMPLETE ---
-
-function onEditorInputRead(cm, change) {
-    if (change.origin !== "+input") return;
-    const cur = cm.getCursor();
-    const token = cm.getTokenAt(cur);
-    const char = change.text[0];
-
-    // Trigger on any alphabetical character or dot
-    if (!/^[a-zA-Z_.]$/.test(char)) return;
-    
-    // Trigger instantly if we have a valid starting char
-    if (token.string.trim().length > 0 || char === ".") {
-        showAutocompleteHints(cm);
-    }
-}
-
-function showAutocompleteHints(cm) {
-    cm.showHint({
-        hint: function(editor) {
-            const cur = editor.getCursor();
-            const token = editor.getTokenAt(cur);
-            const start = token.start;
-            const end = cur.ch;
-            const line = cur.line;
-            const currentWord = token.string;
-
-            const currentWordLower = currentWord.toLowerCase();
-            const priority = ["True", "False", "None"];
-
-            const list = [...new Set([
-                ...PYTHON_KEYWORDS,
-                ...MATH_FUNCTIONS,
-                ...(CodeMirror.hint.anyword(editor).list || [])
-            ])].filter(h => h.toLowerCase().startsWith(currentWordLower))
-               .sort((a, b) => {
-                   // Priority check
-                   const aPri = priority.includes(a);
-                   const bPri = priority.includes(b);
-                   if (aPri && !bPri) return -1;
-                   if (!aPri && bPri) return 1;
-
-                   // Exact case match prioritize
-                   const aStart = a.startsWith(currentWord);
-                   const bStart = b.startsWith(currentWord);
-                   if (aStart && !bStart) return -1;
-                   if (!aStart && bStart) return 1;
-
-                   return a.localeCompare(b);
-               });
-
-            return {
-                list: list,
-                from: CodeMirror.Pos(line, start),
-                to: CodeMirror.Pos(line, end)
-            };
-        },
-        completeSingle: false
-    });
 }
 
 // --- MULTI-LANGUAGE OVERRIDES ---
@@ -1899,26 +1520,51 @@ async function initPyodide() {
     const loading = document.getElementById("loading");
     if (!loading) return;
 
+    const isPython = currentLanguage === "python";
+    const langLabel = getLanguageLabel(currentLanguage);
+    
     loading.classList.add("active");
-    loading.textContent = "Python vositalari yuklanmoqda...";
+    loading.textContent = isPython ? "Python vositalari yuklanmoqda..." : `${langLabel} muhiti tayyorlanmoqda...`;
+
+    if (!isPython) {
+        setTimeout(() => {
+            loading.classList.remove("active");
+        }, 600); // 0.6 soniyadan keyin qotmasligi uchun darhol ekranni ochamiz
+        
+        // Background-da pythonni sekin yuklab qo'yamiz (kelajakda kerak bo'lib qolsa)
+        setTimeout(async () => {
+            if (!pyodide) {
+                try {
+                    pyodide = await loadPyodide();
+                    await ensurePythonRuntimeTools();
+                    await setupSafeExecutionEnvironment();
+                } catch (e) {}
+            }
+        }, 2000);
+        return;
+    }
 
     try {
-        pyodide = await loadPyodide();
-        await ensurePythonRuntimeTools();
-        loading.textContent = "Python muhiti tayyorlanmoqda...";
-        await setupSafeExecutionEnvironment();
+        if (!pyodide) {
+            pyodide = await loadPyodide();
+            await ensurePythonRuntimeTools();
+            loading.textContent = "Python muhiti tayyorlanmoqda...";
+            await setupSafeExecutionEnvironment();
+        }
         loading.textContent = "Python tayyor!";
         setTimeout(() => {
             loading.classList.remove("active");
-        }, 1500);
+        }, 1000);
     } catch (error) {
         console.warn("Python muhiti yuklanmadi:", error);
-        loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
-        loading.style.background = "#fef3c7";
-        loading.style.color = "#92400e";
-        setTimeout(() => {
-            loading.classList.remove("active");
-        }, 2500);
+        if (isPython) {
+            loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
+            loading.style.background = "#fef3c7";
+            loading.style.color = "#92400e";
+            setTimeout(() => {
+                loading.classList.remove("active");
+            }, 2500);
+        }
     }
 }
 
@@ -2028,6 +1674,11 @@ function setEditorLanguage(language, options = {}) {
     dispatchEditorContextUpdate();
     updateHeaderLanguageBranding(nextLanguage);
     scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
+    
+    // Agar foydalanuvchi endi Python'ga o'tsa va muhit tayyor bo'lmasa uni chaqiramiz
+    if (nextLanguage === "python" && !pyodide) {
+        initPyodide();
+    }
 }
 
 function getSelectionToolbarElement() {

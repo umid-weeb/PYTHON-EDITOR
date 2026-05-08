@@ -13,6 +13,9 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import builtins
+import math
+import collections
 import re
 import traceback
 from typing import Any, Dict, List, Optional
@@ -709,8 +712,24 @@ def _safe_exec_solution(code: str, function_name: str, input_str: str) -> tuple[
     Returns: (success, output_str)
     """
     try:
-        # Namespace yaratish
-        namespace: dict = {}
+        # AI kodi serverni qulatmasligi uchun xavfsizroq namespace yaratish
+        safe_builtins = vars(builtins).copy()
+        for dangerous in ['eval', 'exec', 'open', 'exit', 'quit']:
+            safe_builtins.pop(dangerous, None)
+            
+        original_import = builtins.__import__
+        def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name in ['os', 'sys', 'subprocess', 'shlex', 'pty', 'socket']:
+                raise ImportError(f"Xavfsizlik sababli '{name}' modulini yuklash taqiqlangan.")
+            return original_import(name, globals, locals, fromlist, level)
+            
+        safe_builtins['__import__'] = safe_import
+
+        namespace: dict = {
+            "__builtins__": safe_builtins,
+            "math": math,
+            "collections": collections
+        }
         exec(compile(code, "<admin_validate>", "exec"), namespace)  # noqa: S102
 
         func = namespace.get(function_name)

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(find /d/Projects/PYTHON-EDITOR/backend/app/api/routes -type f -name \"*.py\" -exec basename {} \\\\;)",
+      "Bash(git add:*)",
+      "Bash(git commit -m 'Fix: replace 204 status with 200+body for FastAPI compatibility:*)"
+    ]
+  }
+}
