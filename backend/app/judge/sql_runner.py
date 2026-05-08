@@ -292,6 +292,8 @@ class SqlJudge:
         timeout_ms = max(1, int(float(time_limit_seconds) * 1000))
         connection.exec_driver_sql(f"SET LOCAL statement_timeout = {timeout_ms}")
         connection.exec_driver_sql(f"SET LOCAL idle_in_transaction_session_timeout = {timeout_ms + 1000}")
+        # XAVFSIZLIK: Tranzaksiyani to'liq "Faqat o'qish" (Read-Only) rejimiga o'tkazish
+        connection.exec_driver_sql("SET LOCAL default_transaction_read_only = 'on'")
 
     def _format_result(self, columns: Iterable[str], rows: list[Any]) -> str:
         column_names = [str(column) for column in columns]

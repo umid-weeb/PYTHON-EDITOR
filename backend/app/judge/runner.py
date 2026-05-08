@@ -35,6 +35,15 @@ submission_path = workspace / "submission.py"
 MAX_INSTRUCTIONS = payload.get("instruction_limit", 1_000_000)
 MAX_TIME_SECONDS = float(payload.get("time_limit", 2.0))
 
+# RAM xotirasi to'lib qolishidan himoya (Memory Limit)
+try:
+    import resource
+    mem_limit = payload.get("memory_limit_mb", 256) * 1024 * 1024
+    # Qat'iy xotira chegarasini o'rnatish (Faqat Linux/Ubuntu serverlarda ishlaydi)
+    resource.setrlimit(resource.RLIMIT_AS, (mem_limit, mem_limit))
+except (ImportError, AttributeError):
+    pass
+
 # Ensure UTF-8 output even on Windows
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -430,6 +439,7 @@ class JudgeRunner:
                         "args": args,
                         "time_limit": time_limit,
                         "instruction_limit": instruction_limit,
+                        "memory_limit_mb": problem.get("memory_limit_mb", 256),
                     },
                     ensure_ascii=False,
                 ),
@@ -667,5 +677,3 @@ class JudgeRunner:
             "actual_output": actual_output_str,
             "error": None,
         }
-
-

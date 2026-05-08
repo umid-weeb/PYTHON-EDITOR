@@ -255,8 +255,31 @@ def _problem_to_detail(problem: Problem) -> ProblemAdminDetail:
 def _invalidate_cache(problem_id: str | None = None) -> None:
     """Problem cache ni tozalaydi."""
     try:
+        from app.core.config import get_settings
+        settings = get_settings()
+        
+        # 1. Local JSON kesh fayllarni agressiv tozalash
+        if settings.cache_dir and settings.cache_dir.exists():
+            for cache_file in settings.cache_dir.glob("*.json"):
+                try:
+                    cache_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                    
+        # 2. Redis keshni tozalash (index va barcha problemalar)
+        if settings.redis_url:
+            try:
+                import redis
+                client = redis.from_url(settings.redis_url, decode_responses=True)
+                client.delete("index")
+                for key in client.scan_iter(match="problem:*"):
+                    client.delete(key)
+            except Exception as e:
+                logger.warning("Redis agressiv tozalashda xatolik: %s", e)
+
         service = get_problem_service()
         service.cache.invalidate(problem_id)
+        service.cache.invalidate(None)  # Bosh ro'yxat (index) ni albatta tozalash
     except Exception as exc:
         logger.warning("Cache invalidation failed: %s", exc)
 
