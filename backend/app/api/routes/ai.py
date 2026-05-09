@@ -50,9 +50,16 @@ class AIChatRequest(BaseModel):
 #  Rate-limit helpers                                                           #
 # --------------------------------------------------------------------------- #
 def _get_client_ip(request: Request) -> str:
+    x_real_ip = request.headers.get("X-Real-IP")
+    if x_real_ip:
+        return x_real_ip.strip()
+
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        ips = [ip.strip() for ip in forwarded.split(",") if ip.strip()]
+        if ips:
+            # Xaker soxtalashtirgan birinchi IP emas, ishonchli proksi qo'shgan oxirgi IP olinadi
+            return ips[-1]
     return request.client.host if request.client else "unknown"
 
 

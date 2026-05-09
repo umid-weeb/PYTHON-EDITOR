@@ -194,15 +194,22 @@ def upload_avatar(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
-    if file.content_type not in allowed_types:
+    # XAVFSIZLIK: Fayl turini va unga mos kengaytmani faqat oq ro'yxatdan olish
+    allowed_types_map = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/jpg": ".jpg",
+        "image/webp": ".webp"
+    }
+    if file.content_type not in allowed_types_map:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
 
     content = file.file.read()
     if len(content) > 2 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Max file size is 2MB")
 
-    suffix = Path(file.filename or "").suffix.lower() or ".png"
+    # Foydalanuvchi bergan nomga ishonmasdan, xavfsiz kengaytmani majburan o'rnatish
+    suffix = allowed_types_map[file.content_type]
     avatar_url: str
 
     supabase_url = os.getenv("SUPABASE_URL") or os.getenv("ARENA_SUPABASE_URL")
