@@ -1302,11 +1302,26 @@ async function initPyodide() {
     loading.classList.add("active");
 
     try {
-        pyodide = await loadPyodide();
-        loading.textContent = "Formatlash vositalari yuklanmoqda...";
-        await ensurePythonRuntimeTools();
-        loading.textContent = "Python ishga tayyorlanmoqda...";
+        // Start loading Pyodide in the background
+        const pyodidePromise = loadPyodide();
+
+        // Allow user to interact with the editor while Pyodide is loading
+        loading.textContent = "Python vositalari yuklanmoqda...";
+        setTimeout(() => {
+            loading.textContent = "Editor tayyor, Python yuklanmoqda...";
+        }, 1000);
+
+        // Wait for Pyodide to load
+        pyodide = await pyodidePromise;
+
+        // Load Python runtime tools in the background
+        ensurePythonRuntimeTools().catch(error => {
+            console.warn("Python formatter vositalari yuklanmadi:", error);
+        });
+
+        // Setup safe execution environment
         await setupSafeExecutionEnvironment();
+
         loading.textContent = "Python tayyor!";
         setTimeout(() => {
             loading.classList.remove("active");
@@ -1325,7 +1340,7 @@ async function ensurePythonRuntimeTools() {
 import micropip
 try:
     import autopep8
-except Exception:
+except ImportError:
     await micropip.install("autopep8")
     import autopep8
         `);
@@ -1459,16 +1474,15 @@ async function continueRunSession() {
         activeRunSession = null;
         if (!result.success) {
             highlightEditorError(result.error.line, result.error.column || 1);
+            const friendly = translatePythonError(result.error.type, result.error.message);
+            const codeLine = result.error.codeLine || getCodeLineAt(runCode, result.error.line);
             showOutput(buildCompactErrorMessage({
-                title: `${result.error.type}`,
-                summary: normalizeErrorText(result.error.message) || "Python bajarilishida xatolik yuz berdi.",
+                title: friendly.title,
+                summary: friendly.summary,
                 line: result.error.line,
-                codeLine: result.error.codeLine || getCodeLineAt(runCode, result.error.line),
+                codeLine,
                 column: result.error.column || null,
-                tips: [
-                    "Qator ustidagi kodni aynan shu joyda tekshiring.",
-                    "Agar xato `end` yoki `endl` ga o'xshasa, to'g'ri yozuvni qo'ying.",
-                ],
+                tips: [...new Set(friendly.tips)],
                 durationSeconds: time,
             }), "error");
         } else {
@@ -1516,11 +1530,14 @@ function setupEditor() {
     const textArea = document.getElementById("code-editor");
     if (!textArea) return;
 
+    currentLanguage = getStoredLanguage();
+    currentStarterPack = getStoredStarterPack();
+
     editor = CodeMirror.fromTextArea(textArea, {
-        mode: "python",
+        mode: getLanguageMode(currentLanguage),
         theme: "eclipse",
         lineNumbers: true,
-        indentUnit: 4,
+        indentUnit: getLanguageIndentUnit(currentLanguage),
         smartIndent: true,
         indentWithTabs: false,
         lineWrapping: true,
@@ -1532,6 +1549,8 @@ function setupEditor() {
         extraKeys: {
             "Ctrl-Enter": runCode,
             "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
             "Enter": "newlineAndIndent",
             "Ctrl-S": saveCode,
             "Ctrl-Shift-F": formatEditorCode,
@@ -1548,19 +1567,45 @@ function setupEditor() {
             closeOnUnfocus: true
         }
     });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
 
     editor.on("inputRead", onEditorInputRead);
-    editor.on("cursorActivity", updateEditorStatus);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
     editor.on("change", () => {
         updateEditorStatus();
         autoSaveCode();
+        dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
     });
 
+    setupLanguageSelector();
+    setupStarterPackSelector();
     loadTheme();
     loadEditorTypographyPreferences();
-    loadAutoSavedCode();
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
     setupPanelResizer();
     updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
+    clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
 }
 
 function updateEditorStatus() {
@@ -1571,70 +1616,88 @@ function updateEditorStatus() {
     if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
 }
 
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
+}
+
 function highlightEditorError(line, column = 1) {
     clearEditorDiagnostics();
-    if (!line || line > editor.lineCount()) return;
+    if (!editor || !line || line > editor.lineCount()) return;
     const idx = line - 1;
     const ch = Math.max(0, (Number(column) || 1) - 1);
-    activeDebugLineNumber = idx; // Reuse variable for simple highlight
+    activeDebugLineNumber = idx;
     editor.addLineClass(idx, "background", "error-line");
     editor.setCursor({ line: idx, ch });
     editor.scrollIntoView({ line: idx, ch }, 100);
 }
 
 function clearEditorDiagnostics() {
-    if (activeDebugLineNumber !== null) {
+    if (activeDebugLineNumber !== null && editor) {
         editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
         activeDebugLineNumber = null;
     }
 }
 
-// --- THEME & TYPOGRAPHY ---
-
-function toggleTheme() {
-    const isDark = !document.body.classList.contains("dark-mode");
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-    loadTheme();
-}
-
-function loadTheme() {
-    const theme = localStorage.getItem("theme") || "light";
-    const isDark = theme === "dark";
-    document.body.classList.toggle("dark-mode", isDark);
-    const btn = document.getElementById("themeBtn");
-    if (btn) btn.querySelector(".button-label").textContent = isDark ? "Light" : "Dark";
-    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
-}
-
-function applyEditorTypography(family, size) {
-    const wrapper = editor.getWrapperElement();
-    wrapper.style.fontFamily = EDITOR_FONT_FAMILIES[family] || family;
-    wrapper.style.fontSize = size;
-    localStorage.setItem("editorFontFamily", family);
-    localStorage.setItem("editorFontSize", size);
-    editor.refresh();
-}
-
-function loadEditorTypographyPreferences() {
-    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
-    const size = localStorage.getItem("editorFontSize") || "14px";
-    
-    const fSelect = document.getElementById("editor-font-family");
-    const sSelect = document.getElementById("editor-font-size");
-    
-    if (fSelect) {
-        fSelect.value = family;
-        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect.value);
+function clearOutputInputHost({ preserveValue = true } = {}) {
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
     }
-    if (sSelect) {
-        sSelect.value = size;
-        sSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect.value);
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
     }
-    
-    applyEditorTypography(family, size);
+    dispatchEditorContextUpdate();
 }
 
-// --- FILE OPERATIONS ---
+function clearOutput({ preserveInput = true } = {}) {
+    const output = document.getElementById("output");
+    if (output) {
+        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
+        output.className = "output-content";
+    }
+    pendingRemoteRun = null;
+    clearEditorDiagnostics();
+    clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
+}
+
+function showOutput(text, type) {
+    const output = document.getElementById("output");
+    if (!output) return;
+    output.textContent = text;
+    output.className = type ? "output-content " + type : "output-content";
+    scrollOutputToLatest();
+    dispatchEditorContextUpdate();
+}
 
 function saveCode() {
     saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
@@ -1664,7 +1727,10 @@ function uploadFile(event) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-        editor.setValue(e.target.result);
+        if (currentStarterPack !== "array") {
+            setEditorLanguage(currentStarterPack, { persistCurrent: true });
+        }
+        editor.setValue(String(e.target.result || ""));
         showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
     };
     reader.readAsText(file);
@@ -2927,7 +2993,7 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 summary: "Funksiya chaqiruvidagi argumentlar mos kelmadi.",
                 tips: [
                     "Funksiya nomi va argumentlar sonini tekshiring.",
-                    "Qabul qiladigan tur bilan yuborayotgan tur mos ekanini ko'ring.",
+                    "Qabul qilinayotgan tur bilan yuborayotgan tur mos ekanini ko'ring.",
                 ],
             },
             {
@@ -3096,7 +3162,7 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 match: ["unexpected end of input"],
                 summary: "Kod oxirida qavs yoki blok yopilmay qolgan.",
                 tips: [
-                    "Har bir `(`, `{`, `[` uchun mos yopuvchi belgi borligini tekshiring.",
+                    "Har bir `(`, `{`, `[` uchun mos yopilish belgisi borligini tekshiring.",
                 ],
             },
             {
@@ -3229,10 +3295,10 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
             {
                 match: ["cannot read properties of undefined", "cannot read property of undefined"],
                 all: false,
-                summary: "Undefined yoki null ustida property o'qildi.",
+                summary: "Undefined yoki null ustida property o'qilyapti.",
                 tips: [
                     "Obyekt mavjudligini tekshiring.",
-                    "Optional chaining yoki guard ishlating.",
+                    "Kerak bo'lsa optional chaining ishlating.",
                 ],
             },
             {
@@ -3383,7 +3449,7 @@ function translatePythonError(errorType, errorMessage) {
             title: "Nolga bo'lish mumkin emas",
             summary: "Dastur 0 ga bo'lishga uringan.",
             tips: [
-                "Bo'luvchi nol bo'lmasligini oldindan tekshiring.",
+                "Bo'luvchi nol bo'lishi mumkin bo'lgan joyni tekshiring.",
             ],
         };
     }
@@ -3575,7 +3641,8 @@ function translateRemoteError(language, verdict, text) {
                     title: baseTitle,
                     summary: "Kod oxirida qavs yoki blok yopilmay qolgan.",
                     tips: [
-                        "Oxirgi `}`, `)` va `]` larni tekshiring.",
+                        "Oxirgi `}` larni tekshiring.",
+                        "String yoki bracket yopilganini ko'ring.",
                     ],
                 };
             }
@@ -3693,7 +3760,7 @@ function translateRemoteError(language, verdict, text) {
                 summary: "Java'da nom topilmadi. O'zgaruvchi yoki funksiya e'lonini tekshiring.",
                 tips: [
                     "Nomni aynan bir xil yozing.",
-                    "Kerakli importlar qo'shilganini tekshiring.",
+                    "Kerakli importlar qo'shilganini ko'ring.",
                 ],
             };
         }
@@ -3906,7 +3973,7 @@ function buildSpecificFixTips(language, verdict, rawText, codeLine, line, column
 
     if (normalizedLanguage === "go") {
         if (lowerText.includes("syntax error: unexpected")) {
-            tips.push("Bu joyda belgi yoki blok tartibi buzilgan. `(`, `)`, `{`, `}` va `:=` ni tekshiring.");
+            tips.push("Bu joyda belgi yoki blok tartibi buzilgan. `(`, `)` , `{`, `}` va `:=` ni tekshiring.");
         }
         if (lowerText.includes("expected ';'")) {
             tips.push("Go sintaksisida bu joyda ifoda to'liq emas yoki oldingi qism yopilmagan.");
