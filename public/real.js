@@ -4217,6 +4217,7 @@ function clearEditorRuntimeWarmupTimers() {
 }
 
 function scheduleEditorRuntimeWarmup(language, pack, code) {
+    return; // Serverga ortiqcha yuk tushmasligi uchun o'chirildi
     const normalizedLanguage = normalizeLanguage(language);
     const normalizedPack = normalizeStarterPack(pack);
     const config = getLanguageConfig(normalizedLanguage);
@@ -4264,6 +4265,7 @@ async function warmEditorRuntime(language, code) {
 }
 
 function warmServerLocalRuntimeCatalog() {
+    return; // Judge0 navbatini to'ldirib yubormaslik uchun o'chirildi
     const warmLanguages = ["cpp", "java", "go"];
     let delay = 100;
 
