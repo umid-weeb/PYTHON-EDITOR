@@ -1306,9 +1306,10 @@ async function initPyodide() {
         const pyodidePromise = loadPyodide();
 
         // Allow user to interact with the editor while Pyodide is loading
-        loading.textContent = "Python vositalari yuklanmoqda...";
         setTimeout(() => {
-            loading.textContent = "Editor tayyor, Python yuklanmoqda...";
+            if (loading) {
+                loading.textContent = "Editor tayyor, Python yuklanmoqda...";
+            }
         }, 1000);
 
         // Wait for Pyodide to load
@@ -1322,14 +1323,18 @@ async function initPyodide() {
         // Setup safe execution environment
         await setupSafeExecutionEnvironment();
 
-        loading.textContent = "Python tayyor!";
-        setTimeout(() => {
-            loading.classList.remove("active");
-        }, 1500);
+        if (loading) {
+            loading.textContent = "Python tayyor!";
+            setTimeout(() => {
+                loading.classList.remove("active");
+            }, 1500);
+        }
     } catch (error) {
-        loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
-        loading.style.background = "#fee2e2";
-        loading.style.color = "#991b1b";
+        if (loading) {
+            loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
+            loading.style.background = "#fee2e2";
+            loading.style.color = "#991b1b";
+        }
     }
 }
 
@@ -1465,13 +1470,18 @@ async function continueRunSession() {
         const time = ((performance.now() - start) / 1000).toFixed(3);
 
         if (result.awaitingInput) {
-            showOutput(result.output ? result.output + "\n..." : "Input kutilmoqda...", "");
+            if (result.output) {
+                showOutput(result.output + "\n...", "");
+            } else {
+                showOutput("Input kutilmoqda...", "");
+            }
             renderOutputPanelInput(result.error.prompt, result.error.inputIndex);
             return;
         }
 
         const runCode = activeRunSession ? activeRunSession.code : editor.getValue();
         activeRunSession = null;
+        clearEditorDiagnostics();
         if (!result.success) {
             highlightEditorError(result.error.line, result.error.column || 1);
             const friendly = translatePythonError(result.error.type, result.error.message);
@@ -1490,38 +1500,61 @@ async function continueRunSession() {
             showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nVaqt: ${time}s`, "success");
         }
     } catch (e) {
-        showOutput("Xatolik: " + e.message, "error");
+        activeRunSession = null;
+        showOutput("Bajarishda xatolik: " + e.message, "error");
     }
 }
 
 function renderOutputPanelInput(prompt, index) {
-    const host = document.getElementById("output-input-host");
-    if (!host) return;
-    host.className = "output-input-host active";
-    host.innerHTML = `
-        <div class="output-input-label">${escapeHtml(prompt || "Qiymat kiriting:")}</div>
-        <div class="output-input-row">
-            <input type="text" id="output-panel-input" class="output-input-field" autocomplete="off" />
-            <button id="output-panel-submit" class="output-input-submit">Yuborish</button>
-        </div>`;
-    
-    const input = document.getElementById("output-panel-input");
-    const submitBtn = document.getElementById("output-panel-submit");
+    renderInputPanel({
+        inlinePrompt: prompt ? String(prompt) : "Qiymat",
+        buttonLabel: "Yuborish",
+        buttonDisabled: false,
+        inputValue: "",
+        placeholder: "Javobni yozing",
+        persistDraft: false,
+        multiline: false,
+        submitOnEnter: true,
+        onSubmit: () => {
+            const value = getInputPanelValue();
+            if (pendingBrowserLocalRun) {
+                const queued = pendingBrowserLocalRun;
+                pendingBrowserLocalRun = null;
+                setInputPanelValue("");
+                clearInputDraft(queued.language, currentStarterPack);
+                clearOutputInputHost({ preserveValue: false });
+                void runBrowserLocalJavaScript(queued.language, queued.code, value);
+                return;
+            }
+            if (pendingRemoteRun) {
+                const queued = pendingRemoteRun;
+                pendingRemoteRun = null;
+                setInputPanelValue("");
+                clearInputDraft(queued.language, currentStarterPack);
+                clearOutputInputHost({ preserveValue: false });
+                void runRemoteExecution(queued.language, queued.code, value);
+                return;
+            }
+            if (!activeRunSession && !activeDebugSession) return;
+            const lines = value === "" ? [""] : splitInputLines(value);
+            setInputPanelValue("");
+            clearInputDraft(currentLanguage, currentStarterPack);
+            clearOutputInputHost({ preserveValue: false });
+            if (activeRunSession) {
+                activeRunSession.inputValues.push(...lines);
+                continueRunSession();
+                return;
+            }
+            if (activeDebugSession) {
+                activeDebugSession.inputValues.push(...lines);
+                continueDebugSession();
+            }
+        },
+    });
 
-    const submit = () => {
-        const val = input.value;
-        if (activeRunSession) activeRunSession.inputValues.push(val);
-        else if (activeDebugSession) activeDebugSession.inputValues.push(val);
-        clearOutputInputHost();
-        if (activeRunSession) continueRunSession();
-        else if (activeDebugSession) continueDebugSession();
-    };
-
-    submitBtn.onclick = submit;
-    input.onkeydown = (e) => { if (e.key === "Enter") submit(); };
-    input.focus();
+    const input = getInputPanelElement();
+    if (input) input.focus();
     scrollOutputToLatest();
-    dispatchEditorContextUpdate();
 }
 
 // --- EDITOR SETUP ---
@@ -1557,7 +1590,7 @@ function setupEditor() {
             "Tab": (cm) => {
                 if (cm.state.completionActive) return CodeMirror.Pass;
                 if (cm.somethingSelected()) cm.indentSelection("add");
-                else cm.replaceSelection("    ");
+                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
             },
             "Shift-Tab": (cm) => cm.indentSelection("subtract")
         },
@@ -1729,1009 +1762,6 @@ function uploadFile(event) {
     reader.onload = (e) => {
         if (currentStarterPack !== "array") {
             setEditorLanguage(currentStarterPack, { persistCurrent: true });
-        }
-        editor.setValue(String(e.target.result || ""));
-        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
-    };
-    reader.readAsText(file);
-}
-
-function autoSaveCode() {
-    localStorage.setItem("pythonAutoSave", JSON.stringify({
-        code: editor.getValue(),
-        lastSaved: Date.now()
-    }));
-}
-
-function loadAutoSavedCode() {
-    const data = localStorage.getItem("pythonAutoSave");
-    if (data) {
-        try {
-            const parsed = JSON.parse(data);
-            if (parsed.code) editor.setValue(parsed.code);
-        } catch(e) {}
-    }
-}
-
-async function formatEditorCode() {
-    if (!pyodide) return showOutput("Python yuklanmagan.", "error");
-    const code = editor.getValue();
-    showOutput("Formatlanmoqda...", "");
-    try {
-        const res = await pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`);
-        const result = JSON.parse(res);
-        if (result.formatterAvailable) {
-            editor.setValue(result.code);
-                showOutput("OK: Kod formatlandi.", "success");
-        } else {
-            showOutput("Formatlash tooli (autopep8) hali yuklanmagan.", "error");
-        }
-        setTimeout(clearOutput, 2000);
-    } catch (e) {
-        showOutput("Xatolik: " + e.message, "error");
-    }
-}
-
-function clearOutput() {
-    const output = document.getElementById("output");
-    if (output) {
-        output.textContent = "Natija bu yerda ko'rsatiladi...";
-        output.className = "output-content";
-    }
-    clearEditorDiagnostics();
-    clearOutputInputHost();
-    dispatchEditorContextUpdate();
-}
-
-function showOutput(text, type) {
-    const output = document.getElementById("output");
-    if (!output) return;
-    output.textContent = text;
-    output.className = type ? "output-content " + type : "output-content";
-    scrollOutputToLatest();
-    dispatchEditorContextUpdate();
-}
-
-function openArena() {
-    window.location.href = "/zone";
-}
-
-// Debug placeholders for now
-function debugCode() { showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", ""); }
-function clearDebugState() {
-    activeDebugSession = null;
-    activeDebugSteps = [];
-    activeDebugStepIndex = 0;
-}
-
-function continueDebugSession() {
-    showOutput("Debug rejimi hozircha tayyor emas.", "");
-    activeDebugSession = null;
-}
-
-// --- AUTOCOMPLETE ---
-
-function onEditorInputRead(cm, change) {
-    if (change.origin !== "+input") return;
-    const cur = cm.getCursor();
-    const token = cm.getTokenAt(cur);
-    const char = change.text[0];
-
-    // Trigger on any alphabetical character or dot
-    if (!/^[a-zA-Z_.]$/.test(char)) return;
-    
-    // Trigger instantly if we have a valid starting char
-    if (token.string.trim().length > 0 || char === ".") {
-        showAutocompleteHints(cm);
-    }
-}
-
-function showAutocompleteHints(cm) {
-    cm.showHint({
-        hint: function(editor) {
-            const cur = editor.getCursor();
-            const token = editor.getTokenAt(cur);
-            const start = token.start;
-            const end = cur.ch;
-            const line = cur.line;
-            const currentWord = token.string;
-
-            const currentWordLower = currentWord.toLowerCase();
-            const priority = ["True", "False", "None"];
-
-            const list = [...new Set([
-                ...PYTHON_KEYWORDS,
-                ...MATH_FUNCTIONS,
-                ...(CodeMirror.hint.anyword(editor).list || [])
-            ])].filter(h => h.toLowerCase().startsWith(currentWordLower))
-               .sort((a, b) => {
-                   // Priority check
-                   const aPri = priority.includes(a);
-                   const bPri = priority.includes(b);
-                   if (aPri && !bPri) return -1;
-                   if (!aPri && bPri) return 1;
-
-                   // Exact case match prioritize
-                   const aStart = a.startsWith(currentWord);
-                   const bStart = b.startsWith(currentWord);
-                   if (aStart && !bStart) return -1;
-                   if (!aStart && bStart) return 1;
-
-                   return a.localeCompare(b);
-               });
-
-            return {
-                list: list,
-                from: CodeMirror.Pos(line, start),
-                to: CodeMirror.Pos(line, end)
-            };
-        },
-        completeSingle: false
-    });
-}
-
-// --- MULTI-LANGUAGE OVERRIDES ---
-
-function applyEditorTypography(family, size) {
-    const resolvedFamily = EDITOR_FONT_FAMILIES[family] || family;
-    const root = document.documentElement;
-    root.style.setProperty("--editor-font-family", resolvedFamily);
-    root.style.setProperty("--editor-font-size", size);
-
-    if (editor) {
-        const wrapper = editor.getWrapperElement();
-        wrapper.style.fontFamily = resolvedFamily;
-        wrapper.style.fontSize = size;
-        editor.refresh();
-    }
-
-    localStorage.setItem("editorFontFamily", family);
-    localStorage.setItem("editorFontSize", size);
-}
-
-function loadTheme() {
-    const theme = localStorage.getItem("theme") || "light";
-    const isDark = theme === "dark";
-    document.body.classList.toggle("dark-mode", isDark);
-    const btn = document.getElementById("themeBtn");
-    if (btn) {
-        const label = btn.querySelector(".button-label");
-        if (label) label.textContent = isDark ? "Light" : "Dark";
-    }
-    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
-}
-
-function loadEditorTypographyPreferences() {
-    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
-    const size = localStorage.getItem("editorFontSize") || "14px";
-
-    const fSelect = document.getElementById("editor-font-family");
-    const sSelect = document.getElementById("editor-font-size");
-
-    if (fSelect) {
-        fSelect.value = family;
-        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect ? sSelect.value : size);
-    }
-    if (sSelect) {
-        sSelect.value = size;
-        sSelect.onchange = () => applyEditorTypography(fSelect ? fSelect.value : family, sSelect.value);
-    }
-
-    applyEditorTypography(family, size);
-}
-
-const IDENTIFIER_RESERVED_WORDS = (() => {
-    const words = new Set(Object.values(LANGUAGE_AUTOCOMPLETE_WORDS).flat());
-    words.delete("main");
-    words.delete("Main");
-    return words;
-})();
-
-const IDENTIFIER_TONE_COUNT = 10;
-
-function hashIdentifier(name) {
-    let hash = 0;
-    for (let index = 0; index < name.length; index += 1) {
-        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
-    }
-    return hash;
-}
-
-function getIdentifierToneClass(name) {
-    return `cm-identifier-tone-${hashIdentifier(name) % IDENTIFIER_TONE_COUNT}`;
-}
-
-function createIdentifierOverlay() {
-    return {
-        token(stream) {
-            if (stream.eatSpace()) return null;
-
-            const word = stream.match(/^[A-Za-z_][A-Za-z0-9_]*/);
-            if (word) {
-                const token = word[0];
-                if (!IDENTIFIER_RESERVED_WORDS.has(token)) {
-                    return getIdentifierToneClass(token);
-                }
-                return null;
-            }
-
-            stream.next();
-            return null;
-        },
-    };
-}
-
-let pyodideLoadingPromise = null;
-
-async function ensurePyodideLoaded() {
-    if (pyodide) return pyodide;
-    if (pyodideLoadingPromise) return pyodideLoadingPromise;
-
-    const loading = document.getElementById("loading");
-    if (loading) {
-        loading.classList.add("active");
-        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
-    }
-
-    pyodideLoadingPromise = (async () => {
-        try {
-            // Brauzer qotmasligi uchun ozgina pauza beramiz
-            await new Promise(r => setTimeout(r, 50));
-            pyodide = await loadPyodide();
-            
-            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
-            await new Promise(r => setTimeout(r, 50));
-            await setupSafeExecutionEnvironment();
-            
-            if (loading) {
-                loading.textContent = "Python tayyor!";
-                setTimeout(() => loading.classList.remove("active"), 1500);
-            }
-            return pyodide;
-        } catch (error) {
-            console.warn("Python muhiti yuklanmadi:", error);
-            if (loading) {
-                loading.textContent = "Xatolik: Python yuklanmadi.";
-                loading.style.background = "#fee2e2";
-                loading.style.color = "#991b1b";
-                setTimeout(() => loading.classList.remove("active"), 4000);
-            }
-            throw error;
-        }
-    })();
-
-    return pyodideLoadingPromise;
-}
-
-function syncLanguageSelector() {
-    const selector = document.getElementById("editor-language");
-    if (selector) {
-        selector.value = currentLanguage;
-    }
-    updateHeaderLanguageBranding(currentLanguage);
-}
-
-function setupLanguageSelector() {
-    const selector = document.getElementById("editor-language");
-    if (!selector) return;
-    selector.value = currentLanguage;
-    selector.onchange = () => setEditorLanguage(selector.value);
-    updateHeaderLanguageBranding(currentLanguage);
-}
-
-function syncStarterPackSelector() {
-    const selector = document.getElementById("editor-starter-pack");
-    if (selector) {
-        selector.value = currentStarterPack;
-    }
-}
-
-function setupStarterPackSelector() {
-    const selector = document.getElementById("editor-starter-pack");
-    if (!selector) return;
-    selector.value = currentStarterPack;
-    selector.onchange = () => setStarterPack(selector.value);
-}
-
-function setStarterPack(pack, options = {}) {
-    const nextPack = normalizeStarterPack(pack);
-    const shouldPersistCurrent = options.persistCurrent !== false;
-
-    if (!editor) {
-        currentStarterPack = nextPack;
-        setStoredStarterPack(nextPack);
-        syncStarterPackSelector();
-        return;
-    }
-
-    if (currentStarterPack === nextPack && !options.force) {
-        syncStarterPackSelector();
-        updateEditorStatus();
-        return;
-    }
-
-    if (shouldPersistCurrent) {
-        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
-    }
-
-    currentStarterPack = nextPack;
-    setStoredStarterPack(nextPack);
-
-    editor.setValue(getStoredCode(currentLanguage, nextPack));
-    editor.focus();
-    editor.refresh();
-
-    clearOutput({ preserveInput: false });
-    syncStarterPackSelector();
-    updateEditorStatus();
-    setEditorRuntimeMode("LOCAL");
-    dispatchEditorContextUpdate();
-    scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
-}
-
-function setEditorLanguage(language, options = {}) {
-    const nextLanguage = normalizeLanguage(language);
-    const shouldPersistCurrent = options.persistCurrent !== false;
-
-    if (!editor) {
-        currentLanguage = nextLanguage;
-        setStoredLanguage(nextLanguage);
-        syncLanguageSelector();
-        updateHeaderLanguageBranding(nextLanguage);
-        return;
-    }
-
-    if (currentLanguage === nextLanguage && !options.force) {
-        syncLanguageSelector();
-        updateEditorStatus();
-        updateHeaderLanguageBranding(nextLanguage);
-        return;
-    }
-
-    if (shouldPersistCurrent) {
-        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
-    }
-
-    currentLanguage = nextLanguage;
-    setStoredLanguage(nextLanguage);
-
-    editor.setOption("mode", getLanguageMode(nextLanguage));
-    editor.setOption("indentUnit", getLanguageIndentUnit(nextLanguage));
-    editor.setValue(getStoredCode(nextLanguage, currentStarterPack));
-    editor.focus();
-    editor.refresh();
-
-    clearOutput({ preserveInput: false });
-    syncLanguageSelector();
-    syncStarterPackSelector();
-    updateEditorStatus();
-    setEditorRuntimeMode("LOCAL");
-    dispatchEditorContextUpdate();
-    updateHeaderLanguageBranding(nextLanguage);
-    scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
-}
-
-function getSelectionToolbarElement() {
-    return document.getElementById("editor-selection-toolbar");
-}
-
-function hideSelectionToolbar() {
-    const toolbar = getSelectionToolbarElement();
-    if (toolbar) {
-        toolbar.hidden = true;
-    }
-}
-
-function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
-    void message;
-    void tone;
-    void autoRestore;
-}
-
-function getSelectionToolbarSelection() {
-    if (!editor || !editor.somethingSelected()) return null;
-    const from = editor.getCursor("from");
-    const to = editor.getCursor("to");
-    const text = editor.getSelection("\n");
-    if (!text || !text.trim()) return null;
-
-    return {
-        from,
-        to,
-        text,
-        lineCount: Math.max(1, to.line - from.line + 1),
-    };
-}
-
-function getSelectionToolbarAnchor(range) {
-    const fromCoords = editor.charCoords(range.from, "page");
-    const toCoords = editor.charCoords(range.to, "page");
-    const left = Math.min(fromCoords.left, toCoords.left) - window.pageXOffset;
-    const right = Math.max(fromCoords.right, toCoords.right) - window.pageXOffset;
-    const top = Math.min(fromCoords.top, toCoords.top) - window.pageYOffset;
-    const bottom = Math.max(fromCoords.bottom, toCoords.bottom) - window.pageYOffset;
-    return {
-        left: (left + right) / 2,
-        top,
-        bottom,
-    };
-}
-
-function positionSelectionToolbar(toolbar, anchorLeft, anchorTop, anchorBottom) {
-    if (!toolbar) return;
-    const margin = 12;
-    const rect = toolbar.getBoundingClientRect();
-    const width = rect.width || 280;
-    const height = rect.height || 52;
-    let left = Math.round(anchorLeft - width / 2);
-    left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
-
-    let top = Math.round(anchorTop - height - 12);
-    if (top < margin) {
-        top = Math.round((Number(anchorBottom) || anchorTop) + 12);
-    }
-    if (top + height > window.innerHeight - margin) {
-        top = Math.max(margin, window.innerHeight - height - margin);
-    }
-
-    toolbar.style.left = `${left}px`;
-    toolbar.style.top = `${top}px`;
-}
-
-function refreshSelectionToolbar(positionOverride = null) {
-    const toolbar = getSelectionToolbarElement();
-    if (!toolbar) return false;
-
-    const range = getSelectionToolbarSelection();
-    if (!range) {
-        hideSelectionToolbar();
-        return false;
-    }
-
-    toolbar.hidden = false;
-
-    const anchor = positionOverride || getSelectionToolbarAnchor(range);
-    positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
-    return true;
-}
-
-function showSelectionToolbarAtPoint(clientX, clientY) {
-    const toolbar = getSelectionToolbarElement();
-    const range = getSelectionToolbarSelection();
-    if (!toolbar || !range) return false;
-
-    toolbar.hidden = false;
-    positionSelectionToolbar(toolbar, clientX, clientY, clientY);
-    return true;
-}
-
-function getSelectionSnapshotThemeColors() {
-    const root = getComputedStyle(document.documentElement);
-    return {
-        surface: root.getPropertyValue("--surface").trim() || "#ffffff",
-        surfaceMuted: root.getPropertyValue("--surface-muted").trim() || "#f6f8fb",
-        border: root.getPropertyValue("--border").trim() || "#d8e1ec",
-        textMain: root.getPropertyValue("--text-main").trim() || "#132033",
-        textMuted: root.getPropertyValue("--text-muted").trim() || "#5f6f82",
-        codeKeyword: root.getPropertyValue("--code-keyword").trim() || "#2153d6",
-        codeDef: root.getPropertyValue("--code-def").trim() || "#0f766e",
-        codeString: root.getPropertyValue("--code-string").trim() || "#b45309",
-        codeNumber: root.getPropertyValue("--code-number").trim() || "#b42318",
-        codeComment: root.getPropertyValue("--code-comment").trim() || "#6b7280",
-        codeAtom: root.getPropertyValue("--code-atom").trim() || "#7c3aed",
-        codeProperty: root.getPropertyValue("--code-property").trim() || "#0b6b7a",
-        codeVariable: root.getPropertyValue("--code-variable").trim() || "#0f172a",
-        codeOperator: root.getPropertyValue("--code-operator").trim() || "#6d28d9",
-        primary: root.getPropertyValue("--primary").trim() || "#2353d7",
-        primaryHover: root.getPropertyValue("--primary-hover").trim() || "#1b43ac",
-        danger: root.getPropertyValue("--danger").trim() || "#b9384a",
-        success: root.getPropertyValue("--success").trim() || "#0f766e",
-    };
-}
-
-function getSelectionSnapshotTokenColor(tokenType, colors) {
-    const type = String(tokenType || "");
-    if (type.includes("comment")) return colors.codeComment;
-    if (type.includes("string")) return colors.codeString;
-    if (type.includes("number")) return colors.codeNumber;
-    if (type.includes("keyword")) return colors.codeKeyword;
-    if (type.includes("def")) return colors.codeDef;
-    if (type.includes("atom")) return colors.codeAtom;
-    if (type.includes("property")) return colors.codeProperty;
-    if (type.includes("operator")) return colors.codeOperator;
-    if (type.includes("builtin")) return colors.codeAtom;
-    return colors.codeVariable;
-}
-
-function getSelectionSnapshotSegments(lineNo, startCh, endCh) {
-    const lineText = editor.getLine(lineNo) || "";
-    const segments = [];
-    let cursor = Math.max(0, startCh);
-    const safeEnd = Math.max(cursor, Math.min(endCh, lineText.length));
-
-    if (cursor >= safeEnd) {
-        return [{ text: "", type: "" }];
-    }
-
-    while (cursor < safeEnd) {
-        const probe = Math.min(Math.max(cursor, 0), Math.max(0, lineText.length - 1));
-        const token = editor.getTokenAt({ line: lineNo, ch: probe });
-        let tokenStart = Math.max(cursor, Number(token.start) || 0);
-        let tokenEnd = Math.min(safeEnd, Number(token.end) || (cursor + 1));
-
-        if (tokenEnd <= tokenStart) {
-            tokenEnd = Math.min(safeEnd, cursor + 1);
-        }
-
-        segments.push({
-            text: lineText.slice(tokenStart, tokenEnd),
-            type: token.type || "",
-        });
-        cursor = tokenEnd;
-    }
-
-    return segments;
-}
-
-function measureSelectionSnapshotLineWidth(ctx, segments) {
-    return segments.reduce((total, segment) => total + ctx.measureText(segment.text || "").width, 0);
-}
-
-function roundRectPath(ctx, x, y, width, height, radius) {
-    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + width - r, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-    ctx.lineTo(x + width, y + height - r);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-    ctx.lineTo(x + r, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-}
-
-async function createSelectionSnapshotBlob(range) {
-    if (!editor || !range) return null;
-    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
-        try {
-            await document.fonts.ready;
-        } catch (_) {}
-    }
-
-    const colors = getSelectionSnapshotThemeColors();
-    const editorWrapper = editor.getWrapperElement();
-    const computed = getComputedStyle(editorWrapper);
-    const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
-    const fontSize = Math.max(13, Math.min(18, Math.round(parseFloat(computed.fontSize) || 14)));
-    const lineHeight = Math.round(fontSize * 1.48);
-    const topBarHeight = 44;
-    const paddingX = 18;
-    const paddingTop = 14;
-    const paddingBottom = 14;
-    const lineGap = 8;
-    const codeFont = `${fontSize}px ${fontFamily}`;
-    const ctxMeasure = document.createElement("canvas").getContext("2d");
-    if (!ctxMeasure) return null;
-    ctxMeasure.font = codeFont;
-
-    const snapshotLines = [];
-    for (let lineNo = range.from.line; lineNo <= range.to.line; lineNo += 1) {
-        const startCh = lineNo === range.from.line ? range.from.ch : 0;
-        const originalLine = editor.getLine(lineNo) || "";
-        const endCh = lineNo === range.to.line ? range.to.ch : originalLine.length;
-        const segments = getSelectionSnapshotSegments(lineNo, startCh, endCh);
-        snapshotLines.push({
-            lineNumber: lineNo + 1,
-            segments,
-            width: measureSelectionSnapshotLineWidth(ctxMeasure, segments),
-        });
-    }
-
-    const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
-    const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
-    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 12;
-    const contentWidth = Math.max(240, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
-    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 14 + contentWidth);
-    ctxMeasure.font = `600 13px ${fontFamily}`;
-    const headerLanguage = getLanguageLabel();
-    const headerTitle = "Code Snap";
-    const headerText = `${headerLanguage} • ${headerTitle}`;
-    ctxMeasure.font = `600 13px ${fontFamily}`;
-    const headerWidth = Math.ceil(108 + ctxMeasure.measureText(headerText).width + 22);
-    const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
-    const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
-    const scale = Math.min(window.devicePixelRatio || 1, 2);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.scale(scale, scale);
-    ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = colors.surfaceMuted;
-    ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
-    ctx.shadowBlur = 20;
-    ctx.shadowOffsetY = 10;
-    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-
-    ctx.fillStyle = colors.surface;
-    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
-    ctx.fill();
-
-    ctx.fillStyle = colors.surfaceMuted;
-    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 18);
-    ctx.fill();
-
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0.5, topBarHeight + 0.5);
-    ctx.lineTo(width - 0.5, topBarHeight + 0.5);
-    ctx.stroke();
-
-    const dotY = 22;
-    const dotX = 28;
-    const dots = [colors.danger, "#ffbf3c", "#31c55e"];
-    dots.forEach((color, index) => {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(dotX + index * 22, dotY, 6.25, 0, Math.PI * 2);
-        ctx.fill();
-    });
-
-    ctx.fillStyle = colors.textMain;
-    ctx.font = `600 13px ${fontFamily}`;
-    ctx.fillText(headerText, 104, 27);
-
-    const codeTop = topBarHeight + paddingTop + 4;
-    const codeLeft = paddingX + lineNumberWidth + 14;
-
-    snapshotLines.forEach((line, index) => {
-        const y = codeTop + (index * lineHeight) + fontSize;
-        const lineNumberText = String(line.lineNumber);
-        ctx.font = `${fontSize}px ${fontFamily}`;
-        ctx.fillStyle = colors.textMuted;
-        ctx.textAlign = "right";
-        ctx.fillText(lineNumberText, paddingX + lineNumberWidth - 2, y);
-        ctx.textAlign = "left";
-
-        let x = codeLeft;
-        line.segments.forEach((segment) => {
-            const segmentText = segment.text || "";
-            const segmentType = segment.type || "";
-            ctx.fillStyle = getSelectionSnapshotTokenColor(segmentType, colors);
-            ctx.font = `${fontSize}px ${fontFamily}`;
-            ctx.fillText(segmentText, x, y);
-            x += ctx.measureText(segmentText).width;
-        });
-    });
-
-    return await new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), "image/png");
-    });
-}
-
-async function copySelectionSnapshotToClipboard() {
-    const range = getSelectionToolbarSelection();
-    if (!range) {
-        setSelectionToolbarStatus("Avval kodni belgilang", "error", true);
-        return false;
-    }
-
-    const blob = await createSelectionSnapshotBlob(range);
-    if (!blob) {
-        setSelectionToolbarStatus("Snapshot tayyorlanmadi", "error", true);
-        return false;
-    }
-
-    try {
-        if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    [blob.type || "image/png"]: blob,
-                }),
-            ]);
-            setSelectionToolbarStatus("Snap nusxalandi", "success", true);
-            return true;
-        }
-    } catch (error) {
-        // Fall through to text copy fallback.
-    }
-
-    const copiedText = await copySelectionTextToClipboard();
-    if (copiedText) {
-        setSelectionToolbarStatus("Matn nusxalandi", "warning", true);
-        return true;
-    }
-
-    setSelectionToolbarStatus("Nusxalash bo'lmadi", "error", true);
-    return false;
-}
-
-async function copySelectionTextToClipboard() {
-    const range = getSelectionToolbarSelection();
-    if (!range) return false;
-    const text = range.text;
-
-    try {
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-            await navigator.clipboard.writeText(text);
-            return true;
-        }
-    } catch (error) {
-        // Fallback below.
-    }
-
-    const fallback = document.createElement("textarea");
-    fallback.value = text;
-    fallback.setAttribute("readonly", "readonly");
-    fallback.style.position = "fixed";
-    fallback.style.opacity = "0";
-    fallback.style.left = "-9999px";
-    fallback.style.top = "-9999px";
-    document.body.appendChild(fallback);
-    fallback.focus();
-    fallback.select();
-    let success = false;
-    try {
-        success = document.execCommand("copy");
-    } catch (_) {
-        success = false;
-    }
-    document.body.removeChild(fallback);
-    return success;
-}
-
-function bindSelectionToolbarEvents() {
-    const toolbar = getSelectionToolbarElement();
-    if (!toolbar || toolbar.dataset.bound === "1") return;
-
-    toolbar.dataset.bound = "1";
-    toolbar.addEventListener("mousedown", (event) => {
-        event.preventDefault();
-    });
-
-    toolbar.addEventListener("click", async (event) => {
-        const button = event.target instanceof Element
-            ? event.target.closest("[data-selection-action]")
-            : null;
-        if (!button) return;
-
-        const action = button.getAttribute("data-selection-action");
-        if (action === "copy-snap") {
-            await copySelectionSnapshotToClipboard();
-        }
-    });
-}
-
-function setupEditor() {
-    const textArea = document.getElementById("code-editor");
-    if (!textArea) return;
-
-    currentLanguage = getStoredLanguage();
-    currentStarterPack = getStoredStarterPack();
-
-    editor = CodeMirror.fromTextArea(textArea, {
-        mode: getLanguageMode(currentLanguage),
-        theme: "eclipse",
-        lineNumbers: true,
-        indentUnit: getLanguageIndentUnit(currentLanguage),
-        smartIndent: true,
-        indentWithTabs: false,
-        lineWrapping: true,
-        matchBrackets: true,
-        autoCloseBrackets: true,
-        styleActiveLine: true,
-        foldGutter: true,
-        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
-        extraKeys: {
-            "Ctrl-Enter": runCode,
-            "F5": runCode,
-            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
-            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
-            "Enter": "newlineAndIndent",
-            "Ctrl-S": saveCode,
-            "Ctrl-Shift-F": formatEditorCode,
-            "Tab": (cm) => {
-                if (cm.state.completionActive) return CodeMirror.Pass;
-                if (cm.somethingSelected()) cm.indentSelection("add");
-                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
-            },
-            "Shift-Tab": (cm) => cm.indentSelection("subtract"),
-        },
-        hintOptions: {
-            completeSingle: false,
-            alignWithWord: true,
-            closeOnUnfocus: true,
-        },
-    });
-    editor.addOverlay(createIdentifierOverlay(), { combine: true });
-
-    const editorWrapper = editor.getWrapperElement();
-    editorWrapper.addEventListener("contextmenu", (event) => {
-        if (!editor || !editor.somethingSelected()) return;
-        event.preventDefault();
-        showSelectionToolbarAtPoint(event.clientX, event.clientY);
-    });
-
-    editor.on("inputRead", onEditorInputRead);
-    editor.on("cursorActivity", () => {
-        updateEditorStatus();
-        refreshSelectionToolbar();
-        dispatchEditorContextUpdate();
-    });
-    editor.on("scroll", refreshSelectionToolbar);
-    editor.on("change", () => {
-        updateEditorStatus();
-        autoSaveCode();
-        dispatchEditorContextUpdate();
-        refreshSelectionToolbar();
-    });
-
-    setupLanguageSelector();
-    setupStarterPackSelector();
-    loadTheme();
-    loadEditorTypographyPreferences();
-    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
-    setupPanelResizer();
-    updateEditorStatus();
-    setEditorRuntimeMode("LOCAL");
-    syncLanguageSelector();
-    syncStarterPackSelector();
-    updateHeaderLanguageBranding(currentLanguage);
-    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
-    warmServerLocalRuntimeCatalog();
-    clearOutput({ preserveInput: false });
-    bindSelectionToolbarEvents();
-    refreshSelectionToolbar();
-}
-
-function updateEditorStatus() {
-    const cursor = editor.getCursor();
-    const primary = document.getElementById("editor-status-primary");
-    const secondary = document.getElementById("editor-status-secondary");
-    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
-    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
-}
-
-function getEditorAssistantContext() {
-    const output = document.getElementById("output");
-    const inputHost = document.getElementById("output-input-host");
-    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
-    const selection = editor ? editor.getSelection() : "";
-    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
-
-    return {
-        language: currentLanguage,
-        languageLabel: getLanguageLabel(),
-        starterPack: currentStarterPack,
-        starterPackLabel: getStarterPackLabel(),
-        code: editor ? editor.getValue() : "",
-        outputText: output ? output.textContent || "" : "",
-        selectedText: selection || "",
-        cursorLine: cursor.line + 1,
-        cursorColumn: cursor.ch + 1,
-        lineCount: editor ? editor.lineCount() : 0,
-        isDarkMode: document.body.classList.contains("dark-mode"),
-        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
-        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
-    };
-}
-
-function dispatchEditorContextUpdate() {
-    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
-    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
-        detail: getEditorAssistantContext(),
-    }));
-}
-
-function highlightEditorError(line, column = 1) {
-    clearEditorDiagnostics();
-    if (!editor || !line || line > editor.lineCount()) return;
-    const idx = line - 1;
-    const ch = Math.max(0, (Number(column) || 1) - 1);
-    activeDebugLineNumber = idx;
-    editor.addLineClass(idx, "background", "error-line");
-    editor.setCursor({ line: idx, ch });
-    editor.scrollIntoView({ line: idx, ch }, 100);
-}
-
-function clearEditorDiagnostics() {
-    if (activeDebugLineNumber !== null && editor) {
-        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
-        activeDebugLineNumber = null;
-    }
-}
-
-function clearOutputInputHost({ preserveValue = true } = {}) {
-    const input = getInputPanelElement();
-    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
-        saveInputDraft(currentLanguage, input.value, currentStarterPack);
-    }
-    const host = document.getElementById("output-input-host");
-    if (host) {
-        host.className = "output-input-host";
-        host.innerHTML = "";
-    }
-    dispatchEditorContextUpdate();
-}
-
-function clearOutput({ preserveInput = true } = {}) {
-    const output = document.getElementById("output");
-    if (output) {
-        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
-        output.className = "output-content";
-    }
-    pendingRemoteRun = null;
-    clearEditorDiagnostics();
-    clearOutputInputHost({ preserveValue: preserveInput });
-    dispatchEditorContextUpdate();
-}
-
-function showOutput(text, type) {
-    const output = document.getElementById("output");
-    if (!output) return;
-    output.textContent = text;
-    output.className = type ? "output-content " + type : "output-content";
-    scrollOutputToLatest();
-    dispatchEditorContextUpdate();
-}
-
-function saveCode() {
-    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
-    showOutput(`OK: ${getLanguageLabel()} kodi saqlandi.`, "success");
-    setTimeout(clearOutput, 2000);
-}
-
-function loadCode() {
-    const code = getStoredCode(currentLanguage, currentStarterPack);
-    editor.setValue(code);
-    showOutput(`OK: ${getLanguageLabel()} kodi yuklandi.`, "success");
-}
-
-function downloadCode() {
-    const ext = getLanguageFileExtension(currentLanguage);
-    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function uploadFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const extensionMap = {
-        py: "python",
-        js: "javascript",
-        mjs: "javascript",
-        cjs: "javascript",
-        cpp: "cpp",
-        cc: "cpp",
-        cxx: "cpp",
-        h: "cpp",
-        hpp: "cpp",
-        java: "java",
-        go: "go",
-    };
-
-    const ext = file.name.split(".").pop().toLowerCase();
-    const targetLanguage = normalizeLanguage(extensionMap[ext] || currentLanguage);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        if (targetLanguage !== currentLanguage) {
-            setEditorLanguage(targetLanguage, { persistCurrent: true });
         }
         editor.setValue(String(e.target.result || ""));
         showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
@@ -2977,7 +2007,7 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 summary: "Bu qator oxiriga `;` yetishmayapti.",
                 tips: [
                     "Masalan: `cout << \"Salom\" << endl;`",
-                    "Har bir buyruq satrini `;` bilan tugating.",
+                    "Har bir statement oxirini `;` bilan tugating.",
                 ],
             },
             {
@@ -3041,7 +2071,7 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 match: ["';' expected", "expected ';'", "missing ';'"],
                 summary: "Bu qator oxiriga `;` yetishmayapti.",
                 tips: [
-                    "Masalan: `System.out.println(\"Hello\");`",
+                    "Masalan: `System.out.println(...);`",
                     "Har bir statement oxirini `;` bilan yoping.",
                 ],
             },
@@ -3153,16 +2183,17 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
             },
             {
                 match: ["missing initializer in const declaration"],
-                summary: "`const` o'zgaruvchisi qiymatsiz e'lon qilingan.",
+                summary: "`const` uchun qiymat yozilmagan.",
                 tips: [
-                    "`const x = ...` ko'rinishida qiymat berilganini tekshiring.",
+                    "Masalan: `const x = 10;`",
                 ],
             },
             {
                 match: ["unexpected end of input"],
                 summary: "Kod oxirida qavs yoki blok yopilmay qolgan.",
                 tips: [
-                    "Har bir `(`, `{`, `[` uchun mos yopilish belgisi borligini tekshiring.",
+                    "Oxirgi `}` larni tekshiring.",
+                    "String yoki bracket yopilganini ko'ring.",
                 ],
             },
             {
@@ -3194,7 +2225,7 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 match: ["expected ';'"],
                 summary: "Bu qator atrofida sintaksis buzilgan. Qavs yoki operatorni tekshiring.",
                 tips: [
-                    "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'ladi.",
+                    "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'lad.",
                 ],
             },
             {
@@ -3682,7 +2713,7 @@ function translateRemoteError(language, verdict, text) {
                     title: baseTitle,
                     summary: "Bu qator atrofida sintaksis buzilgan. Qavs yoki operatorni tekshiring.",
                     tips: [
-                        "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'ladi.",
+                        "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'lad.",
                     ],
                 };
             }
@@ -3707,7 +2738,7 @@ function translateRemoteError(language, verdict, text) {
             if (lower.includes("missing return")) {
                 return {
                     title: baseTitle,
-                    summary: "Funksiya barcha yo'llarda `return` qilmayapti.",
+                    summary: "Funksiya barcha yo'llarda `return` qilsin.",
                     tips: [
                         "Har bir shartli yo'l oxirida return borligini tekshiring.",
                     ],
@@ -3718,7 +2749,7 @@ function translateRemoteError(language, verdict, text) {
                     title: baseTitle,
                     summary: "Import qilingan paket ishlatilmagan.",
                     tips: [
-                        "Keraksiz importni o'chiring yoki paketdan foydalaning.",
+                        "Keraksiz importni o'chiring yoki undan foydalaning.",
                     ],
                 };
             }
@@ -4577,7 +3608,225 @@ function renderOutputPanelInput(prompt, index) {
     scrollOutputToLatest();
 }
 
-let isFormatterLoaded = false;
+// --- EDITOR SETUP ---
+
+function setupEditor() {
+    const textArea = document.getElementById("code-editor");
+    if (!textArea) return;
+
+    currentLanguage = getStoredLanguage();
+    currentStarterPack = getStoredStarterPack();
+
+    editor = CodeMirror.fromTextArea(textArea, {
+        mode: getLanguageMode(currentLanguage),
+        theme: "eclipse",
+        lineNumbers: true,
+        indentUnit: getLanguageIndentUnit(currentLanguage),
+        smartIndent: true,
+        indentWithTabs: false,
+        lineWrapping: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
+        extraKeys: {
+            "Ctrl-Enter": runCode,
+            "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Enter": "newlineAndIndent",
+            "Ctrl-S": saveCode,
+            "Ctrl-Shift-F": formatEditorCode,
+            "Tab": (cm) => {
+                if (cm.state.completionActive) return CodeMirror.Pass;
+                if (cm.somethingSelected()) cm.indentSelection("add");
+                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
+            },
+            "Shift-Tab": (cm) => cm.indentSelection("subtract")
+        },
+        hintOptions: {
+            completeSingle: false,
+            alignWithWord: true,
+            closeOnUnfocus: true
+        }
+    });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
+
+    editor.on("inputRead", onEditorInputRead);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
+    editor.on("change", () => {
+        updateEditorStatus();
+        autoSaveCode();
+        dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
+    });
+
+    setupLanguageSelector();
+    setupStarterPackSelector();
+    loadTheme();
+    loadEditorTypographyPreferences();
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+    setupPanelResizer();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
+    clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
+}
+
+function updateEditorStatus() {
+    const cursor = editor.getCursor();
+    const primary = document.getElementById("editor-status-primary");
+    const secondary = document.getElementById("editor-status-secondary");
+    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+}
+
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
+}
+
+function highlightEditorError(line, column = 1) {
+    clearEditorDiagnostics();
+    if (!editor || !line || line > editor.lineCount()) return;
+    const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
+    activeDebugLineNumber = idx;
+    editor.addLineClass(idx, "background", "error-line");
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
+}
+
+function clearEditorDiagnostics() {
+    if (activeDebugLineNumber !== null && editor) {
+        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
+        activeDebugLineNumber = null;
+    }
+}
+
+function clearOutputInputHost({ preserveValue = true } = {}) {
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
+    }
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
+    }
+    dispatchEditorContextUpdate();
+}
+
+function clearOutput({ preserveInput = true } = {}) {
+    const output = document.getElementById("output");
+    if (output) {
+        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
+        output.className = "output-content";
+    }
+    pendingRemoteRun = null;
+    clearEditorDiagnostics();
+    clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
+}
+
+function showOutput(text, type) {
+    const output = document.getElementById("output");
+    if (!output) return;
+    output.textContent = text;
+    output.className = type ? "output-content " + type : "output-content";
+    scrollOutputToLatest();
+    dispatchEditorContextUpdate();
+}
+
+function saveCode() {
+    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
+    setTimeout(clearOutput, 2000);
+}
+
+function loadCode() {
+    const code = getStoredCode(currentLanguage, currentStarterPack);
+    editor.setValue(code);
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
+}
+
+function downloadCode() {
+    const ext = getLanguageFileExtension(currentLanguage);
+    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function uploadFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (currentStarterPack !== "array") {
+            setEditorLanguage(currentStarterPack, { persistCurrent: true });
+        }
+        editor.setValue(String(e.target.result || ""));
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
+    };
+    reader.readAsText(file);
+}
+
+function autoSaveCode() {
+    saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+}
+
+function loadAutoSavedCode() {
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+}
 
 async function formatEditorCode() {
     if (currentLanguage !== "python") {
@@ -4592,7 +3841,6 @@ async function formatEditorCode() {
             return showOutput("Python yuklanmadi.", "error");
         }
     }
-    const code = editor.getValue();
     if (!isFormatterLoaded) {
         showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
         await ensurePythonRuntimeTools();
@@ -4629,21 +3877,29 @@ function clearDebugState() {
     activeDebugStepIndex = 0;
 }
 
+function continueDebugSession() {
+    showOutput("Debug rejimi hozircha tayyor emas.", "");
+    activeDebugSession = null;
+}
+
+// --- AUTOCOMPLETE ---
+
 function onEditorInputRead(cm, change) {
     if (change.origin !== "+input") return;
     const cur = cm.getCursor();
     const token = cm.getTokenAt(cur);
     const char = change.text[0];
 
-    if (!/^[a-zA-Z0-9_.:$]$/.test(char)) return;
-
+    // Trigger on any alphabetical character or dot
+    if (!/^[a-zA-Z_.]$/.test(char)) return;
+    
+    // Trigger instantly if we have a valid starting char
     if (token.string.trim().length > 0 || char === ".") {
         showAutocompleteHints(cm);
     }
 }
 
 function showAutocompleteHints(cm) {
-    const language = currentLanguage;
     cm.showHint({
         hint: function(editorInstance) {
             const cur = editorInstance.getCursor();
@@ -4653,11 +3909,7 @@ function showAutocompleteHints(cm) {
             const line = cur.line;
             const currentWord = token.string;
             const currentWordLower = currentWord.toLowerCase();
-            const priority = language === "python"
-                ? ["True", "False", "None"]
-                : language === "javascript"
-                    ? ["true", "false", "null", "undefined"]
-                    : [];
+            const priority = ["True", "False", "None"];
 
             const baseWords = getAutocompleteWords(language);
             const anyWordList = (CodeMirror.hint.anyword(editorInstance).list || []);
@@ -4683,17 +3935,4868 @@ function showAutocompleteHints(cm) {
                 to: CodeMirror.Pos(line, end),
             };
         },
-        completeSingle: false,
+        completeSingle: false
     });
 }
 
-window.pyzoneEditorAssistant = {
-    getContext: getEditorAssistantContext,
-    isReady: () => Boolean(editor),
-};
+// --- MULTI-LANGUAGE OVERRIDES ---
 
-// --- INITIALIZE ---
+function applyEditorTypography(family, size) {
+    const resolvedFamily = EDITOR_FONT_FAMILIES[family] || family;
+    const root = document.documentElement;
+    root.style.setProperty("--editor-font-family", resolvedFamily);
+    root.style.setProperty("--editor-font-size", size);
 
-window.addEventListener("DOMContentLoaded", () => {
-    setupEditor();
+    if (editor) {
+        const wrapper = editor.getWrapperElement();
+        wrapper.style.fontFamily = resolvedFamily;
+        wrapper.style.fontSize = size;
+        editor.refresh();
+    }
+
+    localStorage.setItem("editorFontFamily", family);
+    localStorage.setItem("editorFontSize", size);
+}
+
+function loadTheme() {
+    const theme = localStorage.getItem("theme") || "light";
+    const isDark = theme === "dark";
+    document.body.classList.toggle("dark-mode", isDark);
+    const btn = document.getElementById("themeBtn");
+    if (btn) {
+        const label = btn.querySelector(".button-label");
+        if (label) label.textContent = isDark ? "Light" : "Dark";
+    }
+    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
+}
+
+function loadEditorTypographyPreferences() {
+    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
+    const size = localStorage.getItem("editorFontSize") || "14px";
+
+    const fSelect = document.getElementById("editor-font-family");
+    const sSelect = document.getElementById("editor-font-size");
+
+    if (fSelect) {
+        fSelect.value = family;
+        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect ? sSelect.value : size);
+    }
+    if (sSelect) {
+        sSelect.value = size;
+        sSelect.onchange = () => applyEditorTypography(fSelect ? fSelect.value : family, sSelect.value);
+    }
+
+    applyEditorTypography(family, size);
+}
+
+const IDENTIFIER_RESERVED_WORDS = (() => {
+    const words = new Set(Object.values(LANGUAGE_AUTOCOMPLETE_WORDS).flat());
+    words.delete("main");
+    words.delete("Main");
+    return words;
+})();
+
+const IDENTIFIER_TONE_COUNT = 10;
+
+function hashIdentifier(name) {
+    let hash = 0;
+    for (let index = 0; index < name.length; index += 1) {
+        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+}
+
+function getIdentifierToneClass(name) {
+    return `cm-identifier-tone-${hashIdentifier(name) % IDENTIFIER_TONE_COUNT}`;
+}
+
+function createIdentifierOverlay() {
+    return {
+        token(stream) {
+            if (stream.eatSpace()) return null;
+
+            const word = stream.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+            if (word) {
+                const token = word[0];
+                if (!IDENTIFIER_RESERVED_WORDS.has(token)) {
+                    return getIdentifierToneClass(token);
+                }
+                return null;
+            }
+
+            stream.next();
+            return null;
+        },
+    };
+}
+
+let pyodideLoadingPromise = null;
+
+async function ensurePyodideLoaded() {
+    if (pyodide) return pyodide;
+    if (pyodideLoadingPromise) return pyodideLoadingPromise;
+
+    const loading = document.getElementById("loading");
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
+    }
+
+    pyodideLoadingPromise = (async () => {
+        try {
+            // Brauzer qotmasligi uchun ozgina pauza beramiz
+            await new Promise(r => setTimeout(r, 50));
+            pyodide = await loadPyodide();
+            
+            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
+            await new Promise(r => setTimeout(r, 50));
+            await setupSafeExecutionEnvironment();
+            
+            if (loading) {
+                loading.textContent = "Python tayyor!";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 1500);
+            }
+            return pyodide;
+        } catch (error) {
+            console.warn("Python muhiti yuklanmadi:", error);
+            if (loading) {
+                loading.textContent = "Xatolik: Python yuklanmadi.";
+                loading.style.background = "#fee2e2";
+                loading.style.color = "#991b1b";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 4000);
+            }
+            throw error;
+        }
+    })();
+
+    return pyodideLoadingPromise;
+}
+
+function syncLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (selector) {
+        selector.value = currentLanguage;
+    }
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function setupLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (!selector) return;
+    selector.value = currentLanguage;
+    selector.onchange = () => setEditorLanguage(selector.value);
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function syncStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (selector) {
+        selector.value = currentStarterPack;
+    }
+}
+
+function setupStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (!selector) return;
+    selector.value = currentStarterPack;
+    selector.onchange = () => setStarterPack(selector.value);
+}
+
+function setStarterPack(pack, options = {}) {
+    const nextPack = normalizeStarterPack(pack);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentStarterPack = nextPack;
+        setStoredStarterPack(nextPack);
+        syncStarterPackSelector();
+        return;
+    }
+
+    if (currentStarterPack === nextPack && !options.force) {
+        syncStarterPackSelector();
+        updateEditorStatus();
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentStarterPack = nextPack;
+    setStoredStarterPack(nextPack);
+
+    editor.setValue(getStoredCode(currentLanguage, nextPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
+}
+
+function setEditorLanguage(language, options = {}) {
+    const nextLanguage = normalizeLanguage(language);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentLanguage = nextLanguage;
+        setStoredLanguage(nextLanguage);
+        syncLanguageSelector();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (currentLanguage === nextLanguage && !options.force) {
+        syncLanguageSelector();
+        updateEditorStatus();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentLanguage = nextLanguage;
+    setStoredLanguage(nextLanguage);
+
+    editor.setOption("mode", getLanguageMode(nextLanguage));
+    editor.setOption("indentUnit", getLanguageIndentUnit(nextLanguage));
+    editor.setValue(getStoredCode(nextLanguage, currentStarterPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    updateHeaderLanguageBranding(nextLanguage);
+    scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
+}
+
+function getSelectionToolbarElement() {
+    return document.getElementById("editor-selection-toolbar");
+}
+
+function hideSelectionToolbar() {
+    const toolbar = getSelectionToolbarElement();
+    if (toolbar) {
+        toolbar.hidden = true;
+    }
+}
+
+function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
+    void message;
+    void tone;
+    void autoRestore;
+}
+
+function getSelectionToolbarSelection() {
+    if (!editor || !editor.somethingSelected()) return null;
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const text = editor.getSelection("\n");
+    if (!text || !text.trim()) return null;
+
+    return {
+        from,
+        to,
+        text,
+        lineCount: Math.max(1, to.line - from.line + 1),
+    };
+}
+
+function getSelectionToolbarAnchor(range) {
+    const fromCoords = editor.charCoords(range.from, "page");
+    const toCoords = editor.charCoords(range.to, "page");
+    const left = Math.min(fromCoords.left, toCoords.left) - window.pageXOffset;
+    const right = Math.max(fromCoords.right, toCoords.right) - window.pageXOffset;
+    const top = Math.min(fromCoords.top, toCoords.top) - window.pageYOffset;
+    const bottom = Math.max(fromCoords.bottom, toCoords.bottom) - window.pageYOffset;
+    return {
+        left: (left + right) / 2,
+        top,
+        bottom,
+    };
+}
+
+function positionSelectionToolbar(toolbar, anchorLeft, anchorTop, anchorBottom) {
+    if (!toolbar) return;
+    const margin = 12;
+    const rect = toolbar.getBoundingClientRect();
+    const width = rect.width || 280;
+    const height = rect.height || 52;
+    let left = Math.round(anchorLeft - width / 2);
+    left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
+
+    let top = Math.round(anchorTop - height - 12);
+    if (top < margin) {
+        top = Math.round((Number(anchorBottom) || anchorTop) + 12);
+    }
+    if (top + height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - height - margin);
+    }
+
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+}
+
+function refreshSelectionToolbar(positionOverride = null) {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar) return false;
+
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        hideSelectionToolbar();
+        return false;
+    }
+
+    toolbar.hidden = false;
+
+    const anchor = positionOverride || getSelectionToolbarAnchor(range);
+    positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
+    return true;
+}
+
+function showSelectionToolbarAtPoint(clientX, clientY) {
+    const toolbar = getSelectionToolbarElement();
+    const range = getSelectionToolbarSelection();
+    if (!toolbar || !range) return false;
+
+    toolbar.hidden = false;
+    positionSelectionToolbar(toolbar, clientX, clientY, clientY);
+    return true;
+}
+
+function getSelectionSnapshotThemeColors() {
+    const root = getComputedStyle(document.documentElement);
+    return {
+        surface: root.getPropertyValue("--surface").trim() || "#ffffff",
+        surfaceMuted: root.getPropertyValue("--surface-muted").trim() || "#f6f8fb",
+        border: root.getPropertyValue("--border").trim() || "#d8e1ec",
+        textMain: root.getPropertyValue("--text-main").trim() || "#132033",
+        textMuted: root.getPropertyValue("--text-muted").trim() || "#5f6f82",
+        codeKeyword: root.getPropertyValue("--code-keyword").trim() || "#2153d6",
+        codeDef: root.getPropertyValue("--code-def").trim() || "#0f766e",
+        codeString: root.getPropertyValue("--code-string").trim() || "#b45309",
+        codeNumber: root.getPropertyValue("--code-number").trim() || "#b42318",
+        codeComment: root.getPropertyValue("--code-comment").trim() || "#6b7280",
+        codeAtom: root.getPropertyValue("--code-atom").trim() || "#7c3aed",
+        codeProperty: root.getPropertyValue("--code-property").trim() || "#0b6b7a",
+        codeVariable: root.getPropertyValue("--code-variable").trim() || "#0f172a",
+        codeOperator: root.getPropertyValue("--code-operator").trim() || "#6d28d9",
+        primary: root.getPropertyValue("--primary").trim() || "#2353d7",
+        primaryHover: root.getPropertyValue("--primary-hover").trim() || "#1b43ac",
+        danger: root.getPropertyValue("--danger").trim() || "#b9384a",
+        success: root.getPropertyValue("--success").trim() || "#0f766e",
+    };
+}
+
+function getSelectionSnapshotTokenColor(tokenType, colors) {
+    const type = String(tokenType || "");
+    if (type.includes("comment")) return colors.codeComment;
+    if (type.includes("string")) return colors.codeString;
+    if (type.includes("number")) return colors.codeNumber;
+    if (type.includes("keyword")) return colors.codeKeyword;
+    if (type.includes("def")) return colors.codeDef;
+    if (type.includes("atom")) return colors.codeAtom;
+    if (type.includes("property")) return colors.codeProperty;
+    if (type.includes("operator")) return colors.codeOperator;
+    if (type.includes("builtin")) return colors.codeAtom;
+    return colors.codeVariable;
+}
+
+function getSelectionSnapshotSegments(lineNo, startCh, endCh) {
+    const lineText = editor.getLine(lineNo) || "";
+    const segments = [];
+    let cursor = Math.max(0, startCh);
+    const safeEnd = Math.max(cursor, Math.min(endCh, lineText.length));
+
+    if (cursor >= safeEnd) {
+        return [{ text: "", type: "" }];
+    }
+
+    while (cursor < safeEnd) {
+        const probe = Math.min(Math.max(cursor, 0), Math.max(0, lineText.length - 1));
+        const token = editor.getTokenAt({ line: lineNo, ch: probe });
+        let tokenStart = Math.max(cursor, Number(token.start) || 0);
+        let tokenEnd = Math.min(safeEnd, Number(token.end) || (cursor + 1));
+
+        if (tokenEnd <= tokenStart) {
+            tokenEnd = Math.min(safeEnd, cursor + 1);
+        }
+
+        segments.push({
+            text: lineText.slice(tokenStart, tokenEnd),
+            type: token.type || "",
+        });
+        cursor = tokenEnd;
+    }
+
+    return segments;
+}
+
+function measureSelectionSnapshotLineWidth(ctx, segments) {
+    return segments.reduce((total, segment) => total + ctx.measureText(segment.text || "").width, 0);
+}
+
+function roundRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+async function createSelectionSnapshotBlob(range) {
+    if (!editor || !range) return null;
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {}
+    }
+
+    const colors = getSelectionSnapshotThemeColors();
+    const editorWrapper = editor.getWrapperElement();
+    const computed = getComputedStyle(editorWrapper);
+    const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
+    const fontSize = Math.max(13, Math.min(18, Math.round(parseFloat(computed.fontSize) || 14)));
+    const lineHeight = Math.round(fontSize * 1.48);
+    const topBarHeight = 44;
+    const paddingX = 18;
+    const paddingTop = 14;
+    const paddingBottom = 14;
+    const lineGap = 8;
+    const codeFont = `${fontSize}px ${fontFamily}`;
+    const ctxMeasure = document.createElement("canvas").getContext("2d");
+    if (!ctxMeasure) return null;
+    ctxMeasure.font = codeFont;
+
+    const snapshotLines = [];
+    for (let lineNo = range.from.line; lineNo <= range.to.line; lineNo += 1) {
+        const startCh = lineNo === range.from.line ? range.from.ch : 0;
+        const originalLine = editor.getLine(lineNo) || "";
+        const endCh = lineNo === range.to.line ? range.to.ch : originalLine.length;
+        const segments = getSelectionSnapshotSegments(lineNo, startCh, endCh);
+        snapshotLines.push({
+            lineNumber: lineNo + 1,
+            segments,
+            width: measureSelectionSnapshotLineWidth(ctxMeasure, segments),
+        });
+    }
+
+    const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
+    const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
+    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 12;
+    const contentWidth = Math.max(240, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
+    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 14 + contentWidth);
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerLanguage = getLanguageLabel();
+    const headerTitle = "Code Snap";
+    const headerText = `${headerLanguage} • ${headerTitle}`;
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerWidth = Math.ceil(108 + ctxMeasure.measureText(headerText).width + 22);
+    const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
+    const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = colors.surfaceMuted;
+    ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+
+    ctx.fillStyle = colors.surface;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+
+    ctx.fillStyle = colors.surfaceMuted;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 18);
+    ctx.fill();
+
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0.5, topBarHeight + 0.5);
+    ctx.lineTo(width - 0.5, topBarHeight + 0.5);
+    ctx.stroke();
+
+    const dotY = 22;
+    const dotX = 28;
+    const dots = [colors.danger, "#ffbf3c", "#31c55e"];
+    dots.forEach((color, index) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(dotX + index * 22, dotY, 6.25, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.fillStyle = colors.textMain;
+    ctx.font = `600 13px ${fontFamily}`;
+    ctx.fillText(headerText, 104, 27);
+
+    const codeTop = topBarHeight + paddingTop + 4;
+    const codeLeft = paddingX + lineNumberWidth + 14;
+
+    snapshotLines.forEach((line, index) => {
+        const y = codeTop + (index * lineHeight) + fontSize;
+        const lineNumberText = String(line.lineNumber);
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = colors.textMuted;
+        ctx.textAlign = "right";
+        ctx.fillText(lineNumberText, paddingX + lineNumberWidth - 2, y);
+        ctx.textAlign = "left";
+
+        let x = codeLeft;
+        line.segments.forEach((segment) => {
+            const segmentText = segment.text || "";
+            const segmentType = segment.type || "";
+            ctx.fillStyle = getSelectionSnapshotTokenColor(segmentType, colors);
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            ctx.fillText(segmentText, x, y);
+            x += ctx.measureText(segmentText).width;
+        });
+    });
+
+    return await new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+}
+
+async function copySelectionSnapshotToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        setSelectionToolbarStatus("Avval kodni belgilang", "error", true);
+        return false;
+    }
+
+    const blob = await createSelectionSnapshotBlob(range);
+    if (!blob) {
+        setSelectionToolbarStatus("Snapshot tayyorlanmadi", "error", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type || "image/png"]: blob,
+                }),
+            ]);
+            setSelectionToolbarStatus("Snap nusxalandi", "success", true);
+            return true;
+        }
+    } catch (error) {
+        // Fall through to text copy fallback.
+    }
+
+    const copiedText = await copySelectionTextToClipboard();
+    if (copiedText) {
+        setSelectionToolbarStatus("Matn nusxalandi", "warning", true);
+        return true;
+    }
+
+    setSelectionToolbarStatus("Nusxalash bo'lmadi", "error", true);
+    return false;
+}
+
+async function copySelectionTextToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) return false;
+    const text = range.text;
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (error) {
+        // Fallback below.
+    }
+
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    fallback.setAttribute("readonly", "readonly");
+    fallback.style.position = "fixed";
+    fallback.style.opacity = "0";
+    fallback.style.left = "-9999px";
+    fallback.style.top = "-9999px";
+    document.body.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    let success = false;
+    try {
+        success = document.execCommand("copy");
+    } catch (_) {
+        success = false;
+    }
+    document.body.removeChild(fallback);
+    return success;
+}
+
+function bindSelectionToolbarEvents() {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar || toolbar.dataset.bound === "1") return;
+
+    toolbar.dataset.bound = "1";
+    toolbar.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+    });
+
+    toolbar.addEventListener("click", async (event) => {
+        const button = event.target instanceof Element
+            ? event.target.closest("[data-selection-action]")
+            : null;
+        if (!button) return;
+
+        const action = button.getAttribute("data-selection-action");
+        if (action === "copy-snap") {
+            await copySelectionSnapshotToClipboard();
+        }
+    });
+}
+
+function setupEditor() {
+    const textArea = document.getElementById("code-editor");
+    if (!textArea) return;
+
+    currentLanguage = getStoredLanguage();
+    currentStarterPack = getStoredStarterPack();
+
+    editor = CodeMirror.fromTextArea(textArea, {
+        mode: getLanguageMode(currentLanguage),
+        theme: "eclipse",
+        lineNumbers: true,
+        indentUnit: getLanguageIndentUnit(currentLanguage),
+        smartIndent: true,
+        indentWithTabs: false,
+        lineWrapping: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
+        extraKeys: {
+            "Ctrl-Enter": runCode,
+            "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Enter": "newlineAndIndent",
+            "Ctrl-S": saveCode,
+            "Ctrl-Shift-F": formatEditorCode,
+            "Tab": (cm) => {
+                if (cm.state.completionActive) return CodeMirror.Pass;
+                if (cm.somethingSelected()) cm.indentSelection("add");
+                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
+            },
+            "Shift-Tab": (cm) => cm.indentSelection("subtract")
+        },
+        hintOptions: {
+            completeSingle: false,
+            alignWithWord: true,
+            closeOnUnfocus: true
+        }
+    });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
+
+    editor.on("inputRead", onEditorInputRead);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
+    editor.on("change", () => {
+        updateEditorStatus();
+        autoSaveCode();
+        dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
+    });
+
+    setupLanguageSelector();
+    setupStarterPackSelector();
+    loadTheme();
+    loadEditorTypographyPreferences();
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+    setupPanelResizer();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
+    clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
+}
+
+function updateEditorStatus() {
+    const cursor = editor.getCursor();
+    const primary = document.getElementById("editor-status-primary");
+    const secondary = document.getElementById("editor-status-secondary");
+    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+}
+
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
+}
+
+function highlightEditorError(line, column = 1) {
+    clearEditorDiagnostics();
+    if (!editor || !line || line > editor.lineCount()) return;
+    const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
+    activeDebugLineNumber = idx;
+    editor.addLineClass(idx, "background", "error-line");
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
+}
+
+function clearEditorDiagnostics() {
+    if (activeDebugLineNumber !== null && editor) {
+        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
+        activeDebugLineNumber = null;
+    }
+}
+
+function clearOutputInputHost({ preserveValue = true } = {}) {
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
+    }
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
+    }
+    dispatchEditorContextUpdate();
+}
+
+function clearOutput({ preserveInput = true } = {}) {
+    const output = document.getElementById("output");
+    if (output) {
+        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
+        output.className = "output-content";
+    }
+    pendingRemoteRun = null;
+    clearEditorDiagnostics();
+    clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
+}
+
+function showOutput(text, type) {
+    const output = document.getElementById("output");
+    if (!output) return;
+    output.textContent = text;
+    output.className = type ? "output-content " + type : "output-content";
+    scrollOutputToLatest();
+    dispatchEditorContextUpdate();
+}
+
+function saveCode() {
+    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
+    setTimeout(clearOutput, 2000);
+}
+
+function loadCode() {
+    const code = getStoredCode(currentLanguage, currentStarterPack);
+    editor.setValue(code);
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
+}
+
+function downloadCode() {
+    const ext = getLanguageFileExtension(currentLanguage);
+    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function uploadFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (currentStarterPack !== "array") {
+            setEditorLanguage(currentStarterPack, { persistCurrent: true });
+        }
+        editor.setValue(String(e.target.result || ""));
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
+    };
+    reader.readAsText(file);
+}
+
+function autoSaveCode() {
+    saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+}
+
+function loadAutoSavedCode() {
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+}
+
+async function formatEditorCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
+        return;
+    }
+    if (!pyodide) {
+        showOutput("Python muhiti ishga tushirilmoqda...", "warning");
+        try {
+            await ensurePyodideLoaded();
+        } catch (e) {
+            return showOutput("Python yuklanmadi.", "error");
+        }
+    }
+    if (!isFormatterLoaded) {
+        showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
+        await ensurePythonRuntimeTools();
+        isFormatterLoaded = true;
+    }
+    showOutput("Formatlanmoqda...", "");
+    pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`)
+        .then((res) => {
+            const result = JSON.parse(res);
+            if (result.formatterAvailable) {
+                editor.setValue(result.code);
+                showOutput("OK: Kod formatlandi.", "success");
+            } else {
+                showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
+            }
+            setTimeout(clearOutput, 2000);
+        })
+        .catch((error) => {
+            showOutput("Xatolik: " + error.message, "error");
+        });
+}
+
+function debugCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Debug rejimi hozircha faqat Python uchun mavjud.", "");
+        return;
+    }
+    showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", "");
+}
+
+function clearDebugState() {
+    activeDebugSession = null;
+    activeDebugSteps = [];
+    activeDebugStepIndex = 0;
+}
+
+function continueDebugSession() {
+    showOutput("Debug rejimi hozircha tayyor emas.", "");
+    activeDebugSession = null;
+}
+
+// --- AUTOCOMPLETE ---
+
+function onEditorInputRead(cm, change) {
+    if (change.origin !== "+input") return;
+    const cur = cm.getCursor();
+    const token = cm.getTokenAt(cur);
+    const char = change.text[0];
+
+    // Trigger on any alphabetical character or dot
+    if (!/^[a-zA-Z_.]$/.test(char)) return;
+    
+    // Trigger instantly if we have a valid starting char
+    if (token.string.trim().length > 0 || char === ".") {
+        showAutocompleteHints(cm);
+    }
+}
+
+function showAutocompleteHints(cm) {
+    cm.showHint({
+        hint: function(editorInstance) {
+            const cur = editorInstance.getCursor();
+            const token = editorInstance.getTokenAt(cur);
+            const start = token.start;
+            const end = cur.ch;
+            const line = cur.line;
+            const currentWord = token.string;
+            const currentWordLower = currentWord.toLowerCase();
+            const priority = ["True", "False", "None"];
+
+            const baseWords = getAutocompleteWords(language);
+            const anyWordList = (CodeMirror.hint.anyword(editorInstance).list || []);
+            const list = [...new Set([...baseWords, ...anyWordList])]
+                .filter((word) => word.toLowerCase().startsWith(currentWordLower))
+                .sort((a, b) => {
+                    const aPri = priority.includes(a);
+                    const bPri = priority.includes(b);
+                    if (aPri && !bPri) return -1;
+                    if (!aPri && bPri) return 1;
+
+                    const aStart = a.startsWith(currentWord);
+                    const bStart = b.startsWith(currentWord);
+                    if (aStart && !bStart) return -1;
+                    if (!aStart && bStart) return 1;
+
+                    return a.localeCompare(b);
+                });
+
+            return {
+                list,
+                from: CodeMirror.Pos(line, start),
+                to: CodeMirror.Pos(line, end),
+            };
+        },
+        completeSingle: false
+    });
+}
+
+// --- MULTI-LANGUAGE OVERRIDES ---
+
+function applyEditorTypography(family, size) {
+    const resolvedFamily = EDITOR_FONT_FAMILIES[family] || family;
+    const root = document.documentElement;
+    root.style.setProperty("--editor-font-family", resolvedFamily);
+    root.style.setProperty("--editor-font-size", size);
+
+    if (editor) {
+        const wrapper = editor.getWrapperElement();
+        wrapper.style.fontFamily = resolvedFamily;
+        wrapper.style.fontSize = size;
+        editor.refresh();
+    }
+
+    localStorage.setItem("editorFontFamily", family);
+    localStorage.setItem("editorFontSize", size);
+}
+
+function loadTheme() {
+    const theme = localStorage.getItem("theme") || "light";
+    const isDark = theme === "dark";
+    document.body.classList.toggle("dark-mode", isDark);
+    const btn = document.getElementById("themeBtn");
+    if (btn) {
+        const label = btn.querySelector(".button-label");
+        if (label) label.textContent = isDark ? "Light" : "Dark";
+    }
+    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
+}
+
+function loadEditorTypographyPreferences() {
+    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
+    const size = localStorage.getItem("editorFontSize") || "14px";
+
+    const fSelect = document.getElementById("editor-font-family");
+    const sSelect = document.getElementById("editor-font-size");
+
+    if (fSelect) {
+        fSelect.value = family;
+        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect ? sSelect.value : size);
+    }
+    if (sSelect) {
+        sSelect.value = size;
+        sSelect.onchange = () => applyEditorTypography(fSelect ? fSelect.value : family, sSelect.value);
+    }
+
+    applyEditorTypography(family, size);
+}
+
+const IDENTIFIER_RESERVED_WORDS = (() => {
+    const words = new Set(Object.values(LANGUAGE_AUTOCOMPLETE_WORDS).flat());
+    words.delete("main");
+    words.delete("Main");
+    return words;
+})();
+
+const IDENTIFIER_TONE_COUNT = 10;
+
+function hashIdentifier(name) {
+    let hash = 0;
+    for (let index = 0; index < name.length; index += 1) {
+        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+}
+
+function getIdentifierToneClass(name) {
+    return `cm-identifier-tone-${hashIdentifier(name) % IDENTIFIER_TONE_COUNT}`;
+}
+
+function createIdentifierOverlay() {
+    return {
+        token(stream) {
+            if (stream.eatSpace()) return null;
+
+            const word = stream.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+            if (word) {
+                const token = word[0];
+                if (!IDENTIFIER_RESERVED_WORDS.has(token)) {
+                    return getIdentifierToneClass(token);
+                }
+                return null;
+            }
+
+            stream.next();
+            return null;
+        },
+    };
+}
+
+let pyodideLoadingPromise = null;
+
+async function ensurePyodideLoaded() {
+    if (pyodide) return pyodide;
+    if (pyodideLoadingPromise) return pyodideLoadingPromise;
+
+    const loading = document.getElementById("loading");
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
+    }
+
+    pyodideLoadingPromise = (async () => {
+        try {
+            // Brauzer qotmasligi uchun ozgina pauza beramiz
+            await new Promise(r => setTimeout(r, 50));
+            pyodide = await loadPyodide();
+            
+            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
+            await new Promise(r => setTimeout(r, 50));
+            await setupSafeExecutionEnvironment();
+            
+            if (loading) {
+                loading.textContent = "Python tayyor!";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 1500);
+            }
+            return pyodide;
+        } catch (error) {
+            console.warn("Python muhiti yuklanmadi:", error);
+            if (loading) {
+                loading.textContent = "Xatolik: Python yuklanmadi.";
+                loading.style.background = "#fee2e2";
+                loading.style.color = "#991b1b";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 4000);
+            }
+            throw error;
+        }
+    })();
+
+    return pyodideLoadingPromise;
+}
+
+function syncLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (selector) {
+        selector.value = currentLanguage;
+    }
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function setupLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (!selector) return;
+    selector.value = currentLanguage;
+    selector.onchange = () => setEditorLanguage(selector.value);
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function syncStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (selector) {
+        selector.value = currentStarterPack;
+    }
+}
+
+function setupStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (!selector) return;
+    selector.value = currentStarterPack;
+    selector.onchange = () => setStarterPack(selector.value);
+}
+
+function setStarterPack(pack, options = {}) {
+    const nextPack = normalizeStarterPack(pack);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentStarterPack = nextPack;
+        setStoredStarterPack(nextPack);
+        syncStarterPackSelector();
+        return;
+    }
+
+    if (currentStarterPack === nextPack && !options.force) {
+        syncStarterPackSelector();
+        updateEditorStatus();
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentStarterPack = nextPack;
+    setStoredStarterPack(nextPack);
+
+    editor.setValue(getStoredCode(currentLanguage, nextPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
+}
+
+function setEditorLanguage(language, options = {}) {
+    const nextLanguage = normalizeLanguage(language);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentLanguage = nextLanguage;
+        setStoredLanguage(nextLanguage);
+        syncLanguageSelector();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (currentLanguage === nextLanguage && !options.force) {
+        syncLanguageSelector();
+        updateEditorStatus();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentLanguage = nextLanguage;
+    setStoredLanguage(nextLanguage);
+
+    editor.setOption("mode", getLanguageMode(nextLanguage));
+    editor.setOption("indentUnit", getLanguageIndentUnit(nextLanguage));
+    editor.setValue(getStoredCode(nextLanguage, currentStarterPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    updateHeaderLanguageBranding(nextLanguage);
+    scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
+}
+
+function getSelectionToolbarElement() {
+    return document.getElementById("editor-selection-toolbar");
+}
+
+function hideSelectionToolbar() {
+    const toolbar = getSelectionToolbarElement();
+    if (toolbar) {
+        toolbar.hidden = true;
+    }
+}
+
+function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
+    void message;
+    void tone;
+    void autoRestore;
+}
+
+function getSelectionToolbarSelection() {
+    if (!editor || !editor.somethingSelected()) return null;
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const text = editor.getSelection("\n");
+    if (!text || !text.trim()) return null;
+
+    return {
+        from,
+        to,
+        text,
+        lineCount: Math.max(1, to.line - from.line + 1),
+    };
+}
+
+function getSelectionToolbarAnchor(range) {
+    const fromCoords = editor.charCoords(range.from, "page");
+    const toCoords = editor.charCoords(range.to, "page");
+    const left = Math.min(fromCoords.left, toCoords.left) - window.pageXOffset;
+    const right = Math.max(fromCoords.right, toCoords.right) - window.pageXOffset;
+    const top = Math.min(fromCoords.top, toCoords.top) - window.pageYOffset;
+    const bottom = Math.max(fromCoords.bottom, toCoords.bottom) - window.pageYOffset;
+    return {
+        left: (left + right) / 2,
+        top,
+        bottom,
+    };
+}
+
+function positionSelectionToolbar(toolbar, anchorLeft, anchorTop, anchorBottom) {
+    if (!toolbar) return;
+    const margin = 12;
+    const rect = toolbar.getBoundingClientRect();
+    const width = rect.width || 280;
+    const height = rect.height || 52;
+    let left = Math.round(anchorLeft - width / 2);
+    left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
+
+    let top = Math.round(anchorTop - height - 12);
+    if (top < margin) {
+        top = Math.round((Number(anchorBottom) || anchorTop) + 12);
+    }
+    if (top + height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - height - margin);
+    }
+
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+}
+
+function refreshSelectionToolbar(positionOverride = null) {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar) return false;
+
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        hideSelectionToolbar();
+        return false;
+    }
+
+    toolbar.hidden = false;
+
+    const anchor = positionOverride || getSelectionToolbarAnchor(range);
+    positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
+    return true;
+}
+
+function showSelectionToolbarAtPoint(clientX, clientY) {
+    const toolbar = getSelectionToolbarElement();
+    const range = getSelectionToolbarSelection();
+    if (!toolbar || !range) return false;
+
+    toolbar.hidden = false;
+    positionSelectionToolbar(toolbar, clientX, clientY, clientY);
+    return true;
+}
+
+function getSelectionSnapshotThemeColors() {
+    const root = getComputedStyle(document.documentElement);
+    return {
+        surface: root.getPropertyValue("--surface").trim() || "#ffffff",
+        surfaceMuted: root.getPropertyValue("--surface-muted").trim() || "#f6f8fb",
+        border: root.getPropertyValue("--border").trim() || "#d8e1ec",
+        textMain: root.getPropertyValue("--text-main").trim() || "#132033",
+        textMuted: root.getPropertyValue("--text-muted").trim() || "#5f6f82",
+        codeKeyword: root.getPropertyValue("--code-keyword").trim() || "#2153d6",
+        codeDef: root.getPropertyValue("--code-def").trim() || "#0f766e",
+        codeString: root.getPropertyValue("--code-string").trim() || "#b45309",
+        codeNumber: root.getPropertyValue("--code-number").trim() || "#b42318",
+        codeComment: root.getPropertyValue("--code-comment").trim() || "#6b7280",
+        codeAtom: root.getPropertyValue("--code-atom").trim() || "#7c3aed",
+        codeProperty: root.getPropertyValue("--code-property").trim() || "#0b6b7a",
+        codeVariable: root.getPropertyValue("--code-variable").trim() || "#0f172a",
+        codeOperator: root.getPropertyValue("--code-operator").trim() || "#6d28d9",
+        primary: root.getPropertyValue("--primary").trim() || "#2353d7",
+        primaryHover: root.getPropertyValue("--primary-hover").trim() || "#1b43ac",
+        danger: root.getPropertyValue("--danger").trim() || "#b9384a",
+        success: root.getPropertyValue("--success").trim() || "#0f766e",
+    };
+}
+
+function getSelectionSnapshotTokenColor(tokenType, colors) {
+    const type = String(tokenType || "");
+    if (type.includes("comment")) return colors.codeComment;
+    if (type.includes("string")) return colors.codeString;
+    if (type.includes("number")) return colors.codeNumber;
+    if (type.includes("keyword")) return colors.codeKeyword;
+    if (type.includes("def")) return colors.codeDef;
+    if (type.includes("atom")) return colors.codeAtom;
+    if (type.includes("property")) return colors.codeProperty;
+    if (type.includes("operator")) return colors.codeOperator;
+    if (type.includes("builtin")) return colors.codeAtom;
+    return colors.codeVariable;
+}
+
+function getSelectionSnapshotSegments(lineNo, startCh, endCh) {
+    const lineText = editor.getLine(lineNo) || "";
+    const segments = [];
+    let cursor = Math.max(0, startCh);
+    const safeEnd = Math.max(cursor, Math.min(endCh, lineText.length));
+
+    if (cursor >= safe_end) {
+        return [{ text: "", type: "" }];
+    }
+
+    while (cursor < safe_end) {
+        const probe = Math.min(Math.max(cursor, 0), Math.max(0, lineText.length - 1));
+        const token = editor.getTokenAt({ line: lineNo, ch: probe });
+        let tokenStart = Math.max(cursor, Number(token.start) || 0);
+        let tokenEnd = Math.min(safe_end, Number(token.end) || (cursor + 1));
+
+        if (tokenEnd <= tokenStart) {
+            tokenEnd = Math.min(safe_end, cursor + 1);
+        }
+
+        segments.push({
+            text: lineText.slice(tokenStart, tokenEnd),
+            type: token.type || "",
+        });
+        cursor = tokenEnd;
+    }
+
+    return segments;
+}
+
+function measureSelectionSnapshotLineWidth(ctx, segments) {
+    return segments.reduce((total, segment) => total + ctx.measureText(segment.text || "").width, 0);
+}
+
+function roundRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+async function createSelectionSnapshotBlob(range) {
+    if (!editor || !range) return null;
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {}
+    }
+
+    const colors = getSelectionSnapshotThemeColors();
+    const editorWrapper = editor.getWrapperElement();
+    const computed = getComputedStyle(editorWrapper);
+    const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
+    const fontSize = Math.max(13, Math.min(18, Math.round(parseFloat(computed.fontSize) || 14)));
+    const lineHeight = Math.round(fontSize * 1.48);
+    const topBarHeight = 44;
+    const paddingX = 18;
+    const paddingTop = 14;
+    const paddingBottom = 14;
+    const lineGap = 8;
+    const codeFont = `${fontSize}px ${fontFamily}`;
+    const ctxMeasure = document.createElement("canvas").getContext("2d");
+    if (!ctxMeasure) return null;
+    ctxMeasure.font = codeFont;
+
+    const snapshotLines = [];
+    for (let lineNo = range.from.line; lineNo <= range.to.line; lineNo += 1) {
+        const startCh = lineNo === range.from.line ? range.from.ch : 0;
+        const originalLine = editor.getLine(lineNo) || "";
+        const endCh = lineNo === range.to.line ? range.to.ch : originalLine.length;
+        const segments = getSelectionSnapshotSegments(lineNo, startCh, endCh);
+        snapshotLines.push({
+            lineNumber: lineNo + 1,
+            segments,
+            width: measureSelectionSnapshotLineWidth(ctxMeasure, segments),
+        });
+    }
+
+    const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
+    const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
+    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 12;
+    const contentWidth = Math.max(240, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
+    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 14 + contentWidth);
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerLanguage = getLanguageLabel();
+    const headerTitle = "Code Snap";
+    const headerText = `${headerLanguage} • ${headerTitle}`;
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerWidth = Math.ceil(108 + ctxMeasure.measureText(headerText).width + 22);
+    const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
+    const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = colors.surfaceMuted;
+    ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+
+    ctx.fillStyle = colors.surface;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+
+    ctx.fillStyle = colors.surfaceMuted;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 18);
+    ctx.fill();
+
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0.5, topBarHeight + 0.5);
+    ctx.lineTo(width - 0.5, topBarHeight + 0.5);
+    ctx.stroke();
+
+    const dotY = 22;
+    const dotX = 28;
+    const dots = [colors.danger, "#ffbf3c", "#31c55e"];
+    dots.forEach((color, index) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(dotX + index * 22, dotY, 6.25, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.fillStyle = colors.textMain;
+    ctx.font = `600 13px ${fontFamily}`;
+    ctx.fillText(headerText, 104, 27);
+
+    const codeTop = topBarHeight + paddingTop + 4;
+    const codeLeft = paddingX + lineNumberWidth + 14;
+
+    snapshotLines.forEach((line, index) => {
+        const y = codeTop + (index * lineHeight) + fontSize;
+        const lineNumberText = String(line.lineNumber);
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = colors.textMuted;
+        ctx.textAlign = "right";
+        ctx.fillText(lineNumberText, paddingX + lineNumberWidth - 2, y);
+        ctx.textAlign = "left";
+
+        let x = codeLeft;
+        line.segments.forEach((segment) => {
+            const segmentText = segment.text || "";
+            const segmentType = segment.type || "";
+            ctx.fillStyle = getSelectionSnapshotTokenColor(segmentType, colors);
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            ctx.fillText(segmentText, x, y);
+            x += ctx.measureText(segmentText).width;
+        });
+    });
+
+    return await new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+}
+
+async function copySelectionSnapshotToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        setSelectionToolbarStatus("Avval kodni belgilang", "error", true);
+        return false;
+    }
+
+    const blob = await createSelectionSnapshotBlob(range);
+    if (!blob) {
+        setSelectionToolbarStatus("Snapshot tayyorlanmadi", "error", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type || "image/png"]: blob,
+                }),
+            ]);
+            setSelectionToolbarStatus("Snap nusxalandi", "success", true);
+            return true;
+        }
+    } catch (error) {
+        // Fall through to text copy fallback.
+    }
+
+    const copiedText = await copySelectionTextToClipboard();
+    if (copiedText) {
+        setSelectionToolbarStatus("Matn nusxalandi", "warning", true);
+        return true;
+    }
+
+    setSelectionToolbarStatus("Nusxalash bo'lmadi", "error", true);
+    return false;
+}
+
+async function copySelectionTextToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) return false;
+    const text = range.text;
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (error) {
+        // Fallback below.
+    }
+
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    fallback.setAttribute("readonly", "readonly");
+    fallback.style.position = "fixed";
+    fallback.style.opacity = "0";
+    fallback.style.left = "-9999px";
+    fallback.style.top = "-9999px";
+    document.body.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    let success = false;
+    try {
+        success = document.execCommand("copy");
+    } catch (_) {
+        success = false;
+    }
+    document.body.removeChild(fallback);
+    return success;
+}
+
+function bindSelectionToolbarEvents() {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar || toolbar.dataset.bound === "1") return;
+
+    toolbar.dataset.bound = "1";
+    toolbar.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+    });
+
+    toolbar.addEventListener("click", async (event) => {
+        const button = event.target instanceof Element
+            ? event.target.closest("[data-selection-action]")
+            : null;
+        if (!button) return;
+
+        const action = button.getAttribute("data-selection-action");
+        if (action === "copy-snap") {
+            await copySelectionSnapshotToClipboard();
+        }
+    });
+}
+
+function setupEditor() {
+    const textArea = document.getElementById("code-editor");
+    if (!textArea) return;
+
+    currentLanguage = getStoredLanguage();
+    currentStarterPack = getStoredStarterPack();
+
+    editor = CodeMirror.fromTextArea(textArea, {
+        mode: getLanguageMode(currentLanguage),
+        theme: "eclipse",
+        lineNumbers: true,
+        indentUnit: getLanguageIndentUnit(currentLanguage),
+        smartIndent: true,
+        indentWithTabs: false,
+        lineWrapping: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
+        extraKeys: {
+            "Ctrl-Enter": runCode,
+            "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Enter": "newlineAndIndent",
+            "Ctrl-S": saveCode,
+            "Ctrl-Shift-F": formatEditorCode,
+            "Tab": (cm) => {
+                if (cm.state.completionActive) return CodeMirror.Pass;
+                if (cm.somethingSelected()) cm.indentSelection("add");
+                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
+            },
+            "Shift-Tab": (cm) => cm.indentSelection("subtract")
+        },
+        hintOptions: {
+            completeSingle: false,
+            alignWithWord: true,
+            closeOnUnfocus: true
+        }
+    });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
+
+    editor.on("inputRead", onEditorInputRead);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
+    editor.on("change", () => {
+        updateEditorStatus();
+        autoSaveCode();
+        dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
+    });
+
+    setupLanguageSelector();
+    setupStarterPackSelector();
+    loadTheme();
+    loadEditorTypographyPreferences();
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+    setupPanelResizer();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
+    clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
+}
+
+function updateEditorStatus() {
+    const cursor = editor.getCursor();
+    const primary = document.getElementById("editor-status-primary");
+    const secondary = document.getElementById("editor-status-secondary");
+    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+}
+
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
+}
+
+function highlightEditorError(line, column = 1) {
+    clearEditorDiagnostics();
+    if (!editor || !line || line > editor.lineCount()) return;
+    const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
+    activeDebugLineNumber = idx;
+    editor.addLineClass(idx, "background", "error-line");
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
+}
+
+function clearEditorDiagnostics() {
+    if (activeDebugLineNumber !== null && editor) {
+        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
+        activeDebugLineNumber = null;
+    }
+}
+
+function clearOutputInputHost({ preserveValue = true } = {}) {
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
+    }
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
+    }
+    dispatchEditorContextUpdate();
+}
+
+function clearOutput({ preserveInput = true } = {}) {
+    const output = document.getElementById("output");
+    if (output) {
+        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
+        output.className = "output-content";
+    }
+    pendingRemoteRun = null;
+    clearEditorDiagnostics();
+    clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
+}
+
+function showOutput(text, type) {
+    const output = document.getElementById("output");
+    if (!output) return;
+    output.textContent = text;
+    output.className = type ? "output-content " + type : "output-content";
+    scrollOutputToLatest();
+    dispatchEditorContextUpdate();
+}
+
+function saveCode() {
+    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
+    setTimeout(clearOutput, 2000);
+}
+
+function loadCode() {
+    const code = getStoredCode(currentLanguage, currentStarterPack);
+    editor.setValue(code);
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
+}
+
+function downloadCode() {
+    const ext = getLanguageFileExtension(currentLanguage);
+    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function uploadFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (currentStarterPack !== "array") {
+            setEditorLanguage(currentStarterPack, { persistCurrent: true });
+        }
+        editor.setValue(String(e.target.result || ""));
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
+    };
+    reader.readAsText(file);
+}
+
+function autoSaveCode() {
+    saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+}
+
+function loadAutoSavedCode() {
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+}
+
+async function formatEditorCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
+        return;
+    }
+    if (!pyodide) {
+        showOutput("Python muhiti ishga tushirilmoqda...", "warning");
+        try {
+            await ensurePyodideLoaded();
+        } catch (e) {
+            return showOutput("Python yuklanmadi.", "error");
+        }
+    }
+    if (!isFormatterLoaded) {
+        showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
+        await ensurePythonRuntimeTools();
+        isFormatterLoaded = true;
+    }
+    showOutput("Formatlanmoqda...", "");
+    pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`)
+        .then((res) => {
+            const result = JSON.parse(res);
+            if (result.formatterAvailable) {
+                editor.setValue(result.code);
+                showOutput("OK: Kod formatlandi.", "success");
+            } else {
+                showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
+            }
+            setTimeout(clearOutput, 2000);
+        })
+        .catch((error) => {
+            showOutput("Xatolik: " + error.message, "error");
+        });
+}
+
+function debugCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Debug rejimi hozircha faqat Python uchun mavjud.", "");
+        return;
+    }
+    showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", "");
+}
+
+function clearDebugState() {
+    activeDebugSession = null;
+    activeDebugSteps = [];
+    activeDebugStepIndex = 0;
+}
+
+function continueDebugSession() {
+    showOutput("Debug rejimi hozircha tayyor emas.", "");
+    activeDebugSession = null;
+}
+
+// --- AUTOCOMPLETE ---
+
+function onEditorInputRead(cm, change) {
+    if (change.origin !== "+input") return;
+    const cur = cm.getCursor();
+    const token = cm.getTokenAt(cur);
+    const char = change.text[0];
+
+    // Trigger on any alphabetical character or dot
+    if (!/^[a-zA-Z_.]$/.test(char)) return;
+    
+    // Trigger instantly if we have a valid starting char
+    if (token.string.trim().length > 0 || char === ".") {
+        showAutocompleteHints(cm);
+    }
+}
+
+function showAutocompleteHints(cm) {
+    cm.showHint({
+        hint: function(editorInstance) {
+            const cur = editorInstance.getCursor();
+            const token = editorInstance.getTokenAt(cur);
+            const start = token.start;
+            const end = cur.ch;
+            const line = cur.line;
+            const currentWord = token.string;
+            const currentWordLower = currentWord.toLowerCase();
+            const priority = ["True", "False", "None"];
+
+            const baseWords = getAutocompleteWords(language);
+            const anyWordList = (CodeMirror.hint.anyword(editorInstance).list || []);
+            const list = [...new Set([...baseWords, ...anyWordList])]
+                .filter((word) => word.toLowerCase().startsWith(currentWordLower))
+                .sort((a, b) => {
+                    const aPri = priority.includes(a);
+                    const bPri = priority.includes(b);
+                    if (aPri && !bPri) return -1;
+                    if (!aPri && bPri) return 1;
+
+                    const aStart = a.startsWith(currentWord);
+                    const bStart = b.startsWith(currentWord);
+                    if (aStart && !bStart) return -1;
+                    if (!aStart && bStart) return 1;
+
+                    return a.localeCompare(b);
+                });
+
+            return {
+                list,
+                from: CodeMirror.Pos(line, start),
+                to: CodeMirror.Pos(line, end),
+            };
+        },
+        completeSingle: false
+    });
+}
+
+// --- MULTI-LANGUAGE OVERRIDES ---
+
+function applyEditorTypography(family, size) {
+    const resolvedFamily = EDITOR_FONT_FAMILIES[family] || family;
+    const root = document.documentElement;
+    root.style.setProperty("--editor-font-family", resolvedFamily);
+    root.style.setProperty("--editor-font-size", size);
+
+    if (editor) {
+        const wrapper = editor.getWrapperElement();
+        wrapper.style.fontFamily = resolvedFamily;
+        wrapper.style.fontSize = size;
+        editor.refresh();
+    }
+
+    localStorage.setItem("editorFontFamily", family);
+    localStorage.setItem("editorFontSize", size);
+}
+
+function loadTheme() {
+    const theme = localStorage.getItem("theme") || "light";
+    const isDark = theme === "dark";
+    document.body.classList.toggle("dark-mode", isDark);
+    const btn = document.getElementById("themeBtn");
+    if (btn) {
+        const label = btn.querySelector(".button-label");
+        if (label) label.textContent = isDark ? "Light" : "Dark";
+    }
+    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
+}
+
+function loadEditorTypographyPreferences() {
+    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
+    const size = localStorage.getItem("editorFontSize") || "14px";
+
+    const fSelect = document.getElementById("editor-font-family");
+    const sSelect = document.getElementById("editor-font-size");
+
+    if (fSelect) {
+        fSelect.value = family;
+        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect ? sSelect.value : size);
+    }
+    if (sSelect) {
+        sSelect.value = size;
+        sSelect.onchange = () => applyEditorTypography(fSelect ? fSelect.value : family, sSelect.value);
+    }
+
+    applyEditorTypography(family, size);
+}
+
+const IDENTIFIER_RESERVED_WORDS = (() => {
+    const words = new Set(Object.values(LANGUAGE_AUTOCOMPLETE_WORDS).flat());
+    words.delete("main");
+    words.delete("Main");
+    return words;
+})();
+
+const IDENTIFIER_TONE_COUNT = 10;
+
+function hashIdentifier(name) {
+    let hash = 0;
+    for (let index = 0; index < name.length; index += 1) {
+        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+}
+
+function getIdentifierToneClass(name) {
+    return `cm-identifier-tone-${hashIdentifier(name) % IDENTIFIER_TONE_COUNT}`;
+}
+
+function createIdentifierOverlay() {
+    return {
+        token(stream) {
+            if (stream.eatSpace()) return null;
+
+            const word = stream.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+            if (word) {
+                const token = word[0];
+                if (!IDENTIFIER_RESERVED_WORDS.has(token)) {
+                    return getIdentifierToneClass(token);
+                }
+                return null;
+            }
+
+            stream.next();
+            return null;
+        },
+    };
+}
+
+let pyodideLoadingPromise = null;
+
+async function ensurePyodideLoaded() {
+    if (pyodide) return pyodide;
+    if (pyodideLoadingPromise) return pyodideLoadingPromise;
+
+    const loading = document.getElementById("loading");
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
+    }
+
+    pyodideLoadingPromise = (async () => {
+        try {
+            // Brauzer qotmasligi uchun ozgina pauza beramiz
+            await new Promise(r => setTimeout(r, 50));
+            pyodide = await loadPyodide();
+            
+            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
+            await new Promise(r => setTimeout(r, 50));
+            await setupSafeExecutionEnvironment();
+            
+            if (loading) {
+                loading.textContent = "Python tayyor!";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 1500);
+            }
+            return pyodide;
+        } catch (error) {
+            console.warn("Python muhiti yuklanmadi:", error);
+            if (loading) {
+                loading.textContent = "Xatolik: Python yuklanmadi.";
+                loading.style.background = "#fee2e2";
+                loading.style.color = "#991b1b";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 4000);
+            }
+            throw error;
+        }
+    })();
+
+    return pyodideLoadingPromise;
+}
+
+function syncLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (selector) {
+        selector.value = currentLanguage;
+    }
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function setupLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (!selector) return;
+    selector.value = currentLanguage;
+    selector.onchange = () => setEditorLanguage(selector.value);
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function syncStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (selector) {
+        selector.value = currentStarterPack;
+    }
+}
+
+function setupStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (!selector) return;
+    selector.value = currentStarterPack;
+    selector.onchange = () => setStarterPack(selector.value);
+}
+
+function setStarterPack(pack, options = {}) {
+    const nextPack = normalizeStarterPack(pack);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentStarterPack = nextPack;
+        setStoredStarterPack(nextPack);
+        syncStarterPackSelector();
+        return;
+    }
+
+    if (currentStarterPack === nextPack && !options.force) {
+        syncStarterPackSelector();
+        updateEditorStatus();
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentStarterPack = nextPack;
+    setStoredStarterPack(nextPack);
+
+    editor.setValue(getStoredCode(currentLanguage, nextPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
+}
+
+function setEditorLanguage(language, options = {}) {
+    const nextLanguage = normalizeLanguage(language);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentLanguage = nextLanguage;
+        setStoredLanguage(nextLanguage);
+        syncLanguageSelector();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (currentLanguage === nextLanguage && !options.force) {
+        syncLanguageSelector();
+        updateEditorStatus();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentLanguage = nextLanguage;
+    setStoredLanguage(nextLanguage);
+
+    editor.setOption("mode", getLanguageMode(nextLanguage));
+    editor.setOption("indentUnit", getLanguageIndentUnit(nextLanguage));
+    editor.setValue(getStoredCode(nextLanguage, currentStarterPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    updateHeaderLanguageBranding(nextLanguage);
+    scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
+}
+
+function getSelectionToolbarElement() {
+    return document.getElementById("editor-selection-toolbar");
+}
+
+function hideSelectionToolbar() {
+    const toolbar = getSelectionToolbarElement();
+    if (toolbar) {
+        toolbar.hidden = true;
+    }
+}
+
+function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
+    void message;
+    void tone;
+    void autoRestore;
+}
+
+function getSelectionToolbarSelection() {
+    if (!editor || !editor.somethingSelected()) return null;
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const text = editor.getSelection("\n");
+    if (!text || !text.trim()) return null;
+
+    return {
+        from,
+        to,
+        text,
+        lineCount: Math.max(1, to.line - from.line + 1),
+    };
+}
+
+function getSelectionToolbarAnchor(range) {
+    const fromCoords = editor.charCoords(range.from, "page");
+    const toCoords = editor.charCoords(range.to, "page");
+    const left = Math.min(fromCoords.left, toCoords.left) - window.pageXOffset;
+    const right = Math.max(fromCoords.right, toCoords.right) - window.pageXOffset;
+    const top = Math.min(fromCoords.top, toCoords.top) - window.pageYOffset;
+    const bottom = Math.max(fromCoords.bottom, toCoords.bottom) - window.pageYOffset;
+    return {
+        left: (left + right) / 2,
+        top,
+        bottom,
+    };
+}
+
+function positionSelectionToolbar(toolbar, anchorLeft, anchorTop, anchorBottom) {
+    if (!toolbar) return;
+    const margin = 12;
+    const rect = toolbar.getBoundingClientRect();
+    const width = rect.width || 280;
+    const height = rect.height || 52;
+    let left = Math.round(anchorLeft - width / 2);
+    left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
+
+    let top = Math.round(anchorTop - height - 12);
+    if (top < margin) {
+        top = Math.round((Number(anchorBottom) || anchorTop) + 12);
+    }
+    if (top + height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - height - margin);
+    }
+
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+}
+
+function refreshSelectionToolbar(positionOverride = null) {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar) return false;
+
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        hideSelectionToolbar();
+        return false;
+    }
+
+    toolbar.hidden = false;
+
+    const anchor = positionOverride || getSelectionToolbarAnchor(range);
+    positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
+    return true;
+}
+
+function showSelectionToolbarAtPoint(clientX, clientY) {
+    const toolbar = getSelectionToolbarElement();
+    const range = getSelectionToolbarSelection();
+    if (!toolbar || !range) return false;
+
+    toolbar.hidden = false;
+    positionSelectionToolbar(toolbar, clientX, clientY, clientY);
+    return true;
+}
+
+function getSelectionSnapshotThemeColors() {
+    const root = getComputedStyle(document.documentElement);
+    return {
+        surface: root.getPropertyValue("--surface").trim() || "#ffffff",
+        surfaceMuted: root.getPropertyValue("--surface-muted").trim() || "#f6f8fb",
+        border: root.getPropertyValue("--border").trim() || "#d8e1ec",
+        textMain: root.getPropertyValue("--text-main").trim() || "#132033",
+        textMuted: root.getPropertyValue("--text-muted").trim() || "#5f6f82",
+        codeKeyword: root.getPropertyValue("--code-keyword").trim() || "#2153d6",
+        codeDef: root.getPropertyValue("--code-def").trim() || "#0f766e",
+        codeString: root.getPropertyValue("--code-string").trim() || "#b45309",
+        codeNumber: root.getPropertyValue("--code-number").trim() || "#b42318",
+        codeComment: root.getPropertyValue("--code-comment").trim() || "#6b7280",
+        codeAtom: root.getPropertyValue("--code-atom").trim() || "#7c3aed",
+        codeProperty: root.getPropertyValue("--code-property").trim() || "#0b6b7a",
+        codeVariable: root.getPropertyValue("--code-variable").trim() || "#0f172a",
+        codeOperator: root.getPropertyValue("--code-operator").trim() || "#6d28d9",
+        primary: root.getPropertyValue("--primary").trim() || "#2353d7",
+        primaryHover: root.getPropertyValue("--primary-hover").trim() || "#1b43ac",
+        danger: root.getPropertyValue("--danger").trim() || "#b9384a",
+        success: root.getPropertyValue("--success").trim() || "#0f766e",
+    };
+}
+
+function getSelectionSnapshotTokenColor(tokenType, colors) {
+    const type = String(tokenType || "");
+    if (type.includes("comment")) return colors.codeComment;
+    if (type.includes("string")) return colors.codeString;
+    if (type.includes("number")) return colors.codeNumber;
+    if (type.includes("keyword")) return colors.codeKeyword;
+    if (type.includes("def")) return colors.codeDef;
+    if (type.includes("atom")) return colors.codeAtom;
+    if (type.includes("property")) return colors.codeProperty;
+    if (type.includes("operator")) return colors.codeOperator;
+    if (type.includes("builtin")) return colors.codeAtom;
+    return colors.codeVariable;
+}
+
+function getSelectionSnapshotSegments(lineNo, startCh, endCh) {
+    const lineText = editor.getLine(lineNo) || "";
+    const segments = [];
+    let cursor = Math.max(0, startCh);
+    const safe_end = Math.max(cursor, Math.min(endCh, lineText.length));
+
+    if (cursor >= safe_end) {
+        return [{ text: "", type: "" }];
+    }
+
+    while (cursor < safe_end) {
+        const probe = Math.min(Math.max(cursor, 0), Math.max(0, lineText.length - 1));
+        const token = editor.getTokenAt({ line: lineNo, ch: probe });
+        let tokenStart = Math.max(cursor, Number(token.start) || 0);
+        let tokenEnd = Math.min(safe_end, Number(token.end) || (cursor + 1));
+
+        if (tokenEnd <= tokenStart) {
+            tokenEnd = Math.min(safe_end, cursor + 1);
+        }
+
+        segments.push({
+            text: lineText.slice(tokenStart, tokenEnd),
+            type: token.type || "",
+        });
+        cursor = tokenEnd;
+    }
+
+    return segments;
+}
+
+function measureSelectionSnapshotLineWidth(ctx, segments) {
+    return segments.reduce((total, segment) => total + ctx.measureText(segment.text || "").width, 0);
+}
+
+function roundRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+async function createSelectionSnapshotBlob(range) {
+    if (!editor || !range) return null;
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {}
+    }
+
+    const colors = getSelectionSnapshotThemeColors();
+    const editorWrapper = editor.getWrapperElement();
+    const computed = getComputedStyle(editorWrapper);
+    const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
+    const fontSize = Math.max(13, Math.min(18, Math.round(parseFloat(computed.fontSize) || 14)));
+    const lineHeight = Math.round(fontSize * 1.48);
+    const topBarHeight = 44;
+    const paddingX = 18;
+    const paddingTop = 14;
+    const paddingBottom = 14;
+    const lineGap = 8;
+    const codeFont = `${fontSize}px ${fontFamily}`;
+    const ctxMeasure = document.createElement("canvas").getContext("2d");
+    if (!ctxMeasure) return null;
+    ctxMeasure.font = codeFont;
+
+    const snapshotLines = [];
+    for (let lineNo = range.from.line; lineNo <= range.to.line; lineNo += 1) {
+        const startCh = lineNo === range.from.line ? range.from.ch : 0;
+        const originalLine = editor.getLine(lineNo) || "";
+        const endCh = lineNo === range.to.line ? range.to.ch : originalLine.length;
+        const segments = getSelectionSnapshotSegments(lineNo, startCh, endCh);
+        snapshotLines.push({
+            lineNumber: lineNo + 1,
+            segments,
+            width: measureSelectionSnapshotLineWidth(ctxMeasure, segments),
+        });
+    }
+
+    const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
+    const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
+    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 12;
+    const contentWidth = Math.max(240, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
+    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 14 + contentWidth);
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerLanguage = getLanguageLabel();
+    const headerTitle = "Code Snap";
+    const headerText = `${headerLanguage} • ${headerTitle}`;
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerWidth = Math.ceil(108 + ctxMeasure.measureText(headerText).width + 22);
+    const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
+    const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = colors.surfaceMuted;
+    ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+
+    ctx.fillStyle = colors.surface;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+
+    ctx.fillStyle = colors.surfaceMuted;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 18);
+    ctx.fill();
+
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0.5, topBarHeight + 0.5);
+    ctx.lineTo(width - 0.5, topBarHeight + 0.5);
+    ctx.stroke();
+
+    const dotY = 22;
+    const dotX = 28;
+    const dots = [colors.danger, "#ffbf3c", "#31c55e"];
+    dots.forEach((color, index) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(dotX + index * 22, dotY, 6.25, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.fillStyle = colors.textMain;
+    ctx.font = `600 13px ${fontFamily}`;
+    ctx.fillText(headerText, 104, 27);
+
+    const codeTop = topBarHeight + paddingTop + 4;
+    const codeLeft = paddingX + lineNumberWidth + 14;
+
+    snapshotLines.forEach((line, index) => {
+        const y = codeTop + (index * lineHeight) + fontSize;
+        const lineNumberText = String(line.lineNumber);
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = colors.textMuted;
+        ctx.textAlign = "right";
+        ctx.fillText(lineNumberText, paddingX + lineNumberWidth - 2, y);
+        ctx.textAlign = "left";
+
+        let x = codeLeft;
+        line.segments.forEach((segment) => {
+            const segmentText = segment.text || "";
+            const segmentType = segment.type || "";
+            ctx.fillStyle = getSelectionSnapshotTokenColor(segmentType, colors);
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            ctx.fillText(segmentText, x, y);
+            x += ctx.measureText(segmentText).width;
+        });
+    });
+
+    return await new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+}
+
+async function copySelectionSnapshotToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        setSelectionToolbarStatus("Avval kodni belgilang", "error", true);
+        return false;
+    }
+
+    const blob = await createSelectionSnapshotBlob(range);
+    if (!blob) {
+        setSelectionToolbarStatus("Snapshot tayyorlanmadi", "error", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type || "image/png"]: blob,
+                }),
+            ]);
+            setSelectionToolbarStatus("Snap nusxalandi", "success", true);
+            return true;
+        }
+    } catch (error) {
+        // Fall through to text copy fallback.
+    }
+
+    const copiedText = await copySelectionTextToClipboard();
+    if (copiedText) {
+        setSelectionToolbarStatus("Matn nusxalandi", "warning", true);
+        return true;
+    }
+
+    setSelectionToolbarStatus("Nusxalash bo'lmadi", "error", true);
+    return false;
+}
+
+async function copySelectionTextToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) return false;
+    const text = range.text;
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (error) {
+        // Fallback below.
+    }
+
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    fallback.setAttribute("readonly", "readonly");
+    fallback.style.position = "fixed";
+    fallback.style.opacity = "0";
+    fallback.style.left = "-9999px";
+    fallback.style.top = "-9999px";
+    document.body.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    let success = false;
+    try {
+        success = document.execCommand("copy");
+    } catch (_) {
+        success = false;
+    }
+    document.body.removeChild(fallback);
+    return success;
+}
+
+function bindSelectionToolbarEvents() {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar || toolbar.dataset.bound === "1") return;
+
+    toolbar.dataset.bound = "1";
+    toolbar.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+    });
+
+    toolbar.addEventListener("click", async (event) => {
+        const button = event.target instanceof Element
+            ? event.target.closest("[data-selection-action]")
+            : null;
+        if (!button) return;
+
+        const action = button.getAttribute("data-selection-action");
+        if (action === "copy-snap") {
+            await copySelectionSnapshotToClipboard();
+        }
+    });
+}
+
+function setupEditor() {
+    const textArea = document.getElementById("code-editor");
+    if (!textArea) return;
+
+    currentLanguage = getStoredLanguage();
+    currentStarterPack = getStoredStarterPack();
+
+    editor = CodeMirror.fromTextArea(textArea, {
+        mode: getLanguageMode(currentLanguage),
+        theme: "eclipse",
+        lineNumbers: true,
+        indentUnit: getLanguageIndentUnit(currentLanguage),
+        smartIndent: true,
+        indentWithTabs: false,
+        lineWrapping: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
+        extraKeys: {
+            "Ctrl-Enter": runCode,
+            "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Enter": "newlineAndIndent",
+            "Ctrl-S": saveCode,
+            "Ctrl-Shift-F": formatEditorCode,
+            "Tab": (cm) => {
+                if (cm.state.completionActive) return CodeMirror.Pass;
+                if (cm.somethingSelected()) cm.indentSelection("add");
+                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
+            },
+            "Shift-Tab": (cm) => cm.indentSelection("subtract")
+        },
+        hintOptions: {
+            completeSingle: false,
+            alignWithWord: true,
+            closeOnUnfocus: true
+        }
+    });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
+
+    editor.on("inputRead", onEditorInputRead);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
+    editor.on("change", () => {
+        updateEditorStatus();
+        autoSaveCode();
+        dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
+    });
+
+    setupLanguageSelector();
+    setupStarterPackSelector();
+    loadTheme();
+    loadEditorTypographyPreferences();
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+    setupPanelResizer();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
+    clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
+}
+
+function updateEditorStatus() {
+    const cursor = editor.getCursor();
+    const primary = document.getElementById("editor-status-primary");
+    const secondary = document.getElementById("editor-status-secondary");
+    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+}
+
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
+}
+
+function highlightEditorError(line, column = 1) {
+    clearEditorDiagnostics();
+    if (!editor || !line || line > editor.lineCount()) return;
+    const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
+    activeDebugLineNumber = idx;
+    editor.addLineClass(idx, "background", "error-line");
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
+}
+
+function clearEditorDiagnostics() {
+    if (activeDebugLineNumber !== null && editor) {
+        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
+        activeDebugLineNumber = null;
+    }
+}
+
+function clearOutputInputHost({ preserveValue = true } = {}) {
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
+    }
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
+    }
+    dispatchEditorContextUpdate();
+}
+
+function clearOutput({ preserveInput = true } = {}) {
+    const output = document.getElementById("output");
+    if (output) {
+        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
+        output.className = "output-content";
+    }
+    pendingRemoteRun = null;
+    clearEditorDiagnostics();
+    clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
+}
+
+function showOutput(text, type) {
+    const output = document.getElementById("output");
+    if (!output) return;
+    output.textContent = text;
+    output.className = type ? "output-content " + type : "output-content";
+    scrollOutputToLatest();
+    dispatchEditorContextUpdate();
+}
+
+function saveCode() {
+    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
+    setTimeout(clearOutput, 2000);
+}
+
+function loadCode() {
+    const code = getStoredCode(currentLanguage, currentStarterPack);
+    editor.setValue(code);
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
+}
+
+function downloadCode() {
+    const ext = getLanguageFileExtension(currentLanguage);
+    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function uploadFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (currentStarterPack !== "array") {
+            setEditorLanguage(currentStarterPack, { persistCurrent: true });
+        }
+        editor.setValue(String(e.target.result || ""));
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
+    };
+    reader.readAsText(file);
+}
+
+function autoSaveCode() {
+    saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+}
+
+function loadAutoSavedCode() {
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+}
+
+async function formatEditorCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
+        return;
+    }
+    if (!pyodide) {
+        showOutput("Python muhiti ishga tushirilmoqda...", "warning");
+        try {
+            await ensurePyodideLoaded();
+        } catch (e) {
+            return showOutput("Python yuklanmadi.", "error");
+        }
+    }
+    if (!isFormatterLoaded) {
+        showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
+        await ensurePythonRuntimeTools();
+        isFormatterLoaded = true;
+    }
+    showOutput("Formatlanmoqda...", "");
+    pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`)
+        .then((res) => {
+            const result = JSON.parse(res);
+            if (result.formatterAvailable) {
+                editor.setValue(result.code);
+                showOutput("OK: Kod formatlandi.", "success");
+            } else {
+                showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
+            }
+            setTimeout(clearOutput, 2000);
+        })
+        .catch((error) => {
+            showOutput("Xatolik: " + error.message, "error");
+        });
+}
+
+function debugCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Debug rejimi hozircha faqat Python uchun mavjud.", "");
+        return;
+    }
+    showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", "");
+}
+
+function clearDebugState() {
+    activeDebugSession = null;
+    activeDebugSteps = [];
+    activeDebugStepIndex = 0;
+}
+
+function continueDebugSession() {
+    showOutput("Debug rejimi hozircha tayyor emas.", "");
+    activeDebugSession = null;
+}
+
+// --- AUTOCOMPLETE ---
+
+function onEditorInputRead(cm, change) {
+    if (change.origin !== "+input") return;
+    const cur = cm.getCursor();
+    const token = cm.getTokenAt(cur);
+    const char = change.text[0];
+
+    // Trigger on any alphabetical character or dot
+    if (!/^[a-zA-Z_.]$/.test(char)) return;
+    
+    // Trigger instantly if we have a valid starting char
+    if (token.string.trim().length > 0 || char === ".") {
+        showAutocompleteHints(cm);
+    }
+}
+
+function showAutocompleteHints(cm) {
+    cm.showHint({
+        hint: function(editorInstance) {
+            const cur = editorInstance.getCursor();
+            const token = editorInstance.getTokenAt(cur);
+            const start = token.start;
+            const end = cur.ch;
+            const line = cur.line;
+            const currentWord = token.string;
+            const currentWordLower = currentWord.toLowerCase();
+            const priority = ["True", "False", "None"];
+
+            const baseWords = getAutocompleteWords(language);
+            const anyWordList = (CodeMirror.hint.anyword(editorInstance).list || []);
+            const list = [...new Set([...baseWords, ...anyWordList])]
+                .filter((word) => word.toLowerCase().startsWith(currentWordLower))
+                .sort((a, b) => {
+                    const aPri = priority.includes(a);
+                    const bPri = priority.includes(b);
+                    if (aPri && !bPri) return -1;
+                    if (!aPri && bPri) return 1;
+
+                    const aStart = a.startsWith(currentWord);
+                    const bStart = b.startsWith(currentWord);
+                    if (aStart && !bStart) return -1;
+                    if (!aStart && bStart) return 1;
+
+                    return a.localeCompare(b);
+                });
+
+            return {
+                list,
+                from: CodeMirror.Pos(line, start),
+                to: CodeMirror.Pos(line, end),
+            };
+        },
+        completeSingle: false
+    });
+}
+
+// --- MULTI-LANGUAGE OVERRIDES ---
+
+function applyEditorTypography(family, size) {
+    const resolvedFamily = EDITOR_FONT_FAMILIES[family] || family;
+    const root = document.documentElement;
+    root.style.setProperty("--editor-font-family", resolvedFamily);
+    root.style.setProperty("--editor-font-size", size);
+
+    if (editor) {
+        const wrapper = editor.getWrapperElement();
+        wrapper.style.fontFamily = resolvedFamily;
+        wrapper.style.fontSize = size;
+        editor.refresh();
+    }
+
+    localStorage.setItem("editorFontFamily", family);
+    localStorage.setItem("editorFontSize", size);
+}
+
+function loadTheme() {
+    const theme = localStorage.getItem("theme") || "light";
+    const isDark = theme === "dark";
+    document.body.classList.toggle("dark-mode", isDark);
+    const btn = document.getElementById("themeBtn");
+    if (btn) {
+        const label = btn.querySelector(".button-label");
+        if (label) label.textContent = isDark ? "Light" : "Dark";
+    }
+    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
+}
+
+function loadEditorTypographyPreferences() {
+    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
+    const size = localStorage.getItem("editorFontSize") || "14px";
+
+    const fSelect = document.getElementById("editor-font-family");
+    const sSelect = document.getElementById("editor-font-size");
+
+    if (fSelect) {
+        fSelect.value = family;
+        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect ? sSelect.value : size);
+    }
+    if (sSelect) {
+        sSelect.value = size;
+        sSelect.onchange = () => applyEditorTypography(fSelect ? fSelect.value : family, sSelect.value);
+    }
+
+    applyEditorTypography(family, size);
+}
+
+const IDENTIFIER_RESERVED_WORDS = (() => {
+    const words = new Set(Object.values(LANGUAGE_AUTOCOMPLETE_WORDS).flat());
+    words.delete("main");
+    words.delete("Main");
+    return words;
+})();
+
+const IDENTIFIER_TONE_COUNT = 10;
+
+function hashIdentifier(name) {
+    let hash = 0;
+    for (let index = 0; index < name.length; index += 1) {
+        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+}
+
+function getIdentifierToneClass(name) {
+    return `cm-identifier-tone-${hashIdentifier(name) % IDENTIFIER_TONE_COUNT}`;
+}
+
+function createIdentifierOverlay() {
+    return {
+        token(stream) {
+            if (stream.eatSpace()) return null;
+
+            const word = stream.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+            if (word) {
+                const token = word[0];
+                if (!IDENTIFIER_RESERVED_WORDS.has(token)) {
+                    return getIdentifierToneClass(token);
+                }
+                return null;
+            }
+
+            stream.next();
+            return null;
+        },
+    };
+}
+
+let pyodideLoadingPromise = null;
+
+async function ensurePyodideLoaded() {
+    if (pyodide) return pyodide;
+    if (pyodideLoadingPromise) return pyodideLoadingPromise;
+
+    const loading = document.getElementById("loading");
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
+    }
+
+    pyodideLoadingPromise = (async () => {
+        try {
+            // Brauzer qotmasligi uchun ozgina pauza beramiz
+            await new Promise(r => setTimeout(r, 50));
+            pyodide = await loadPyodide();
+            
+            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
+            await new Promise(r => setTimeout(r, 50));
+            await setupSafeExecutionEnvironment();
+            
+            if (loading) {
+                loading.textContent = "Python tayyor!";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 1500);
+            }
+            return pyodide;
+        } catch (error) {
+            console.warn("Python muhiti yuklanmadi:", error);
+            if (loading) {
+                loading.textContent = "Xatolik: Python yuklanmadi.";
+                loading.style.background = "#fee2e2";
+                loading.style.color = "#991b1b";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 4000);
+            }
+            throw error;
+        }
+    })();
+
+    return pyodideLoadingPromise;
+}
+
+function syncLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (selector) {
+        selector.value = currentLanguage;
+    }
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function setupLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (!selector) return;
+    selector.value = currentLanguage;
+    selector.onchange = () => setEditorLanguage(selector.value);
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function syncStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (selector) {
+        selector.value = currentStarterPack;
+    }
+}
+
+function setupStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (!selector) return;
+    selector.value = currentStarterPack;
+    selector.onchange = () => setStarterPack(selector.value);
+}
+
+function setStarterPack(pack, options = {}) {
+    const nextPack = normalizeStarterPack(pack);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentStarterPack = nextPack;
+        setStoredStarterPack(nextPack);
+        syncStarterPackSelector();
+        return;
+    }
+
+    if (currentStarterPack === nextPack && !options.force) {
+        syncStarterPackSelector();
+        updateEditorStatus();
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentStarterPack = nextPack;
+    setStoredStarterPack(nextPack);
+
+    editor.setValue(getStoredCode(currentLanguage, nextPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
+}
+
+function setEditorLanguage(language, options = {}) {
+    const nextLanguage = normalizeLanguage(language);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentLanguage = nextLanguage;
+        setStoredLanguage(nextLanguage);
+        syncLanguageSelector();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (currentLanguage === nextLanguage && !options.force) {
+        syncLanguageSelector();
+        updateEditorStatus();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentLanguage = nextLanguage;
+    setStoredLanguage(nextLanguage);
+
+    editor.setOption("mode", getLanguageMode(nextLanguage));
+    editor.setOption("indentUnit", getLanguageIndentUnit(nextLanguage));
+    editor.setValue(getStoredCode(nextLanguage, currentStarterPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    updateHeaderLanguageBranding(nextLanguage);
+    scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
+}
+
+function getSelectionToolbarElement() {
+    return document.getElementById("editor-selection-toolbar");
+}
+
+function hideSelectionToolbar() {
+    const toolbar = getSelectionToolbarElement();
+    if (toolbar) {
+        toolbar.hidden = true;
+    }
+}
+
+function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
+    void message;
+    void tone;
+    void autoRestore;
+}
+
+function getSelectionToolbarSelection() {
+    if (!editor || !editor.somethingSelected()) return null;
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const text = editor.getSelection("\n");
+    if (!text || !text.trim()) return null;
+
+    return {
+        from,
+        to,
+        text,
+        lineCount: Math.max(1, to.line - from.line + 1),
+    };
+}
+
+function getSelectionToolbarAnchor(range) {
+    const fromCoords = editor.charCoords(range.from, "page");
+    const toCoords = editor.charCoords(range.to, "page");
+    const left = Math.min(fromCoords.left, toCoords.left) - window.pageXOffset;
+    const right = Math.max(fromCoords.right, toCoords.right) - window.pageXOffset;
+    const top = Math.min(fromCoords.top, toCoords.top) - window.pageYOffset;
+    const bottom = Math.max(fromCoords.bottom, toCoords.bottom) - window.pageYOffset;
+    return {
+        left: (left + right) / 2,
+        top,
+        bottom,
+    };
+}
+
+function positionSelectionToolbar(toolbar, anchorLeft, anchorTop, anchorBottom) {
+    if (!toolbar) return;
+    const margin = 12;
+    const rect = toolbar.getBoundingClientRect();
+    const width = rect.width || 280;
+    const height = rect.height || 52;
+    let left = Math.round(anchorLeft - width / 2);
+    left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
+
+    let top = Math.round(anchorTop - height - 12);
+    if (top < margin) {
+        top = Math.round((Number(anchorBottom) || anchorTop) + 12);
+    }
+    if (top + height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - height - margin);
+    }
+
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+}
+
+function refreshSelectionToolbar(positionOverride = null) {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar) return false;
+
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        hideSelectionToolbar();
+        return false;
+    }
+
+    toolbar.hidden = false;
+
+    const anchor = positionOverride || getSelectionToolbarAnchor(range);
+    positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
+    return true;
+}
+
+function showSelectionToolbarAtPoint(clientX, clientY) {
+    const toolbar = getSelectionToolbarElement();
+    const range = getSelectionToolbarSelection();
+    if (!toolbar || !range) return false;
+
+    toolbar.hidden = false;
+    positionSelectionToolbar(toolbar, clientX, clientY, clientY);
+    return true;
+}
+
+function getSelectionSnapshotThemeColors() {
+    const root = getComputedStyle(document.documentElement);
+    return {
+        surface: root.getPropertyValue("--surface").trim() || "#ffffff",
+        surfaceMuted: root.getPropertyValue("--surface-muted").trim() || "#f6f8fb",
+        border: root.getPropertyValue("--border").trim() || "#d8e1ec",
+        textMain: root.getPropertyValue("--text-main").trim() || "#132033",
+        textMuted: root.getPropertyValue("--text-muted").trim() || "#5f6f82",
+        codeKeyword: root.getPropertyValue("--code-keyword").trim() || "#2153d6",
+        codeDef: root.getPropertyValue("--code-def").trim() || "#0f766e",
+        codeString: root.getPropertyValue("--code-string").trim() || "#b45309",
+        codeNumber: root.getPropertyValue("--code-number").trim() || "#b42318",
+        codeComment: root.getPropertyValue("--code-comment").trim() || "#6b7280",
+        codeAtom: root.getPropertyValue("--code-atom").trim() || "#7c3aed",
+        codeProperty: root.getPropertyValue("--code-property").trim() || "#0b6b7a",
+        codeVariable: root.getPropertyValue("--code-variable").trim() || "#0f172a",
+        codeOperator: root.getPropertyValue("--code-operator").trim() || "#6d28d9",
+        primary: root.getPropertyValue("--primary").trim() || "#2353d7",
+        primaryHover: root.getPropertyValue("--primary-hover").trim() || "#1b43ac",
+        danger: root.getPropertyValue("--danger").trim() || "#b9384a",
+        success: root.getPropertyValue("--success").trim() || "#0f766e",
+    };
+}
+
+function getSelectionSnapshotTokenColor(tokenType, colors) {
+    const type = String(tokenType || "");
+    if (type.includes("comment")) return colors.codeComment;
+    if (type.includes("string")) return colors.codeString;
+    if (type.includes("number")) return colors.codeNumber;
+    if (type.includes("keyword")) return colors.codeKeyword;
+    if (type.includes("def")) return colors.codeDef;
+    if (type.includes("atom")) return colors.codeAtom;
+    if (type.includes("property")) return colors.codeProperty;
+    if (type.includes("operator")) return colors.codeOperator;
+    if (type.includes("builtin")) return colors.codeAtom;
+    return colors.codeVariable;
+}
+
+function getSelectionSnapshotSegments(lineNo, startCh, endCh) {
+    const lineText = editor.getLine(lineNo) || "";
+    const segments = [];
+    let cursor = Math.max(0, startCh);
+    const safe_end = Math.max(cursor, Math.min(endCh, lineText.length));
+
+    if (cursor >= safe_end) {
+        return [{ text: "", type: "" }];
+    }
+
+    while (cursor < safe_end) {
+        const probe = Math.min(Math.max(cursor, 0), Math.max(0, lineText.length - 1));
+        const token = editor.getTokenAt({ line: lineNo, ch: probe });
+        let tokenStart = Math.max(cursor, Number(token.start) || 0);
+        let tokenEnd = Math.min(safe_end, Number(token.end) || (cursor + 1));
+
+        if (tokenEnd <= tokenStart) {
+            tokenEnd = Math.min(safe_end, cursor + 1);
+        }
+
+        segments.push({
+            text: lineText.slice(tokenStart, tokenEnd),
+            type: token.type || "",
+        });
+        cursor = tokenEnd;
+    }
+
+    return segments;
+}
+
+function measureSelectionSnapshotLineWidth(ctx, segments) {
+    return segments.reduce((total, segment) => total + ctx.measureText(segment.text || "").width, 0);
+}
+
+function roundRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+async function createSelectionSnapshotBlob(range) {
+    if (!editor || !range) return null;
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {}
+    }
+
+    const colors = getSelectionSnapshotThemeColors();
+    const editorWrapper = editor.getWrapperElement();
+    const computed = getComputedStyle(editorWrapper);
+    const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
+    const fontSize = Math.max(13, Math.min(18, Math.round(parseFloat(computed.fontSize) || 14)));
+    const lineHeight = Math.round(fontSize * 1.48);
+    const topBarHeight = 44;
+    const paddingX = 18;
+    const paddingTop = 14;
+    const paddingBottom = 14;
+    const lineGap = 8;
+    const codeFont = `${fontSize}px ${fontFamily}`;
+    const ctxMeasure = document.createElement("canvas").getContext("2d");
+    if (!ctxMeasure) return null;
+    ctxMeasure.font = codeFont;
+
+    const snapshotLines = [];
+    for (let lineNo = range.from.line; lineNo <= range.to.line; lineNo += 1) {
+        const startCh = lineNo === range.from.line ? range.from.ch : 0;
+        const originalLine = editor.getLine(lineNo) || "";
+        const endCh = lineNo === range.to.line ? range.to.ch : originalLine.length;
+        const segments = getSelectionSnapshotSegments(lineNo, startCh, endCh);
+        snapshotLines.push({
+            lineNumber: lineNo + 1,
+            segments,
+            width: measureSelectionSnapshotLineWidth(ctxMeasure, segments),
+        });
+    }
+
+    const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
+    const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
+    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 12;
+    const contentWidth = Math.max(240, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
+    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 14 + contentWidth);
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerLanguage = getLanguageLabel();
+    const headerTitle = "Code Snap";
+    const headerText = `${headerLanguage} • ${headerTitle}`;
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerWidth = Math.ceil(108 + ctxMeasure.measureText(headerText).width + 22);
+    const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
+    const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = colors.surfaceMuted;
+    ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+
+    ctx.fillStyle = colors.surface;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+
+    ctx.fillStyle = colors.surfaceMuted;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 18);
+    ctx.fill();
+
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0.5, topBarHeight + 0.5);
+    ctx.lineTo(width - 0.5, topBarHeight + 0.5);
+    ctx.stroke();
+
+    const dotY = 22;
+    const dotX = 28;
+    const dots = [colors.danger, "#ffbf3c", "#31c55e"];
+    dots.forEach((color, index) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(dotX + index * 22, dotY, 6.25, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.fillStyle = colors.textMain;
+    ctx.font = `600 13px ${fontFamily}`;
+    ctx.fillText(headerText, 104, 27);
+
+    const codeTop = topBarHeight + paddingTop + 4;
+    const codeLeft = paddingX + lineNumberWidth + 14;
+
+    snapshotLines.forEach((line, index) => {
+        const y = codeTop + (index * lineHeight) + fontSize;
+        const lineNumberText = String(line.lineNumber);
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = colors.textMuted;
+        ctx.textAlign = "right";
+        ctx.fillText(lineNumberText, paddingX + lineNumberWidth - 2, y);
+        ctx.textAlign = "left";
+
+        let x = codeLeft;
+        line.segments.forEach((segment) => {
+            const segmentText = segment.text || "";
+            const segmentType = segment.type || "";
+            ctx.fillStyle = getSelectionSnapshotTokenColor(segmentType, colors);
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            ctx.fillText(segmentText, x, y);
+            x += ctx.measureText(segmentText).width;
+        });
+    });
+
+    return await new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+}
+
+async function copySelectionSnapshotToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        setSelectionToolbarStatus("Avval kodni belgilang", "error", true);
+        return false;
+    }
+
+    const blob = await createSelectionSnapshotBlob(range);
+    if (!blob) {
+        setSelectionToolbarStatus("Snapshot tayyorlanmadi", "error", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type || "image/png"]: blob,
+                }),
+            ]);
+            setSelectionToolbarStatus("Snap nusxalandi", "success", true);
+            return true;
+        }
+    } catch (error) {
+        // Fall through to text copy fallback.
+    }
+
+    const copiedText = await copySelectionTextToClipboard();
+    if (copiedText) {
+        setSelectionToolbarStatus("Matn nusxalandi", "warning", true);
+        return true;
+    }
+
+    setSelectionToolbarStatus("Nusxalash bo'lmadi", "error", true);
+    return false;
+}
+
+async function copySelectionTextToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) return false;
+    const text = range.text;
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (error) {
+        // Fallback below.
+    }
+
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    fallback.setAttribute("readonly", "readonly");
+    fallback.style.position = "fixed";
+    fallback.style.opacity = "0";
+    fallback.style.left = "-9999px";
+    fallback.style.top = "-9999px";
+    document.body.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    let success = false;
+    try {
+        success = document.execCommand("copy");
+    } catch (_) {
+        success = false;
+    }
+    document.body.removeChild(fallback);
+    return success;
+}
+
+function bindSelectionToolbarEvents() {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar || toolbar.dataset.bound === "1") return;
+
+    toolbar.dataset.bound = "1";
+    toolbar.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+    });
+
+    toolbar.addEventListener("click", async (event) => {
+        const button = event.target instanceof Element
+            ? event.target.closest("[data-selection-action]")
+            : null;
+        if (!button) return;
+
+        const action = button.getAttribute("data-selection-action");
+        if (action === "copy-snap") {
+            await copySelectionSnapshotToClipboard();
+        }
+    });
+}
+
+function setupEditor() {
+    const textArea = document.getElementById("code-editor");
+    if (!textArea) return;
+
+    currentLanguage = getStoredLanguage();
+    currentStarterPack = getStoredStarterPack();
+
+    editor = CodeMirror.fromTextArea(textArea, {
+        mode: getLanguageMode(currentLanguage),
+        theme: "eclipse",
+        lineNumbers: true,
+        indentUnit: getLanguageIndentUnit(currentLanguage),
+        smartIndent: true,
+        indentWithTabs: false,
+        lineWrapping: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
+        extraKeys: {
+            "Ctrl-Enter": runCode,
+            "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Enter": "newlineAndIndent",
+            "Ctrl-S": saveCode,
+            "Ctrl-Shift-F": formatEditorCode,
+            "Tab": (cm) => {
+                if (cm.state.completionActive) return CodeMirror.Pass;
+                if (cm.somethingSelected()) cm.indentSelection("add");
+                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
+            },
+            "Shift-Tab": (cm) => cm.indentSelection("subtract")
+        },
+        hintOptions: {
+            completeSingle: false,
+            alignWithWord: true,
+            closeOnUnfocus: true
+        }
+    });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
+
+    editor.on("inputRead", onEditorInputRead);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
+    editor.on("change", () => {
+        updateEditorStatus();
+        autoSaveCode();
+        dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
+    });
+
+    setupLanguageSelector();
+    setupStarterPackSelector();
+    loadTheme();
+    loadEditorTypographyPreferences();
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+    setupPanelResizer();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
+    clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
+}
+
+function updateEditorStatus() {
+    const cursor = editor.getCursor();
+    const primary = document.getElementById("editor-status-primary");
+    const secondary = document.getElementById("editor-status-secondary");
+    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+}
+
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
+}
+
+function highlightEditorError(line, column = 1) {
+    clearEditorDiagnostics();
+    if (!editor || !line || line > editor.lineCount()) return;
+    const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
+    activeDebugLineNumber = idx;
+    editor.addLineClass(idx, "background", "error-line");
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
+}
+
+function clearEditorDiagnostics() {
+    if (activeDebugLineNumber !== null && editor) {
+        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
+        activeDebugLineNumber = null;
+    }
+}
+
+function clearOutputInputHost({ preserveValue = true } = {}) {
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
+    }
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
+    }
+    dispatchEditorContextUpdate();
+}
+
+function clearOutput({ preserveInput = true } = {}) {
+    const output = document.getElementById("output");
+    if (output) {
+        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
+        output.className = "output-content";
+    }
+    pendingRemoteRun = null;
+    clearEditorDiagnostics();
+    clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
+}
+
+function showOutput(text, type) {
+    const output = document.getElementById("output");
+    if (!output) return;
+    output.textContent = text;
+    output.className = type ? "output-content " + type : "output-content";
+    scrollOutputToLatest();
+    dispatchEditorContextUpdate();
+}
+
+function saveCode() {
+    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
+    setTimeout(clearOutput, 2000);
+}
+
+function loadCode() {
+    const code = getStoredCode(currentLanguage, currentStarterPack);
+    editor.setValue(code);
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
+}
+
+function downloadCode() {
+    const ext = getLanguageFileExtension(currentLanguage);
+    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function uploadFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (currentStarterPack !== "array") {
+            setEditorLanguage(currentStarterPack, { persistCurrent: true });
+        }
+        editor.setValue(String(e.target.result || ""));
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
+    };
+    reader.readAsText(file);
+}
+
+function autoSaveCode() {
+    saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+}
+
+function loadAutoSavedCode() {
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+}
+
+async function formatEditorCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
+        return;
+    }
+    if (!pyodide) {
+        showOutput("Python muhiti ishga tushirilmoqda...", "warning");
+        try {
+            await ensurePyodideLoaded();
+        } catch (e) {
+            return showOutput("Python yuklanmadi.", "error");
+        }
+    }
+    if (!isFormatterLoaded) {
+        showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
+        await ensurePythonRuntimeTools();
+        isFormatterLoaded = true;
+    }
+    showOutput("Formatlanmoqda...", "");
+    pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`)
+        .then((res) => {
+            const result = JSON.parse(res);
+            if (result.formatterAvailable) {
+                editor.setValue(result.code);
+                showOutput("OK: Kod formatlandi.", "success");
+            } else {
+                showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
+            }
+            setTimeout(clearOutput, 2000);
+        })
+        .catch((error) => {
+            showOutput("Xatolik: " + error.message, "error");
+        });
+}
+
+function debugCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Debug rejimi hozircha faqat Python uchun mavjud.", "");
+        return;
+    }
+    showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", "");
+}
+
+function clearDebugState() {
+    activeDebugSession = null;
+    activeDebugSteps = [];
+    activeDebugStepIndex = 0;
+}
+
+function continueDebugSession() {
+    showOutput("Debug rejimi hozircha tayyor emas.", "");
+    activeDebugSession = null;
+}
+
+// --- AUTOCOMPLETE ---
+
+function onEditorInputRead(cm, change) {
+    if (change.origin !== "+input") return;
+    const cur = cm.getCursor();
+    const token = cm.getTokenAt(cur);
+    const char = change.text[0];
+
+    // Trigger on any alphabetical character or dot
+    if (!/^[a-zA-Z_.]$/.test(char)) return;
+    
+    // Trigger instantly if we have a valid starting char
+    if (token.string.trim().length > 0 || char === ".") {
+        showAutocompleteHints(cm);
+    }
+}
+
+function showAutocompleteHints(cm) {
+    cm.showHint({
+        hint: function(editorInstance) {
+            const cur = editorInstance.getCursor();
+            const token = editorInstance.getTokenAt(cur);
+            const start = token.start;
+            const end = cur.ch;
+            const line = cur.line;
+            const currentWord = token.string;
+            const currentWordLower = currentWord.toLowerCase();
+            const priority = ["True", "False", "None"];
+
+            const baseWords = getAutocompleteWords(language);
+            const anyWordList = (CodeMirror.hint.anyword(editorInstance).list || []);
+            const list = [...new Set([...baseWords, ...anyWordList])]
+                .filter((word) => word.toLowerCase().startsWith(currentWordLower))
+                .sort((a, b) => {
+                    const aPri = priority.includes(a);
+                    const bPri = priority.includes(b);
+                    if (aPri && !bPri) return -1;
+                    if (!aPri && bPri) return 1;
+
+                    const aStart = a.startsWith(currentWord);
+                    const bStart = b.startsWith(currentWord);
+                    if (aStart && !bStart) return -1;
+                    if (!aStart && bStart) return 1;
+
+                    return a.localeCompare(b);
+                });
+
+            return {
+                list,
+                from: CodeMirror.Pos(line, start),
+                to: CodeMirror.Pos(line, end),
+            };
+        },
+        completeSingle: false
+    });
+}
+
+// --- MULTI-LANGUAGE OVERRIDES ---
+
+function applyEditorTypography(family, size) {
+    const resolvedFamily = EDITOR_FONT_FAMILIES[family] || family;
+    const root = document.documentElement;
+    root.style.setProperty("--editor-font-family", resolvedFamily);
+    root.style.setProperty("--editor-font-size", size);
+
+    if (editor) {
+        const wrapper = editor.getWrapperElement();
+        wrapper.style.fontFamily = resolvedFamily;
+        wrapper.style.fontSize = size;
+        editor.refresh();
+    }
+
+    localStorage.setItem("editorFontFamily", family);
+    localStorage.setItem("editorFontSize", size);
+}
+
+function loadTheme() {
+    const theme = localStorage.getItem("theme") || "light";
+    const isDark = theme === "dark";
+    document.body.classList.toggle("dark-mode", isDark);
+    const btn = document.getElementById("themeBtn");
+    if (btn) {
+        const label = btn.querySelector(".button-label");
+        if (label) label.textContent = isDark ? "Light" : "Dark";
+    }
+    if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
+}
+
+function loadEditorTypographyPreferences() {
+    const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
+    const size = localStorage.getItem("editorFontSize") || "14px";
+
+    const fSelect = document.getElementById("editor-font-family");
+    const sSelect = document.getElementById("editor-font-size");
+
+    if (fSelect) {
+        fSelect.value = family;
+        fSelect.onchange = () => applyEditorTypography(fSelect.value, sSelect ? sSelect.value : size);
+    }
+    if (sSelect) {
+        sSelect.value = size;
+        sSelect.onchange = () => applyEditorTypography(fSelect ? fSelect.value : family, sSelect.value);
+    }
+
+    applyEditorTypography(family, size);
+}
+
+const IDENTIFIER_RESERVED_WORDS = (() => {
+    const words = new Set(Object.values(LANGUAGE_AUTOCOMPLETE_WORDS).flat());
+    words.delete("main");
+    words.delete("Main");
+    return words;
+})();
+
+const IDENTIFIER_TONE_COUNT = 10;
+
+function hashIdentifier(name) {
+    let hash = 0;
+    for (let index = 0; index < name.length; index += 1) {
+        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+}
+
+function getIdentifierToneClass(name) {
+    return `cm-identifier-tone-${hashIdentifier(name) % IDENTIFIER_TONE_COUNT}`;
+}
+
+function createIdentifierOverlay() {
+    return {
+        token(stream) {
+            if (stream.eatSpace()) return null;
+
+            const word = stream.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+            if (word) {
+                const token = word[0];
+                if (!IDENTIFIER_RESERVED_WORDS.has(token)) {
+                    return getIdentifierToneClass(token);
+                }
+                return null;
+            }
+
+            stream.next();
+            return null;
+        },
+    };
+}
+
+let pyodideLoadingPromise = null;
+
+async function ensurePyodideLoaded() {
+    if (pyodide) return pyodide;
+    if (pyodideLoadingPromise) return pyodideLoadingPromise;
+
+    const loading = document.getElementById("loading");
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
+    }
+
+    pyodideLoadingPromise = (async () => {
+        try {
+            // Brauzer qotmasligi uchun ozgina pauza beramiz
+            await new Promise(r => setTimeout(r, 50));
+            pyodide = await loadPyodide();
+            
+            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
+            await new Promise(r => setTimeout(r, 50));
+            await setupSafeExecutionEnvironment();
+            
+            if (loading) {
+                loading.textContent = "Python tayyor!";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 1500);
+            }
+            return pyodide;
+        } catch (error) {
+            console.warn("Python muhiti yuklanmadi:", error);
+            if (loading) {
+                loading.textContent = "Xatolik: Python yuklanmadi.";
+                loading.style.background = "#fee2e2";
+                loading.style.color = "#991b1b";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 4000);
+            }
+            throw error;
+        }
+    })();
+
+    return pyodideLoadingPromise;
+}
+
+function syncLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (selector) {
+        selector.value = currentLanguage;
+    }
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function setupLanguageSelector() {
+    const selector = document.getElementById("editor-language");
+    if (!selector) return;
+    selector.value = currentLanguage;
+    selector.onchange = () => setEditorLanguage(selector.value);
+    updateHeaderLanguageBranding(currentLanguage);
+}
+
+function syncStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (selector) {
+        selector.value = currentStarterPack;
+    }
+}
+
+function setupStarterPackSelector() {
+    const selector = document.getElementById("editor-starter-pack");
+    if (!selector) return;
+    selector.value = currentStarterPack;
+    selector.onchange = () => setStarterPack(selector.value);
+}
+
+function setStarterPack(pack, options = {}) {
+    const nextPack = normalizeStarterPack(pack);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentStarterPack = nextPack;
+        setStoredStarterPack(nextPack);
+        syncStarterPackSelector();
+        return;
+    }
+
+    if (currentStarterPack === nextPack && !options.force) {
+        syncStarterPackSelector();
+        updateEditorStatus();
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentStarterPack = nextPack;
+    setStoredStarterPack(nextPack);
+
+    editor.setValue(getStoredCode(currentLanguage, nextPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    scheduleEditorRuntimeWarmup(currentLanguage, nextPack, editor.getValue());
+}
+
+function setEditorLanguage(language, options = {}) {
+    const nextLanguage = normalizeLanguage(language);
+    const shouldPersistCurrent = options.persistCurrent !== false;
+
+    if (!editor) {
+        currentLanguage = nextLanguage;
+        setStoredLanguage(nextLanguage);
+        syncLanguageSelector();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (currentLanguage === nextLanguage && !options.force) {
+        syncLanguageSelector();
+        updateEditorStatus();
+        updateHeaderLanguageBranding(nextLanguage);
+        return;
+    }
+
+    if (shouldPersistCurrent) {
+        saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    }
+
+    currentLanguage = nextLanguage;
+    setStoredLanguage(nextLanguage);
+
+    editor.setOption("mode", getLanguageMode(nextLanguage));
+    editor.setOption("indentUnit", getLanguageIndentUnit(nextLanguage));
+    editor.setValue(getStoredCode(nextLanguage, currentStarterPack));
+    editor.focus();
+    editor.refresh();
+
+    clearOutput({ preserveInput: false });
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    dispatchEditorContextUpdate();
+    updateHeaderLanguageBranding(nextLanguage);
+    scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
+}
+
+function getSelectionToolbarElement() {
+    return document.getElementById("editor-selection-toolbar");
+}
+
+function hideSelectionToolbar() {
+    const toolbar = getSelectionToolbarElement();
+    if (toolbar) {
+        toolbar.hidden = true;
+    }
+}
+
+function setSelectionToolbarStatus(message, tone = "", autoRestore = false) {
+    void message;
+    void tone;
+    void autoRestore;
+}
+
+function getSelectionToolbarSelection() {
+    if (!editor || !editor.somethingSelected()) return null;
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const text = editor.getSelection("\n");
+    if (!text || !text.trim()) return null;
+
+    return {
+        from,
+        to,
+        text,
+        lineCount: Math.max(1, to.line - from.line + 1),
+    };
+}
+
+function getSelectionToolbarAnchor(range) {
+    const fromCoords = editor.charCoords(range.from, "page");
+    const toCoords = editor.charCoords(range.to, "page");
+    const left = Math.min(fromCoords.left, toCoords.left) - window.pageXOffset;
+    const right = Math.max(fromCoords.right, toCoords.right) - window.pageXOffset;
+    const top = Math.min(fromCoords.top, toCoords.top) - window.pageYOffset;
+    const bottom = Math.max(fromCoords.bottom, toCoords.bottom) - window.pageYOffset;
+    return {
+        left: (left + right) / 2,
+        top,
+        bottom,
+    };
+}
+
+function positionSelectionToolbar(toolbar, anchorLeft, anchorTop, anchorBottom) {
+    if (!toolbar) return;
+    const margin = 12;
+    const rect = toolbar.getBoundingClientRect();
+    const width = rect.width || 280;
+    const height = rect.height || 52;
+    let left = Math.round(anchorLeft - width / 2);
+    left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
+
+    let top = Math.round(anchorTop - height - 12);
+    if (top < margin) {
+        top = Math.round((Number(anchorBottom) || anchorTop) + 12);
+    }
+    if (top + height > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - height - margin);
+    }
+
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+}
+
+function refreshSelectionToolbar(positionOverride = null) {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar) return false;
+
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        hideSelectionToolbar();
+        return false;
+    }
+
+    toolbar.hidden = false;
+
+    const anchor = positionOverride || getSelectionToolbarAnchor(range);
+    positionSelectionToolbar(toolbar, anchor.left, anchor.top, anchor.bottom);
+    return true;
+}
+
+function showSelectionToolbarAtPoint(clientX, clientY) {
+    const toolbar = getSelectionToolbarElement();
+    const range = getSelectionToolbarSelection();
+    if (!toolbar || !range) return false;
+
+    toolbar.hidden = false;
+    positionSelectionToolbar(toolbar, clientX, clientY, clientY);
+    return true;
+}
+
+function getSelectionSnapshotThemeColors() {
+    const root = getComputedStyle(document.documentElement);
+    return {
+        surface: root.getPropertyValue("--surface").trim() || "#ffffff",
+        surfaceMuted: root.getPropertyValue("--surface-muted").trim() || "#f6f8fb",
+        border: root.getPropertyValue("--border").trim() || "#d8e1ec",
+        textMain: root.getPropertyValue("--text-main").trim() || "#132033",
+        textMuted: root.getPropertyValue("--text-muted").trim() || "#5f6f82",
+        codeKeyword: root.getPropertyValue("--code-keyword").trim() || "#2153d6",
+        codeDef: root.getPropertyValue("--code-def").trim() || "#0f766e",
+        codeString: root.getPropertyValue("--code-string").trim() || "#b45309",
+        codeNumber: root.getPropertyValue("--code-number").trim() || "#b42318",
+        codeComment: root.getPropertyValue("--code-comment").trim() || "#6b7280",
+        codeAtom: root.getPropertyValue("--code-atom").trim() || "#7c3aed",
+        codeProperty: root.getPropertyValue("--code-property").trim() || "#0b6b7a",
+        codeVariable: root.getPropertyValue("--code-variable").trim() || "#0f172a",
+        codeOperator: root.getPropertyValue("--code-operator").trim() || "#6d28d9",
+        primary: root.getPropertyValue("--primary").trim() || "#2353d7",
+        primaryHover: root.getPropertyValue("--primary-hover").trim() || "#1b43ac",
+        danger: root.getPropertyValue("--danger").trim() || "#b9384a",
+        success: root.getPropertyValue("--success").trim() || "#0f766e",
+    };
+}
+
+function getSelectionSnapshotTokenColor(tokenType, colors) {
+    const type = String(tokenType || "");
+    if (type.includes("comment")) return colors.codeComment;
+    if (type.includes("string")) return colors.codeString;
+    if (type.includes("number")) return colors.codeNumber;
+    if (type.includes("keyword")) return colors.codeKeyword;
+    if (type.includes("def")) return colors.codeDef;
+    if (type.includes("atom")) return colors.codeAtom;
+    if (type.includes("property")) return colors.codeProperty;
+    if (type.includes("operator")) return colors.codeOperator;
+    if (type.includes("builtin")) return colors.codeAtom;
+    return colors.codeVariable;
+}
+
+function getSelectionSnapshotSegments(lineNo, startCh, endCh) {
+    const lineText = editor.getLine(lineNo) || "";
+    const segments = [];
+    let cursor = Math.max(0, startCh);
+    const safe_end = Math.max(cursor, Math.min(endCh, lineText.length));
+
+    if (cursor >= safe_end) {
+        return [{ text: "", type: "" }];
+    }
+
+    while (cursor < safe_end) {
+        const probe = Math.min(Math.max(cursor, 0), Math.max(0, lineText.length - 1));
+        const token = editor.getTokenAt({ line: lineNo, ch: probe });
+        let tokenStart = Math.max(cursor, Number(token.start) || 0);
+        let tokenEnd = Math.min(safe_end, Number(token.end) || (cursor + 1));
+
+        if (tokenEnd <= tokenStart) {
+            tokenEnd = Math.min(safe_end, cursor + 1);
+        }
+
+        segments.push({
+            text: lineText.slice(tokenStart, tokenEnd),
+            type: token.type || "",
+        });
+        cursor = tokenEnd;
+    }
+
+    return segments;
+}
+
+function measureSelectionSnapshotLineWidth(ctx, segments) {
+    return segments.reduce((total, segment) => total + ctx.measureText(segment.text || "").width, 0);
+}
+
+function roundRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+async function createSelectionSnapshotBlob(range) {
+    if (!editor || !range) return null;
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {}
+    }
+
+    const colors = getSelectionSnapshotThemeColors();
+    const editorWrapper = editor.getWrapperElement();
+    const computed = getComputedStyle(editorWrapper);
+    const fontFamily = computed.fontFamily || EDITOR_FONT_FAMILIES[localStorage.getItem("editorFontFamily") || "IBM Plex Mono"] || '"IBM Plex Mono", monospace';
+    const fontSize = Math.max(13, Math.min(18, Math.round(parseFloat(computed.fontSize) || 14)));
+    const lineHeight = Math.round(fontSize * 1.48);
+    const topBarHeight = 44;
+    const paddingX = 18;
+    const paddingTop = 14;
+    const paddingBottom = 14;
+    const lineGap = 8;
+    const codeFont = `${fontSize}px ${fontFamily}`;
+    const ctxMeasure = document.createElement("canvas").getContext("2d");
+    if (!ctxMeasure) return null;
+    ctxMeasure.font = codeFont;
+
+    const snapshotLines = [];
+    for (let lineNo = range.from.line; lineNo <= range.to.line; lineNo += 1) {
+        const startCh = lineNo === range.from.line ? range.from.ch : 0;
+        const originalLine = editor.getLine(lineNo) || "";
+        const endCh = lineNo === range.to.line ? range.to.ch : originalLine.length;
+        const segments = getSelectionSnapshotSegments(lineNo, startCh, endCh);
+        snapshotLines.push({
+            lineNumber: lineNo + 1,
+            segments,
+            width: measureSelectionSnapshotLineWidth(ctxMeasure, segments),
+        });
+    }
+
+    const lastLineNumber = snapshotLines[snapshotLines.length - 1].lineNumber;
+    const lineNumberDigits = Math.max(2, String(lastLineNumber).length);
+    const lineNumberWidth = Math.ceil(ctxMeasure.measureText("9".repeat(lineNumberDigits)).width) + 12;
+    const contentWidth = Math.max(240, Math.ceil(Math.max(...snapshotLines.map((item) => item.width), 0)));
+    const codeBlockWidth = Math.ceil(paddingX * 2 + lineNumberWidth + 14 + contentWidth);
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerLanguage = getLanguageLabel();
+    const headerTitle = "Code Snap";
+    const headerText = `${headerLanguage} • ${headerTitle}`;
+    ctxMeasure.font = `600 13px ${fontFamily}`;
+    const headerWidth = Math.ceil(108 + ctxMeasure.measureText(headerText).width + 22);
+    const width = Math.ceil(Math.max(codeBlockWidth, headerWidth));
+    const height = Math.ceil(topBarHeight + paddingTop + (snapshotLines.length * lineHeight) + paddingBottom + lineGap);
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = colors.surfaceMuted;
+    ctx.shadowColor = "rgba(15, 23, 42, 0.22)";
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+
+    ctx.fillStyle = colors.surface;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, height - 1, 18);
+    ctx.fill();
+
+    ctx.fillStyle = colors.surfaceMuted;
+    roundRectPath(ctx, 0.5, 0.5, width - 1, topBarHeight, 18);
+    ctx.fill();
+
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0.5, topBarHeight + 0.5);
+    ctx.lineTo(width - 0.5, topBarHeight + 0.5);
+    ctx.stroke();
+
+    const dotY = 22;
+    const dotX = 28;
+    const dots = [colors.danger, "#ffbf3c", "#31c55e"];
+    dots.forEach((color, index) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(dotX + index * 22, dotY, 6.25, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    ctx.fillStyle = colors.textMain;
+    ctx.font = `600 13px ${fontFamily}`;
+    ctx.fillText(headerText, 104, 27);
+
+    const codeTop = topBarHeight + paddingTop + 4;
+    const codeLeft = paddingX + lineNumberWidth + 14;
+
+    snapshotLines.forEach((line, index) => {
+        const y = codeTop + (index * lineHeight) + fontSize;
+        const lineNumberText = String(line.lineNumber);
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = colors.textMuted;
+        ctx.textAlign = "right";
+        ctx.fillText(lineNumberText, paddingX + lineNumberWidth - 2, y);
+        ctx.textAlign = "left";
+
+        let x = codeLeft;
+        line.segments.forEach((segment) => {
+            const segmentText = segment.text || "";
+            const segmentType = segment.type || "";
+            ctx.fillStyle = getSelectionSnapshotTokenColor(segmentType, colors);
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            ctx.fillText(segmentText, x, y);
+            x += ctx.measureText(segmentText).width;
+        });
+    });
+
+    return await new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+}
+
+async function copySelectionSnapshotToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) {
+        setSelectionToolbarStatus("Avval kodni belgilang", "error", true);
+        return false;
+    }
+
+    const blob = await createSelectionSnapshotBlob(range);
+    if (!blob) {
+        setSelectionToolbarStatus("Snapshot tayyorlanmadi", "error", true);
+        return false;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.write === "function" && typeof ClipboardItem !== "undefined") {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type || "image/png"]: blob,
+                }),
+            ]);
+            setSelectionToolbarStatus("Snap nusxalandi", "success", true);
+            return true;
+        }
+    } catch (error) {
+        // Fall through to text copy fallback.
+    }
+
+    const copiedText = await copySelectionTextToClipboard();
+    if (copiedText) {
+        setSelectionToolbarStatus("Matn nusxalandi", "warning", true);
+        return true;
+    }
+
+    setSelectionToolbarStatus("Nusxalash bo'lmadi", "error", true);
+    return false;
+}
+
+async function copySelectionTextToClipboard() {
+    const range = getSelectionToolbarSelection();
+    if (!range) return false;
+    const text = range.text;
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (error) {
+        // Fallback below.
+    }
+
+    const fallback = document.createElement("textarea");
+    fallback.value = text;
+    fallback.setAttribute("readonly", "readonly");
+    fallback.style.position = "fixed";
+    fallback.style.opacity = "0";
+    fallback.style.left = "-9999px";
+    fallback.style.top = "-9999px";
+    document.body.appendChild(fallback);
+    fallback.focus();
+    fallback.select();
+    let success = false;
+    try {
+        success = document.execCommand("copy");
+    } catch (_) {
+        success = false;
+    }
+    document.body.removeChild(fallback);
+    return success;
+}
+
+function bindSelectionToolbarEvents() {
+    const toolbar = getSelectionToolbarElement();
+    if (!toolbar || toolbar.dataset.bound === "1") return;
+
+    toolbar.dataset.bound = "1";
+    toolbar.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+    });
+
+    toolbar.addEventListener("click", async (event) => {
+        const button = event.target instanceof Element
+            ? event.target.closest("[data-selection-action]")
+            : null;
+        if (!button) return;
+
+        const action = button.getAttribute("data-selection-action");
+        if (action === "copy-snap") {
+            await copySelectionSnapshotToClipboard();
+        }
+    });
+}
+
+function setupEditor() {
+    const textArea = document.getElementById("code-editor");
+    if (!textArea) return;
+
+    currentLanguage = getStoredLanguage();
+    currentStarterPack = getStoredStarterPack();
+
+    editor = CodeMirror.fromTextArea(textArea, {
+        mode: getLanguageMode(currentLanguage),
+        theme: "eclipse",
+        lineNumbers: true,
+        indentUnit: getLanguageIndentUnit(currentLanguage),
+        smartIndent: true,
+        indentWithTabs: false,
+        lineWrapping: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        foldGutter: true,
+        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
+        extraKeys: {
+            "Ctrl-Enter": runCode,
+            "F5": runCode,
+            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
+            "Enter": "newlineAndIndent",
+            "Ctrl-S": saveCode,
+            "Ctrl-Shift-F": formatEditorCode,
+            "Tab": (cm) => {
+                if (cm.state.completionActive) return CodeMirror.Pass;
+                if (cm.somethingSelected()) cm.indentSelection("add");
+                else cm.replaceSelection(" ".repeat(getLanguageIndentUnit()));
+            },
+            "Shift-Tab": (cm) => cm.indentSelection("subtract")
+        },
+        hintOptions: {
+            completeSingle: false,
+            alignWithWord: true,
+            closeOnUnfocus: true
+        }
+    });
+    editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    const editorWrapper = editor.getWrapperElement();
+    editorWrapper.addEventListener("contextmenu", (event) => {
+        if (!editor || !editor.somethingSelected()) return;
+        event.preventDefault();
+        showSelectionToolbarAtPoint(event.clientX, event.clientY);
+    });
+
+    editor.on("inputRead", onEditorInputRead);
+    editor.on("cursorActivity", () => {
+        updateEditorStatus();
+        refreshSelectionToolbar();
+        dispatchEditorContextUpdate();
+    });
+    editor.on("scroll", refreshSelectionToolbar);
+    editor.on("change", () => {
+        updateEditorStatus();
+        autoSaveCode();
+        dispatchEditorContextUpdate();
+        refreshSelectionToolbar();
+    });
+
+    setupLanguageSelector();
+    setupStarterPackSelector();
+    loadTheme();
+    loadEditorTypographyPreferences();
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+    setupPanelResizer();
+    updateEditorStatus();
+    setEditorRuntimeMode("LOCAL");
+    syncLanguageSelector();
+    syncStarterPackSelector();
+    updateHeaderLanguageBranding(currentLanguage);
+    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
+    warmServerLocalRuntimeCatalog();
+    clearOutput({ preserveInput: false });
+    bindSelectionToolbarEvents();
+    refreshSelectionToolbar();
+}
+
+function updateEditorStatus() {
+    const cursor = editor.getCursor();
+    const primary = document.getElementById("editor-status-primary");
+    const secondary = document.getElementById("editor-status-secondary");
+    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
+}
+
+function getEditorAssistantContext() {
+    const output = document.getElementById("output");
+    const inputHost = document.getElementById("output-input-host");
+    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
+    const selection = editor ? editor.getSelection() : "";
+    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
+
+    return {
+        language: currentLanguage,
+        languageLabel: getLanguageLabel(),
+        starterPack: currentStarterPack,
+        starterPackLabel: getStarterPackLabel(),
+        code: editor ? editor.getValue() : "",
+        outputText: output ? output.textContent || "" : "",
+        selectedText: selection || "",
+        cursorLine: cursor.line + 1,
+        cursorColumn: cursor.ch + 1,
+        lineCount: editor ? editor.lineCount() : 0,
+        isDarkMode: document.body.classList.contains("dark-mode"),
+        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
+        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
+    };
+}
+
+function dispatchEditorContextUpdate() {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
+        detail: getEditorAssistantContext(),
+    }));
+}
+
+function highlightEditorError(line, column = 1) {
+    clearEditorDiagnostics();
+    if (!editor || !line || line > editor.lineCount()) return;
+    const idx = line - 1;
+    const ch = Math.max(0, (Number(column) || 1) - 1);
+    activeDebugLineNumber = idx;
+    editor.addLineClass(idx, "background", "error-line");
+    editor.setCursor({ line: idx, ch });
+    editor.scrollIntoView({ line: idx, ch }, 100);
+}
+
+function clearEditorDiagnostics() {
+    if (activeDebugLineNumber !== null && editor) {
+        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
+        activeDebugLineNumber = null;
+    }
+}
+
+function clearOutputInputHost({ preserveValue = true } = {}) {
+    const input = getInputPanelElement();
+    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
+        saveInputDraft(currentLanguage, input.value, currentStarterPack);
+    }
+    const host = document.getElementById("output-input-host");
+    if (host) {
+        host.className = "output-input-host";
+        host.innerHTML = "";
+    }
+    dispatchEditorContextUpdate();
+}
+
+function clearOutput({ preserveInput = true } = {}) {
+    const output = document.getElementById("output");
+    if (output) {
+        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
+        output.className = "output-content";
+    }
+    pendingRemoteRun = null;
+    clearEditorDiagnostics();
+    clearOutputInputHost({ preserveValue: preserveInput });
+    dispatchEditorContextUpdate();
+}
+
+function showOutput(text, type) {
+    const output = document.getElementById("output");
+    if (!output) return;
+    output.textContent = text;
+    output.className = type ? "output-content " + type : "output-content";
+    scrollOutputToLatest();
+    dispatchEditorContextUpdate();
+}
+
+function saveCode() {
+    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
+    setTimeout(clearOutput, 2000);
+}
+
+function loadCode() {
+    const code = getStoredCode(currentLanguage, currentStarterPack);
+    editor.setValue(code);
+    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
+}
+
+function downloadCode() {
+    const ext = getLanguageFileExtension(currentLanguage);
+    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function uploadFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (currentStarterPack !== "array") {
+            setEditorLanguage(currentStarterPack, { persistCurrent: true });
+        }
+        editor.setValue(String(e.target.result || ""));
+        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
+    };
+    reader.readAsText(file);
+}
+
+function autoSaveCode() {
+    saveAutoCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
+}
+
+function loadAutoSavedCode() {
+    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
+}
+
+async function formatEditorCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
+        return;
+    }
+    if (!pyodide) {
+        showOutput("Python muhiti ishga tushirilmoqda...", "warning");
+        try {
+            await ensurePyodideLoaded();
+        } catch (e) {
+            return showOutput("Python yuklanmadi.", "error");
+        }
+    }
+    if (!isFormatterLoaded) {
+        showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
+        await ensurePythonRuntimeTools();
+        isFormatterLoaded = true;
+    }
+    showOutput("Formatlanmoqda...", "");
+    pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`)
+        .then((res) => {
+            const result = JSON.parse(res);
+            if (result.formatterAvailable) {
+                editor.setValue(result.code);
+                showOutput("OK: Kod formatlandi.", "success");
+            } else {
+                showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
+            }
+            setTimeout(clearOutput, 2000);
+        })
+        .catch((error) => {
+            showOutput("Xatolik: " + error.message, "error");
+        });
+}
+
+function debugCode() {
+    if (currentLanguage !== "python") {
+        showOutput("Debug rejimi hozircha faqat Python uchun mavjud.", "");
+        return;
+    }
+    showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", "");
+}
+
+function clearDebugState() {
+    activeDebugSession = null;
+    activeDebugSteps = [];
+    activeDebugStepIndex = 0;
+}
+
+function continueDebugSession() {
+    showOutput("Debug rejimi hozircha tayyor emas.", "");
+    activeDebugSession = null;
+}
+
+// --- AUTOCOMPLETE
+
+// Preload Python environment and tools as soon as the editor is initialized
+async function preloadPythonEnvironment() {
+    const loading = document.getElementById("loading");
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python vositalari yuklanmoqda...";
+    }
+
+    try {
+        // Start loading Pyodide in the background
+        const pyodidePromise = loadPyodide();
+
+        // Load Python runtime tools in the background
+        pyodidePromise.then(async (loadedPyodide) => {
+            pyodide = loadedPyodide;
+            if (loading) loading.textContent = "Python vositalari sozlanmoqda...";
+
+            await ensurePythonRuntimeTools();
+            await setupSafeExecutionEnvironment();
+
+            if (loading) {
+                loading.textContent = "Python tayyor!";
+                setTimeout(() => {
+                    loading.classList.remove("active");
+                }, 1500);
+            }
+        });
+    } catch (error) {
+        if (loading) {
+            loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
+            loading.style.background = "#fee2e2";
+            loading.style.color = "#991b1b";
+        }
+        console.error("Error loading Python environment:", error);
+    }
+}
+
+// Call the preload function when the editor is initialized
+window.addEventListener("load", () => {
+    preloadPythonEnvironment();
 });
