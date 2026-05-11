@@ -11,7 +11,7 @@ from jose import JWTError, jwt
 import logging
 import bcrypt
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -34,6 +34,19 @@ security = HTTPBearer(auto_error=False)
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> User:
     if credentials is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    try:
+        blacklisted = db.execute(
+            text("SELECT 1 FROM token_blacklist WHERE token = :token"),
+            {"token": credentials.credentials}
+        ).fetchone()
+        if blacklisted:
+            raise HTTPException(status_code=401, detail="Token has been revoked (logged out)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Blacklist check failed: %s", e)
+
     try:
         from app.api.routes.auth import ALGORITHM, SECRET_KEY
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
@@ -663,7 +676,7 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)) ->
 
 
 @router.post("/logout")
-def logout(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> dict:
+def logout(credentials: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)) -> dict:
     """
     Logout endpoint that validates the token and returns success.
     Frontend should handle token removal from localStorage.
@@ -674,10 +687,27 @@ def logout(credentials: HTTPAuthorizationCredentials | None = Depends(security))
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("user_id")
         username: str | None = payload.get("username") or payload.get("sub")
+        exp = payload.get("exp")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     if not (user_id or username):
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        if exp:
+            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+        else:
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+        db.execute(
+            text("INSERT INTO token_blacklist (token, expires_at) VALUES (:token, :expires_at) ON CONFLICT DO NOTHING"),
+            {"token": credentials.credentials, "expires_at": expires_at}
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error("Failed to blacklist token: %s", e)
+
     return {"message": "Successfully logged out"}
 
 

@@ -4486,13 +4486,20 @@ function renderOutputPanelInput(prompt, index) {
     scrollOutputToLatest();
 }
 
-function formatEditorCode() {
+let isFormatterLoaded = false;
+
+async function formatEditorCode() {
     if (currentLanguage !== "python") {
         showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
         return;
     }
     if (!pyodide) return showOutput("Python yuklanmagan.", "error");
     const code = editor.getValue();
+    if (!isFormatterLoaded) {
+        showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
+        await ensurePythonRuntimeTools();
+        isFormatterLoaded = true;
+    }
     showOutput("Formatlanmoqda...", "");
     pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`)
         .then((res) => {

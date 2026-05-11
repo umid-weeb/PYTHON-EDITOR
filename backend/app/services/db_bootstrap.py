@@ -149,6 +149,13 @@ POSTGRES_BOOTSTRAP_SQL = [
     WHERE google_sub IS NOT NULL;
     """,
     """
+    CREATE TABLE IF NOT EXISTS token_blacklist (
+        token TEXT PRIMARY KEY,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
+    """
     CREATE TABLE IF NOT EXISTS user_stats (
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       solved_count INTEGER NOT NULL DEFAULT 0,
@@ -392,6 +399,9 @@ POSTGRES_BOOTSTRAP_SQL = [
     ALTER TABLE submissions ADD COLUMN IF NOT EXISTS external_submission_id TEXT;
     """,
     """
+    ALTER TABLE submissions ALTER COLUMN external_submission_id DROP NOT NULL;
+    """,
+    """
     ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(120);
     """,
     """
@@ -582,6 +592,15 @@ POSTGRES_BOOTSTRAP_SQL = [
     """,
     """
     CREATE INDEX IF NOT EXISTS idx_problem_comments_parent ON problem_comments(parent_id);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_user_stats_rating_solved ON user_stats(rating DESC, solved_count DESC);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_submissions_composite_stats ON submissions(problem_id, mode, status);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_problems_difficulty ON problems(difficulty);
     """,
 ]
 

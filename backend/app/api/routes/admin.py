@@ -4,6 +4,7 @@ Faqat is_admin=True foydalanuvchilar uchun.
 """
 from __future__ import annotations
 
+import os
 import json
 import logging
 import re
@@ -27,7 +28,7 @@ logger = logging.getLogger("pyzone.arena.admin")
 # ---------------------------------------------------------------------------
 # Admin panel default password (bcrypt-hashed on first use)
 # ---------------------------------------------------------------------------
-_DEFAULT_ADMIN_PASSWORD = "11092009"
+_DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "pyzone_changeme123")
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
