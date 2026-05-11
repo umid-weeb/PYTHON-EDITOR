@@ -1895,31 +1895,46 @@ function createIdentifierOverlay() {
     };
 }
 
-async function initPyodide() {
+let pyodideLoadingPromise = null;
+
+async function ensurePyodideLoaded() {
+    if (pyodide) return pyodide;
+    if (pyodideLoadingPromise) return pyodideLoadingPromise;
+
     const loading = document.getElementById("loading");
-    if (!loading) return;
-
-    loading.classList.add("active");
-    loading.textContent = "Python vositalari yuklanmoqda...";
-
-    try {
-        pyodide = await loadPyodide();
-        await ensurePythonRuntimeTools();
-        loading.textContent = "Python muhiti tayyorlanmoqda...";
-        await setupSafeExecutionEnvironment();
-        loading.textContent = "Python tayyor!";
-        setTimeout(() => {
-            loading.classList.remove("active");
-        }, 1500);
-    } catch (error) {
-        console.warn("Python muhiti yuklanmadi:", error);
-        loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
-        loading.style.background = "#fef3c7";
-        loading.style.color = "#92400e";
-        setTimeout(() => {
-            loading.classList.remove("active");
-        }, 2500);
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
     }
+
+    pyodideLoadingPromise = (async () => {
+        try {
+            // Brauzer qotmasligi uchun ozgina pauza beramiz
+            await new Promise(r => setTimeout(r, 50));
+            pyodide = await loadPyodide();
+            
+            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
+            await new Promise(r => setTimeout(r, 50));
+            await setupSafeExecutionEnvironment();
+            
+            if (loading) {
+                loading.textContent = "Python tayyor!";
+                setTimeout(() => loading.classList.remove("active"), 1500);
+            }
+            return pyodide;
+        } catch (error) {
+            console.warn("Python muhiti yuklanmadi:", error);
+            if (loading) {
+                loading.textContent = "Xatolik: Python yuklanmadi.";
+                loading.style.background = "#fee2e2";
+                loading.style.color = "#991b1b";
+                setTimeout(() => loading.classList.remove("active"), 4000);
+            }
+            throw error;
+        }
+    })();
+
+    return pyodideLoadingPromise;
 }
 
 function syncLanguageSelector() {
@@ -4368,7 +4383,14 @@ async function runCode() {
     }
 
     if (config.supportsLocalRun) {
-        if (!pyodide) return showOutput("Python yuklanmoqda...", "error");
+        if (!pyodide) {
+            showOutput("Python muhiti ishga tushirilmoqda, iltimos kuting...", "warning");
+            try {
+                await ensurePyodideLoaded();
+            } catch (e) {
+                return showOutput("Python yuklanmadi. Iltimos sahifani yangilang.", "error");
+            }
+        }
         activeRunSession = { code, inputValues: splitInputLines(stdinText) };
         setEditorRuntimeMode("LOCAL");
         showOutput("Bajarilmoqda...", "");
@@ -4493,7 +4515,14 @@ async function formatEditorCode() {
         showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
         return;
     }
-    if (!pyodide) return showOutput("Python yuklanmagan.", "error");
+    if (!pyodide) {
+        showOutput("Python muhiti ishga tushirilmoqda...", "warning");
+        try {
+            await ensurePyodideLoaded();
+        } catch (e) {
+            return showOutput("Python yuklanmadi.", "error");
+        }
+    }
     const code = editor.getValue();
     if (!isFormatterLoaded) {
         showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
@@ -4598,5 +4627,4 @@ window.pyzoneEditorAssistant = {
 
 window.addEventListener("DOMContentLoaded", () => {
     setupEditor();
-    initPyodide();
 });
