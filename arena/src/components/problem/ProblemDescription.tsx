@@ -5,8 +5,12 @@ import DiscussionTab from "./DiscussionTab.js";
 import { API_BASE_URL, arenaApi } from "../../lib/apiClient.js";
 
 function buildWsUrl(slug: string) {
-  const base = API_BASE_URL.replace(/^http/, "ws") || `ws://${window.location.host}`;
-  return `${base}/ws/problems/${encodeURIComponent(slug)}/presence`;
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  if (API_BASE_URL) {
+    const base = API_BASE_URL.replace(/^https/, "wss").replace(/^http(?!s)/, "ws");
+    return `${base}/ws/problems/${encodeURIComponent(slug)}/presence`;
+  }
+  return `${proto}//${window.location.host}/ws/problems/${encodeURIComponent(slug)}/presence`;
 }
 
 type VisibleTestcase = {
@@ -69,18 +73,23 @@ export default function ProblemDescription({ problem, loading, embedded = false,
       if (res?.view_count != null) setViewCount(res.view_count);
     }).catch(() => {});
 
-    const ws = new WebSocket(buildWsUrl(slug));
-    wsRef.current = ws;
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.count != null) setLiveCount(msg.count);
-      } catch {}
-    };
-    ws.onerror = () => {};
-    ws.onclose = () => {};
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(buildWsUrl(slug));
+      wsRef.current = ws;
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.count != null) setLiveCount(msg.count);
+        } catch {}
+      };
+      ws.onerror = () => {};
+      ws.onclose = () => {};
+    } catch {
+      // WebSocket blocked (CSP / mixed content) — live count stays at 1
+    }
 
-    return () => { ws.close(); };
+    return () => { try { ws?.close(); } catch {} };
   }, [problem?.slug, problem?.id]);
 
   if (loading) {
