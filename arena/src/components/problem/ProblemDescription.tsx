@@ -71,7 +71,9 @@ export default function ProblemDescription({ problem, loading, embedded = false,
     }).catch(() => {});
 
     // Heartbeat: announce presence + get live count + refresh view count
+    // Only fires when tab is visible → minimizes server load
     function sendHeartbeat() {
+      if (document.visibilityState === "hidden") return;
       arenaApi.heartbeat(slug, clientId).then((res: any) => {
         if (res?.active_users != null) setLiveCount(res.active_users);
         if (res?.view_count != null) setViewCount(res.view_count);
@@ -79,8 +81,16 @@ export default function ProblemDescription({ problem, loading, embedded = false,
     }
 
     sendHeartbeat();
-    const timer = setInterval(sendHeartbeat, 15000);
-    return () => clearInterval(timer);
+    const timer = setInterval(sendHeartbeat, 30000);
+
+    // Resume immediately when tab becomes visible again
+    const onVisible = () => { if (document.visibilityState === "visible") sendHeartbeat(); };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [problem?.slug, problem?.id]);
 
   if (loading) {
