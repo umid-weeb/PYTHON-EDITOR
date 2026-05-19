@@ -20,10 +20,16 @@ from app.services.problem_service import (
 )
 from app.repositories.submission_tracking import submission_tracking_repository
 from app.services.ws_manager import problem_presence_manager
-
+import time
+import threading
 
 router = APIRouter(tags=["problems"])
 ws_router = APIRouter(tags=["WebSockets"])
+
+# In-memory presence tracker: {slug: {client_id: last_seen_epoch}}
+_presence: dict[str, dict[str, float]] = {}
+_presence_lock = threading.Lock()
+_SESSION_TTL = 35  # seconds — clients heartbeat every 15s
 logger = logging.getLogger("pyzone.arena.problems")
 
 
@@ -456,6 +462,30 @@ def toggle_like(
     ).fetchone().likes
 
     return {"liked": liked, "likes": new_likes}
+
+
+def _active_count(slug: str) -> int:
+    now = time.time()
+    with _presence_lock:
+        sessions = _presence.get(slug, {})
+        active = {cid: ts for cid, ts in sessions.items() if now - ts < _SESSION_TTL}
+        _presence[slug] = active
+        return len(active)
+
+
+@router.post("/problems/{problem_slug}/heartbeat")
+def heartbeat(problem_slug: str, client_id: str = Query(...), db: Session = Depends(get_db)):
+    now = time.time()
+    with _presence_lock:
+        if problem_slug not in _presence:
+            _presence[problem_slug] = {}
+        _presence[problem_slug][client_id] = now
+    active = _active_count(problem_slug)
+    row = db.execute(
+        _text("SELECT view_count FROM problems WHERE slug = :slug"),
+        {"slug": problem_slug},
+    ).fetchone()
+    return {"active_users": active, "view_count": row.view_count if row else 0}
 
 
 @router.post("/problems/{problem_slug}/view")

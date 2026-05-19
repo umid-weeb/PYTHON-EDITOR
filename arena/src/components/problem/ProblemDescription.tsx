@@ -2,15 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { formatProblemTitle, localizeDifficultyLabel } from "../../lib/problemPresentation.js";
 import DiscussionTab from "./DiscussionTab.js";
-import { API_BASE_URL, arenaApi } from "../../lib/apiClient.js";
+import { arenaApi } from "../../lib/apiClient.js";
 
-function buildWsUrl(slug: string) {
-  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  if (API_BASE_URL) {
-    const base = API_BASE_URL.replace(/^https/, "wss").replace(/^http(?!s)/, "ws");
-    return `${base}/ws/problems/${encodeURIComponent(slug)}/presence`;
-  }
-  return `${proto}//${window.location.host}/ws/problems/${encodeURIComponent(slug)}/presence`;
+function makeClientId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 type VisibleTestcase = {
@@ -59,7 +54,7 @@ export default function ProblemDescription({ problem, loading, embedded = false,
   const [activeTab, setActiveTab] = useState<TabId>("description");
   const [viewCount, setViewCount] = useState(problem?.view_count ?? 0);
   const [liveCount, setLiveCount] = useState(1);
-  const wsRef = useRef<WebSocket | null>(null);
+  const clientIdRef = useRef<string>(makeClientId());
 
   useEffect(() => {
     setViewCount(problem?.view_count ?? 0);
@@ -68,28 +63,24 @@ export default function ProblemDescription({ problem, loading, embedded = false,
   useEffect(() => {
     const slug = problem?.slug || problem?.id || "";
     if (!slug) return;
+    const clientId = clientIdRef.current;
 
+    // Record view on open
     arenaApi.recordView(slug).then((res: any) => {
       if (res?.view_count != null) setViewCount(res.view_count);
     }).catch(() => {});
 
-    let ws: WebSocket | null = null;
-    try {
-      ws = new WebSocket(buildWsUrl(slug));
-      wsRef.current = ws;
-      ws.onmessage = (e) => {
-        try {
-          const msg = JSON.parse(e.data);
-          if (msg.count != null) setLiveCount(msg.count);
-        } catch {}
-      };
-      ws.onerror = () => {};
-      ws.onclose = () => {};
-    } catch {
-      // WebSocket blocked (CSP / mixed content) — live count stays at 1
+    // Heartbeat: announce presence + get live count + refresh view count
+    function sendHeartbeat() {
+      arenaApi.heartbeat(slug, clientId).then((res: any) => {
+        if (res?.active_users != null) setLiveCount(res.active_users);
+        if (res?.view_count != null) setViewCount(res.view_count);
+      }).catch(() => {});
     }
 
-    return () => { try { ws?.close(); } catch {} };
+    sendHeartbeat();
+    const timer = setInterval(sendHeartbeat, 15000);
+    return () => clearInterval(timer);
   }, [problem?.slug, problem?.id]);
 
   if (loading) {

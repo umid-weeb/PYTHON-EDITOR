@@ -175,6 +175,9 @@ export const arenaApi = {
   recordView(problemSlug) {
     return request(`/api/problems/${encodeURIComponent(problemSlug)}/view`, { method: "POST" });
   },
+  heartbeat(problemSlug, clientId) {
+    return request(`/api/problems/${encodeURIComponent(problemSlug)}/heartbeat?client_id=${encodeURIComponent(clientId)}`, { method: "POST" });
+  },
 };
 
 export const userApi = {
