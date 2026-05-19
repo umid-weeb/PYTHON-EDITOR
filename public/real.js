@@ -551,13 +551,6 @@ const LEGACY_STARTER_SIGNATURES = {
     ],
 };
 
-function isLegacyStarterCode(language, code) {
-    const normalizedLanguage = normalizeLanguage(language);
-    const normalizedCode = String(code || "").replace(/\r\n/g, "\n");
-    const signatures = LEGACY_STARTER_SIGNATURES[normalizedLanguage] || [];
-    return signatures.length > 0 && signatures.every((fragment) => normalizedCode.includes(fragment));
-}
-
 const LANGUAGE_STARTER_CODES = {
     python: {
         array: LANGUAGE_CONFIGS.python.defaultCode,
@@ -1171,14 +1164,6 @@ function scrollEditorToCursor() {
     }
 }
 
-function clearOutputInputHost() {
-    const host = document.getElementById("output-input-host");
-    if (host) {
-        host.className = "output-input-host";
-        host.innerHTML = "";
-    }
-}
-
 function getPanelSplitStorageKey(stacked) {
     return stacked ? "editorPanelSplitMobileRatio" : "editorPanelSplitDesktopRatio";
 }
@@ -1374,6 +1359,18 @@ def _tick():
     if time.time() - _executor.start_time > _executor.timeout:
         raise LoopIterationError("Vaqt chegarasi tugadi (1s). Cheksiz sikl bo'lishi mumkin.")
 
+ALLOWED_IMPORTS = {
+    "math", "cmath", "decimal", "fractions", "random", "statistics",
+    "itertools", "functools", "operator", "collections", "heapq", "bisect",
+    "string", "re", "json", "copy", "pprint", "enum", "dataclasses",
+    "typing", "abc", "io", "datetime",
+}
+
+def _blocked_import(name, *args, **kwargs):
+    if name in ALLOWED_IMPORTS:
+        return __import__(name, *args, **kwargs)
+    raise ImportError(f"'{name}' modulini import qilishga ruxsat yo'q.")
+
 class SafeExecutor:
     def __init__(self, timeout=1.0):
         self.timeout = timeout
@@ -1419,8 +1416,32 @@ class SafeExecutor:
             ast.fix_missing_locations(tree)
             compiled = compile(tree, filename="<user_code>", mode="exec")
             
-            self.start_time = time.time() # Corrected time.now to time.time
-            glbs = {"__builtins__": dict(vars(builtins), input=m_input), "__name__": "__main__", "_tick": _tick}
+            self.start_time = time.time()
+            safe_builtins = {
+                name: getattr(builtins, name)
+                for name in [
+                    "abs", "all", "any", "ascii", "bin", "bool", "bytearray", "bytes",
+                    "callable", "chr", "complex", "dict", "dir", "divmod", "enumerate",
+                    "filter", "float", "format", "frozenset", "getattr", "hasattr", "hash",
+                    "hex", "id", "int", "isinstance", "issubclass", "iter", "len", "list",
+                    "locals", "map", "max", "min", "next", "object", "oct", "ord", "pow",
+                    "print", "range", "repr", "reversed", "round", "set", "setattr",
+                    "slice", "sorted", "str", "sum", "super", "tuple", "type", "vars",
+                    "zip", "True", "False", "None",
+                    "ArithmeticError", "AssertionError", "AttributeError", "EOFError",
+                    "Exception", "FloatingPointError", "GeneratorExit", "IOError",
+                    "ImportError", "IndexError", "KeyError", "KeyboardInterrupt",
+                    "LookupError", "MemoryError", "NameError", "NotImplementedError",
+                    "OSError", "OverflowError", "RecursionError", "RuntimeError",
+                    "StopIteration", "SyntaxError", "SystemExit", "TypeError",
+                    "UnboundLocalError", "UnicodeError", "ValueError", "ZeroDivisionError",
+                    "__build_class__", "__name__",
+                ]
+                if hasattr(builtins, name)
+            }
+            safe_builtins["input"] = m_input
+            safe_builtins["__import__"] = _blocked_import
+            glbs = {"__builtins__": safe_builtins, "__name__": "__main__", "_tick": _tick}
             exec(compiled, glbs)
             return {"success": True, "output": sys.stdout.getvalue().rstrip()}
         except AwaitingInput as e:
@@ -1443,365 +1464,8 @@ def auto_fix_code(code):
     `);
 }
 
-// --- CORE FUNCTIONS ---
-
-async function runCode() {
-    if (!pyodide) return showOutput("Python yuklanmoqda...", "error");
-    const code = editor.getValue();
-    if (!code.trim()) return showOutput("Kod kiritilmagan.", "error");
-
-    clearDebugState();
-    activeRunSession = { code, inputValues: [] };
-    showOutput("Bajarilmoqda...", "");
-    await continueRunSession();
-}
-
-async function continueRunSession() {
-    if (!activeRunSession) return;
-    const start = performance.now();
-    try {
-        const res = await pyodide.runPythonAsync(`import json; json.dumps(safe_run(${JSON.stringify(activeRunSession.code)}, ${JSON.stringify(activeRunSession.inputValues)}))`);
-        const result = JSON.parse(res);
-        const time = ((performance.now() - start) / 1000).toFixed(3);
-
-        if (result.awaitingInput) {
-            showOutput(result.output ? result.output + "\n..." : "Input kutilmoqda...", "");
-            renderOutputPanelInput(result.error.prompt, result.error.inputIndex);
-            return;
-        }
-
-        const runCode = activeRunSession ? activeRunSession.code : editor.getValue();
-        activeRunSession = null;
-        if (!result.success) {
-            highlightEditorError(result.error.line, result.error.column || 1);
-            const friendly = translatePythonError(result.error.type, result.error.message);
-            const codeLine = result.error.codeLine || getCodeLineAt(runCode, result.error.line);
-            showOutput(buildCompactErrorMessage({
-                title: friendly.title,
-                summary: friendly.summary,
-                line: result.error.line,
-                codeLine,
-                column: result.error.column || null,
-                tips: [...new Set(friendly.tips)],
-                durationSeconds: time,
-            }), "error");
-        } else {
-            clearEditorDiagnostics();
-            showOutput(`${result.output || "Muvaffaqiyatli bajarildi."}\n\nVaqt: ${time}s`, "success");
-        }
-    } catch (e) {
-        showOutput("Xatolik: " + e.message, "error");
-    }
-}
-
-function renderOutputPanelInput(prompt, index) {
-    const host = document.getElementById("output-input-host");
-    if (!host) return;
-    host.className = "output-input-host active";
-    host.innerHTML = `
-        <div class="output-input-label">${escapeHtml(prompt || "Qiymat kiriting:")}</div>
-        <div class="output-input-row">
-            <input type="text" id="output-panel-input" class="output-input-field" autocomplete="off" />
-            <button id="output-panel-submit" class="output-input-submit">Yuborish</button>
-        </div>`;
-    
-    const input = document.getElementById("output-panel-input");
-    const submitBtn = document.getElementById("output-panel-submit");
-
-    const submit = () => {
-        const val = input.value;
-        if (activeRunSession) activeRunSession.inputValues.push(val);
-        else if (activeDebugSession) activeDebugSession.inputValues.push(val);
-        clearOutputInputHost();
-        if (activeRunSession) continueRunSession();
-        else if (activeDebugSession) continueDebugSession();
-    };
-
-    submitBtn.onclick = submit;
-    input.onkeydown = (e) => { if (e.key === "Enter") submit(); };
-    input.focus();
-    scrollOutputToLatest();
-    dispatchEditorContextUpdate();
-}
-
-// --- EDITOR SETUP ---
-
-function setupEditor() {
-    const textArea = document.getElementById("code-editor");
-    if (!textArea) return;
-
-    currentLanguage = getStoredLanguage();
-    currentStarterPack = getStoredStarterPack();
-
-    editor = CodeMirror.fromTextArea(textArea, {
-        mode: getLanguageMode(currentLanguage),
-        theme: "eclipse",
-        lineNumbers: true,
-        indentUnit: getLanguageIndentUnit(currentLanguage),
-        smartIndent: true,
-        indentWithTabs: false,
-        lineWrapping: true,
-        matchBrackets: true,
-        autoCloseBrackets: true,
-        styleActiveLine: true,
-        foldGutter: true,
-        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", "breakpoints"],
-        extraKeys: {
-            "Ctrl-Enter": runCode,
-            "F5": runCode,
-            "Ctrl-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
-            "Cmd-Shift-C": (cm) => { void copySelectionSnapshotToClipboard(); },
-            "Enter": "newlineAndIndent",
-            "Ctrl-S": saveCode,
-            "Ctrl-Shift-F": formatEditorCode,
-            "Tab": (cm) => {
-                if (cm.state.completionActive) return CodeMirror.Pass;
-                if (cm.somethingSelected()) cm.indentSelection("add");
-                else cm.replaceSelection("    ");
-            },
-            "Shift-Tab": (cm) => cm.indentSelection("subtract")
-        },
-        hintOptions: {
-            completeSingle: false,
-            alignWithWord: true,
-            closeOnUnfocus: true
-        }
-    });
-    editor.addOverlay(createIdentifierOverlay(), { combine: true });
-
-    const editorWrapper = editor.getWrapperElement();
-    editorWrapper.addEventListener("contextmenu", (event) => {
-        if (!editor || !editor.somethingSelected()) return;
-        event.preventDefault();
-        showSelectionToolbarAtPoint(event.clientX, event.clientY);
-    });
-
-    editor.on("inputRead", onEditorInputRead);
-    editor.on("cursorActivity", () => {
-        updateEditorStatus();
-        refreshSelectionToolbar();
-        dispatchEditorContextUpdate();
-    });
-    editor.on("scroll", refreshSelectionToolbar);
-    editor.on("change", () => {
-        updateEditorStatus();
-        autoSaveCode();
-        dispatchEditorContextUpdate();
-        refreshSelectionToolbar();
-    });
-
-    setupLanguageSelector();
-    setupStarterPackSelector();
-    loadTheme();
-    loadEditorTypographyPreferences();
-    editor.setValue(getStoredCode(currentLanguage, currentStarterPack));
-    setupPanelResizer();
-    updateEditorStatus();
-    setEditorRuntimeMode("LOCAL");
-    syncLanguageSelector();
-    syncStarterPackSelector();
-    updateHeaderLanguageBranding(currentLanguage);
-    scheduleEditorRuntimeWarmup(currentLanguage, currentStarterPack, editor.getValue());
-    warmServerLocalRuntimeCatalog();
-    clearOutput({ preserveInput: false });
-    bindSelectionToolbarEvents();
-    refreshSelectionToolbar();
-}
-
-function updateEditorStatus() {
-    const cursor = editor.getCursor();
-    const primary = document.getElementById("editor-status-primary");
-    const secondary = document.getElementById("editor-status-secondary");
-    if (primary) primary.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
-    if (secondary) secondary.textContent = `${getLanguageStatusLabel()} | UTF-8 | Spaces: ${getLanguageIndentUnit()}`;
-}
-
-function getEditorAssistantContext() {
-    const output = document.getElementById("output");
-    const inputHost = document.getElementById("output-input-host");
-    const inputLabel = inputHost ? inputHost.querySelector(".output-input-label") : null;
-    const selection = editor ? editor.getSelection() : "";
-    const cursor = editor ? editor.getCursor() : { line: 0, ch: 0 };
-
-    return {
-        language: currentLanguage,
-        languageLabel: getLanguageLabel(),
-        starterPack: currentStarterPack,
-        starterPackLabel: getStarterPackLabel(),
-        code: editor ? editor.getValue() : "",
-        outputText: output ? output.textContent || "" : "",
-        selectedText: selection || "",
-        cursorLine: cursor.line + 1,
-        cursorColumn: cursor.ch + 1,
-        lineCount: editor ? editor.lineCount() : 0,
-        isDarkMode: document.body.classList.contains("dark-mode"),
-        consoleInputActive: Boolean(inputHost && inputHost.classList.contains("active")),
-        consoleInputPrompt: inputLabel ? inputLabel.textContent || "" : "",
-    };
-}
-
-function dispatchEditorContextUpdate() {
-    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
-    window.dispatchEvent(new CustomEvent("pyzone-editor-context-changed", {
-        detail: getEditorAssistantContext(),
-    }));
-}
-
-function highlightEditorError(line, column = 1) {
-    clearEditorDiagnostics();
-    if (!editor || !line || line > editor.lineCount()) return;
-    const idx = line - 1;
-    const ch = Math.max(0, (Number(column) || 1) - 1);
-    activeDebugLineNumber = idx;
-    editor.addLineClass(idx, "background", "error-line");
-    editor.setCursor({ line: idx, ch });
-    editor.scrollIntoView({ line: idx, ch }, 100);
-}
-
-function clearEditorDiagnostics() {
-    if (activeDebugLineNumber !== null && editor) {
-        editor.removeLineClass(activeDebugLineNumber, "background", "error-line");
-        activeDebugLineNumber = null;
-    }
-}
-
-function clearOutputInputHost({ preserveValue = true } = {}) {
-    const input = getInputPanelElement();
-    if (preserveValue && input && typeof input.value === "string" && input.value.length) {
-        saveInputDraft(currentLanguage, input.value, currentStarterPack);
-    }
-    const host = document.getElementById("output-input-host");
-    if (host) {
-        host.className = "output-input-host";
-        host.innerHTML = "";
-    }
-    dispatchEditorContextUpdate();
-}
-
-function clearOutput({ preserveInput = true } = {}) {
-    const output = document.getElementById("output");
-    if (output) {
-        output.textContent = getLanguageOutputPlaceholder(currentLanguage, currentStarterPack);
-        output.className = "output-content";
-    }
-    pendingRemoteRun = null;
-    clearEditorDiagnostics();
-    clearOutputInputHost({ preserveValue: preserveInput });
-    dispatchEditorContextUpdate();
-}
-
-function showOutput(text, type) {
-    const output = document.getElementById("output");
-    if (!output) return;
-    output.textContent = text;
-    output.className = type ? "output-content " + type : "output-content";
-    scrollOutputToLatest();
-    dispatchEditorContextUpdate();
-}
-
-function saveCode() {
-    saveCodeSnapshot(currentLanguage, editor.getValue(), currentStarterPack);
-    showOutput(`✅ ${getLanguageLabel()} kodi saqlandi.`, "success");
-    setTimeout(clearOutput, 2000);
-}
-
-function loadCode() {
-    const code = getStoredCode(currentLanguage, currentStarterPack);
-    editor.setValue(code);
-    showOutput(`✅ ${getLanguageLabel()} kodi yuklandi.`, "success");
-}
-
-function downloadCode() {
-    const ext = getLanguageFileExtension(currentLanguage);
-    const blob = new Blob([editor.getValue()], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `main_${currentLanguage}_${Date.now()}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function uploadFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        if (currentStarterPack !== "array") {
-            setEditorLanguage(currentStarterPack, { persistCurrent: true });
-        }
-        editor.setValue(String(e.target.result || ""));
-        showOutput(`OK: Fayl yuklandi: ${file.name}`, "success");
-    };
-    reader.readAsText(file);
-}
-
-function autoSaveCode() {
-    localStorage.setItem("pythonAutoSave", JSON.stringify({
-        code: editor.getValue(),
-        lastSaved: Date.now()
-    }));
-}
-
-function loadAutoSavedCode() {
-    const data = localStorage.getItem("pythonAutoSave");
-    if (data) {
-        try {
-            const parsed = JSON.parse(data);
-            if (parsed.code) editor.setValue(parsed.code);
-        } catch(e) {}
-    }
-}
-
-async function formatEditorCode() {
-    if (!pyodide) return showOutput("Python yuklanmagan.", "error");
-    const code = editor.getValue();
-    showOutput("Formatlanmoqda...", "");
-    try {
-        const res = await pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`);
-        const result = JSON.parse(res);
-        if (result.formatterAvailable) {
-            editor.setValue(result.code);
-                showOutput("OK: Kod formatlandi.", "success");
-        } else {
-            showOutput("Formatlash tooli (autopep8) hali yuklanmagan.", "error");
-        }
-        setTimeout(clearOutput, 2000);
-    } catch (e) {
-        showOutput("Xatolik: " + e.message, "error");
-    }
-}
-
-function clearOutput() {
-    const output = document.getElementById("output");
-    if (output) {
-        output.textContent = "Natija bu yerda ko'rsatiladi...";
-        output.className = "output-content";
-    }
-    clearEditorDiagnostics();
-    clearOutputInputHost();
-    dispatchEditorContextUpdate();
-}
-
-function showOutput(text, type) {
-    const output = document.getElementById("output");
-    if (!output) return;
-    output.textContent = text;
-    output.className = type ? "output-content " + type : "output-content";
-    scrollOutputToLatest();
-    dispatchEditorContextUpdate();
-}
-
 function openArena() {
     window.location.href = "/zone";
-}
-
-// Debug placeholders for now
-function debugCode() { showOutput("Debug rejimi online editor uchun tez orada qo'shiladi.", ""); }
-function clearDebugState() {
-    activeDebugSession = null;
-    activeDebugSteps = [];
-    activeDebugStepIndex = 0;
 }
 
 function continueDebugSession() {
@@ -1809,66 +1473,6 @@ function continueDebugSession() {
     activeDebugSession = null;
 }
 
-// --- AUTOCOMPLETE ---
-
-function onEditorInputRead(cm, change) {
-    if (change.origin !== "+input") return;
-    const cur = cm.getCursor();
-    const token = cm.getTokenAt(cur);
-    const char = change.text[0];
-
-    // Trigger on any alphabetical character or dot
-    if (!/^[a-zA-Z_.]$/.test(char)) return;
-    
-    // Trigger instantly if we have a valid starting char
-    if (token.string.trim().length > 0 || char === ".") {
-        showAutocompleteHints(cm);
-    }
-}
-
-function showAutocompleteHints(cm) {
-    cm.showHint({
-        hint: function(editor) {
-            const cur = editor.getCursor();
-            const token = editor.getTokenAt(cur);
-            const start = token.start;
-            const end = cur.ch;
-            const line = cur.line;
-            const currentWord = token.string;
-
-            const currentWordLower = currentWord.toLowerCase();
-            const priority = ["True", "False", "None"];
-
-            const list = [...new Set([
-                ...PYTHON_KEYWORDS,
-                ...MATH_FUNCTIONS,
-                ...(CodeMirror.hint.anyword(editor).list || [])
-            ])].filter(h => h.toLowerCase().startsWith(currentWordLower))
-               .sort((a, b) => {
-                   // Priority check
-                   const aPri = priority.includes(a);
-                   const bPri = priority.includes(b);
-                   if (aPri && !bPri) return -1;
-                   if (!aPri && bPri) return 1;
-
-                   // Exact case match prioritize
-                   const aStart = a.startsWith(currentWord);
-                   const bStart = b.startsWith(currentWord);
-                   if (aStart && !bStart) return -1;
-                   if (!aStart && bStart) return 1;
-
-                   return a.localeCompare(b);
-               });
-
-            return {
-                list: list,
-                from: CodeMirror.Pos(line, start),
-                to: CodeMirror.Pos(line, end)
-            };
-        },
-        completeSingle: false
-    });
-}
 
 // --- MULTI-LANGUAGE OVERRIDES ---
 
@@ -3194,7 +2798,7 @@ function getLanguageSpecificErrorAdvice(language, verdict, lowerText) {
                 match: ["expected ';'"],
                 summary: "Bu qator atrofida sintaksis buzilgan. Qavs yoki operatorni tekshiring.",
                 tips: [
-                    "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'ladi.",
+                    "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'lad.",
                 ],
             },
             {
@@ -3682,7 +3286,7 @@ function translateRemoteError(language, verdict, text) {
                     title: baseTitle,
                     summary: "Bu qator atrofida sintaksis buzilgan. Qavs yoki operatorni tekshiring.",
                     tips: [
-                        "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'ladi.",
+                        "Go'da ba'zan qator oxiridagi belgi yoki blok yopilishi muhim bo'lad.",
                     ],
                 };
             }
@@ -4696,4 +4300,46 @@ window.pyzoneEditorAssistant = {
 
 window.addEventListener("DOMContentLoaded", () => {
     setupEditor();
+});
+
+// Preload Python environment and tools as soon as the editor is initialized
+async function preloadPythonEnvironment() {
+    const loading = document.getElementById("loading");
+    if (loading) {
+        loading.classList.add("active");
+        loading.textContent = "Python vositalari yuklanmoqda...";
+    }
+
+    try {
+        pyodide = await loadPyodide();
+
+        if (loading) loading.textContent = "Python vositalari sozlanmoqda...";
+
+        // Load formatting tools in background — don't block code execution if it fails
+        ensurePythonRuntimeTools().catch(error => {
+            console.warn("Python formatter vositalari yuklanmadi:", error);
+        });
+
+        // Must always run so safe_run is defined before user clicks Run
+        await setupSafeExecutionEnvironment();
+
+        if (loading) {
+            loading.textContent = "Python tayyor!";
+            setTimeout(() => {
+                loading.classList.remove("active");
+            }, 1500);
+        }
+    } catch (error) {
+        if (loading) {
+            loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
+            loading.style.background = "#fee2e2";
+            loading.style.color = "#991b1b";
+        }
+        console.error("Error loading Python environment:", error);
+    }
+}
+
+// Call the preload function when the editor is initialized
+window.addEventListener("load", () => {
+    preloadPythonEnvironment();
 });
