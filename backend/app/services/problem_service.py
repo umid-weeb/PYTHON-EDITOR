@@ -330,7 +330,7 @@ class ProblemService:
             id=problem.id,
             slug=problem.slug,
             title=problem.title,
-            order_index=order_map.get(problem.slug),
+            order_index=order_map.get(problem.slug) or problem.order_index,
             difficulty=problem.difficulty.lower(),
             tags=tags,
             preview=preview,
@@ -345,6 +345,7 @@ class ProblemService:
 
     def _build_problem_bundle(self, problem: Problem) -> dict[str, Any]:
         order_map = build_combined_problem_order_map()
+        effective_order = order_map.get(problem.slug) or problem.order_index
         visible_testcases = []
         hidden_testcases = []
 
@@ -367,7 +368,7 @@ class ProblemService:
             "id": problem.id,
             "slug": problem.slug,
             "title": problem.title,
-            "order_index": order_map.get(problem.slug),
+            "order_index": effective_order,
             "difficulty": problem.difficulty.lower(),
             "description": problem.description,
             "starter_code": problem.starter_code,
@@ -450,7 +451,7 @@ class ProblemService:
             id=problem.id,
             slug=problem.slug,
             title=translation["title"],
-            order_index=order_map.get(problem.slug),
+            order_index=order_map.get(problem.slug) or problem.order_index,
             difficulty=problem.difficulty.lower(),
             tags=tags,
             preview=preview,
@@ -490,7 +491,7 @@ class ProblemService:
             "id": problem.id,
             "slug": problem.slug,
             "title": translation["title"],
-            "order_index": order_map.get(problem.slug),
+            "order_index": order_map.get(problem.slug) or problem.order_index,
             "difficulty": problem.difficulty.lower(),
             "description": translation["description"],
             "starter_code": translation["starter_code"],

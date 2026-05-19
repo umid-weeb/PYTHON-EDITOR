@@ -50,6 +50,36 @@ catalog_ready = threading.Event()
 migrations_complete = False
 
 
+def _fill_missing_order_indexes() -> None:
+    """Mavjud admin masalalariga order_index raqam berish (bir martalik)."""
+    from sqlalchemy import func
+    from app.models.problem import Problem
+    from app.services.problem_service import build_combined_problem_order_map
+
+    order_map = build_combined_problem_order_map()
+    catalog_slugs = set(order_map.keys())
+    max_catalog_idx = max(order_map.values(), default=0)
+
+    with SessionLocal() as db:
+        max_db_idx = db.query(func.max(Problem.order_index)).scalar() or 0
+        next_idx = max(max_catalog_idx, max_db_idx) + 1
+
+        unordered = (
+            db.query(Problem)
+            .filter(Problem.order_index.is_(None))
+            .filter(~Problem.slug.in_(catalog_slugs))
+            .order_by(Problem.created_at.asc())
+            .all()
+        )
+        for problem in unordered:
+            problem.order_index = next_idx
+            next_idx += 1
+
+        if unordered:
+            db.commit()
+            logger.info("order_index: %d ta admin masalasiga raqam berildi", len(unordered))
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     global migrations_complete
@@ -87,6 +117,11 @@ async def lifespan(_: FastAPI):
             logger.info("Background catalog sync completed.")
         except Exception as exc:  # pragma: no cover
             logger.warning("Background catalog sync failed: %s", exc)
+
+        try:
+            _fill_missing_order_indexes()
+        except Exception as exc:  # pragma: no cover
+            logger.warning("order_index fill failed: %s", exc)
         finally:
             # Always mark ready so the flag eventually unblocks even on error
             catalog_ready.set()

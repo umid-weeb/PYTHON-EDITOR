@@ -454,9 +454,18 @@ def create_problem(
     _admin: User = Depends(get_admin_user),
 ) -> ProblemAdminDetail:
     """Yangi masala yaratish."""
+    from sqlalchemy import func as sqlfunc
+    from app.services.problem_service import build_combined_problem_order_map
+
     # Slug: berilmagan bo'lsa title dan avtomatik
     raw_slug = data.slug or _slug_from_title(data.title)
     slug = _ensure_unique_slug(db, raw_slug)
+
+    # Tartib raqamini avtomatik belgilash
+    order_map = build_combined_problem_order_map()
+    max_catalog_idx = max(order_map.values(), default=0)
+    max_db_idx = db.query(sqlfunc.max(Problem.order_index)).scalar() or 0
+    next_order_index = max(max_catalog_idx, max_db_idx) + 1
 
     problem_id = str(uuid.uuid4())
     problem = Problem(
@@ -472,6 +481,7 @@ def create_problem(
         function_name=data.function_name,
         tags_json=json.dumps(data.tags, ensure_ascii=False),
         leetcode_id=data.leetcode_id,
+        order_index=next_order_index,
         created_at=datetime.now(timezone.utc),
     )
     db.add(problem)
