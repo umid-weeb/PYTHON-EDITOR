@@ -281,6 +281,13 @@ def _invalidate_cache(problem_id: str | None = None) -> None:
         service = get_problem_service()
         service.cache.invalidate(problem_id)
         service.cache.invalidate(None)  # Bosh ro'yxat (index) ni albatta tozalash
+
+        # In-memory lru_cache ni ham tozalash (admin problem sluglar ordermap da yo'q)
+        try:
+            from app.services.problem_service import build_combined_problem_order_map
+            build_combined_problem_order_map.cache_clear()
+        except Exception:
+            pass
     except Exception as exc:
         logger.warning("Cache invalidation failed: %s", exc)
 

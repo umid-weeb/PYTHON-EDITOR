@@ -74,20 +74,19 @@ class ProblemService:
 
     async def list_problems(self, force_refresh: bool = False) -> list[ProblemSummary]:
         order_map = build_combined_problem_order_map()
-        visible_slugs = set(order_map)
 
         if not force_refresh and self._catalog_ready():
             cached = self.cache.load_index()
             if cached is not None and all(
-                isinstance(item, dict) and item.get("slug") and item.get("order_index") is not None
+                isinstance(item, dict) and item.get("slug")
                 for item in cached
-            ) and len(cached) == len(order_map):
+            ):
                 cached_items = [ProblemSummary.model_validate(item) for item in cached]
                 cached_items.sort(key=_problem_summary_sort_key)
                 return cached_items
 
         with SessionLocal() as db:
-            problems = db.query(Problem).filter(Problem.slug.in_(visible_slugs)).all()
+            problems = db.query(Problem).all()
 
         problems.sort(key=lambda problem: (order_map.get(problem.slug, 10**9), str(problem.slug)))
 
@@ -300,11 +299,7 @@ class ProblemService:
 
         if not force_refresh and self._catalog_ready():
             cached = self.cache.load_problem(problem_key)
-            if (
-                cached is not None
-                and cached.get("slug") in order_map
-                and cached.get("order_index") is not None
-            ):
+            if cached is not None and cached.get("slug"):
                 return cached
 
         with SessionLocal() as db:
@@ -315,7 +310,7 @@ class ProblemService:
                 .first()
             )
 
-        if problem is None or problem.slug not in order_map:
+        if problem is None:
             raise ProblemNotFoundError(problem_key)
 
         bundle = self._build_problem_bundle(problem)
