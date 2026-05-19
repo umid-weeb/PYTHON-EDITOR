@@ -1326,6 +1326,7 @@ function applyEditorTypography(family, size) {
 function loadTheme() {
     const theme = localStorage.getItem("theme") || "light";
     const isDark = theme === "dark";
+    document.documentElement.classList.remove("dark-mode-pre");
     document.body.classList.toggle("dark-mode", isDark);
     const btn = document.getElementById("themeBtn");
     if (btn) {
@@ -2054,6 +2055,10 @@ function setupEditor() {
         },
     });
     editor.addOverlay(createIdentifierOverlay(), { combine: true });
+
+    // Mark panel as ready so CSS skeleton is removed
+    const editorPanel = textArea.closest(".editor-panel");
+    if (editorPanel) editorPanel.classList.add("cm-ready");
 
     const editorWrapper = editor.getWrapperElement();
     editorWrapper.addEventListener("contextmenu", (event) => {

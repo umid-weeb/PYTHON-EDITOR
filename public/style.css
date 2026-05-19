@@ -1,3 +1,6 @@
+/* Pre-apply dark background before JS loads — prevents white flash on dark mode */
+html.dark-mode-pre body { background: #09111d; }
+
 :root {
   --shell-frame-padding: 48px;
   --editor-font-family: "IBM Plex Mono", monospace;
@@ -733,6 +736,16 @@ body.dark-mode .editor-select-shell::after {
 body.dark-mode .editor-select option {
   background: var(--surface);
   color: var(--text-main);
+}
+
+/* Hide raw textarea before CodeMirror initializes — prevents FOUC */
+#code-editor {
+  display: none !important;
+}
+
+/* Editor area skeleton while CodeMirror hasn't loaded yet */
+.editor-panel:not(.cm-ready) .CodeMirror {
+  visibility: hidden;
 }
 
 .CodeMirror {
