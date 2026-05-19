@@ -1335,6 +1335,13 @@ function loadTheme() {
     if (editor) editor.setOption("theme", isDark ? "monokai" : "eclipse");
 }
 
+function toggleTheme() {
+    const isDark = document.body.classList.contains("dark-mode");
+    const next = isDark ? "light" : "dark";
+    localStorage.setItem("theme", next);
+    loadTheme();
+}
+
 function loadEditorTypographyPreferences() {
     const family = localStorage.getItem("editorFontFamily") || "IBM Plex Mono";
     const size = localStorage.getItem("editorFontSize") || "14px";
