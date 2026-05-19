@@ -4111,11 +4111,10 @@ function _formatCLike(code, language) {
         const formatted = window.js_beautify(code, {
             indent_size: indent,
             indent_char: " ",
-            brace_style: "k&r",
+            brace_style: "collapse",
             keep_array_indentation: false,
             end_with_newline: true,
             space_before_conditional: true,
-            jslint_happy: false,
             wrap_line_length: 0,
         });
         return { ok: true, code: formatted };
