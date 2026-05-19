@@ -1713,6 +1713,22 @@ function setEditorLanguage(language, options = {}) {
     dispatchEditorContextUpdate();
     updateHeaderLanguageBranding(nextLanguage);
     scheduleEditorRuntimeWarmup(nextLanguage, currentStarterPack, editor.getValue());
+
+    // Show/hide Python loading banner based on language
+    const _loading = document.getElementById("loading");
+    if (nextLanguage === "python") {
+        if (!pyodide && !pyodideLoadingPromise) {
+            // Start loading Python proactively now that user is on Python
+            preloadPythonEnvironment();
+        } else if (!pyodide && pyodideLoadingPromise) {
+            // Already loading, just show the banner
+            if (_loading) { _loading.classList.add("active"); _loading.textContent = "Python vositalari yuklanmoqda..."; }
+        }
+        // If pyodide already loaded, banner stays hidden — nothing to do
+    } else {
+        // Switched away from Python — hide the loading banner
+        if (_loading) _loading.classList.remove("active");
+    }
 }
 
 function getSelectionToolbarElement() {
@@ -4302,44 +4318,21 @@ window.addEventListener("DOMContentLoaded", () => {
     setupEditor();
 });
 
-// Preload Python environment and tools as soon as the editor is initialized
+// Preload Python — only called when language is Python, deferred so UI renders first
 async function preloadPythonEnvironment() {
-    const loading = document.getElementById("loading");
-    if (loading) {
-        loading.classList.add("active");
-        loading.textContent = "Python vositalari yuklanmoqda...";
-    }
-
+    if (pyodide || pyodideLoadingPromise) return;
+    if (currentLanguage !== "python") return;
     try {
-        pyodide = await loadPyodide();
-
-        if (loading) loading.textContent = "Python vositalari sozlanmoqda...";
-
-        // Load formatting tools in background — don't block code execution if it fails
-        ensurePythonRuntimeTools().catch(error => {
-            console.warn("Python formatter vositalari yuklanmadi:", error);
-        });
-
-        // Must always run so safe_run is defined before user clicks Run
-        await setupSafeExecutionEnvironment();
-
-        if (loading) {
-            loading.textContent = "Python tayyor!";
-            setTimeout(() => {
-                loading.classList.remove("active");
-            }, 1500);
-        }
-    } catch (error) {
-        if (loading) {
-            loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
-            loading.style.background = "#fee2e2";
-            loading.style.color = "#991b1b";
-        }
-        console.error("Error loading Python environment:", error);
+        await ensurePyodideLoaded();
+        ensurePythonRuntimeTools().catch(err => console.warn("Python formatter yuklanmadi:", err));
+    } catch (e) {
+        // ensurePyodideLoaded handles its own error UI
     }
 }
 
-// Call the preload function when the editor is initialized
+// Only preload Python if the user starts on Python — deferred so the page renders first
 window.addEventListener("load", () => {
-    preloadPythonEnvironment();
+    if (currentLanguage === "python") {
+        setTimeout(preloadPythonEnvironment, 200);
+    }
 });
