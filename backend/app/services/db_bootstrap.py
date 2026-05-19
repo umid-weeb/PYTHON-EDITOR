@@ -611,6 +611,9 @@ POSTGRES_BOOTSTRAP_SQL = [
     """
     CREATE INDEX IF NOT EXISTS idx_problems_order_index ON problems(order_index);
     """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 
@@ -619,6 +622,7 @@ def _run_sqlite_migrations(engine: Engine) -> None:
     sqlite_columns = [
         "ALTER TABLE problems ADD COLUMN is_published BOOLEAN DEFAULT 1",
         "ALTER TABLE problems ADD COLUMN order_index INTEGER",
+        "ALTER TABLE problems ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0",
     ]
     with engine.connect() as connection:
         for stmt in sqlite_columns:

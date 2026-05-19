@@ -23,6 +23,7 @@ class ProblemSummary(BaseModel):
     language: Literal["python", "javascript", "cpp", "sql"] = "python"
     language_code: str = "en"
     leetcode_id: int | None = None
+    view_count: int = 0
 
 
 class VisibleTestcase(BaseModel):

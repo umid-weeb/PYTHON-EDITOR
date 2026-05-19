@@ -3,7 +3,7 @@ from app.models.schemas import ProblemDetail
 import logging
 from time import perf_counter
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text as _text
 from sqlalchemy.orm import Session
@@ -19,9 +19,11 @@ from app.services.problem_service import (
     get_problem_service,
 )
 from app.repositories.submission_tracking import submission_tracking_repository
+from app.services.ws_manager import problem_presence_manager
 
 
 router = APIRouter(tags=["problems"])
+ws_router = APIRouter(tags=["WebSockets"])
 logger = logging.getLogger("pyzone.arena.problems")
 
 
@@ -454,3 +456,27 @@ def toggle_like(
     ).fetchone().likes
 
     return {"liked": liked, "likes": new_likes}
+
+
+@router.post("/problems/{problem_slug}/view")
+def record_view(problem_slug: str, db: Session = Depends(get_db)):
+    row = db.execute(
+        _text("UPDATE problems SET view_count = view_count + 1 WHERE slug = :slug RETURNING view_count"),
+        {"slug": problem_slug},
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Masala topilmadi")
+    db.commit()
+    return {"view_count": row.view_count}
+
+
+@ws_router.websocket("/ws/problems/{problem_slug}/presence")
+async def problem_presence(websocket: WebSocket, problem_slug: str):
+    await problem_presence_manager.connect(websocket, problem_slug)
+    await problem_presence_manager.broadcast_count(problem_slug)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        problem_presence_manager.disconnect(websocket, problem_slug)
+        await problem_presence_manager.broadcast_count(problem_slug)

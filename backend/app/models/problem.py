@@ -23,6 +23,7 @@ class Problem(Base):
     leetcode_id = Column(Integer, nullable=True)
     order_index = Column(Integer, nullable=True, index=True)
     is_published = Column(Boolean, nullable=True, default=True)
+    view_count = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     test_cases = relationship(

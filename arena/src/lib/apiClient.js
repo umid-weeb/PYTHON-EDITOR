@@ -172,6 +172,9 @@ export const arenaApi = {
   getSolutions(problemSlug) {
     return request(`/api/problems/${encodeURIComponent(problemSlug)}/solutions`);
   },
+  recordView(problemSlug) {
+    return request(`/api/problems/${encodeURIComponent(problemSlug)}/view`, { method: "POST" });
+  },
 };
 
 export const userApi = {

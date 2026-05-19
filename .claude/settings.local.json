@@ -4,7 +4,13 @@
       "Bash(git push:*)",
       "Bash(find /d/Projects/PYTHON-EDITOR/backend/app/api/routes -type f -name \"*.py\" -exec basename {} \\\\;)",
       "Bash(git add:*)",
-      "Bash(git commit -m 'Fix: replace 204 status with 200+body for FastAPI compatibility:*)"
+      "Bash(git commit -m 'Fix: replace 204 status with 200+body for FastAPI compatibility:*)",
+      "Bash(node -e ' *)",
+      "Bash(del fix_dups.js remove_dead.js)",
+      "Bash(cat deploy.sh)",
+      "Bash(ls *.sh)",
+      "Bash(ls backend/scripts/deploy*)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

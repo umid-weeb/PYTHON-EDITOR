@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { formatMemory, formatRuntime, localizeVerdictLabel } from "../../lib/formatters.js";
 import { formatProblemTitle, localizeDifficultyLabel } from "../../lib/problemPresentation.js";
 import { getMySubmissions, hydrateSubmissionRows, resolveSubmissionOutcome } from "../../services/profileService";
 import ProblemDescription from "../problem/ProblemDescription.tsx";
+import { API_BASE_URL, arenaApi } from "../../lib/apiClient.js";
+
+function buildWsUrl(slug) {
+  const base = API_BASE_URL.replace(/^http/, "ws") || `ws://${window.location.host}`;
+  return `${base}/ws/problems/${encodeURIComponent(slug)}/presence`;
+}
 
 const DIFFICULTY_FILTERS = [
   { id: "all", label: "Barchasi" },
@@ -183,6 +189,9 @@ export default function ProblemWorkspacePanel({
   const [activeTab, setActiveTab] = useState("description");
   const [submissionStatus, setSubmissionStatus] = useState("idle");
   const [submissionRows, setSubmissionRows] = useState([]);
+  const [viewCount, setViewCount] = useState(problem?.view_count ?? 0);
+  const [liveCount, setLiveCount] = useState(1);
+  const wsRef = useRef(null);
 
   const currentProblemKey = problem?.slug || problem?.id || selectedProblemId || "";
   const currentIndex = useMemo(
@@ -200,6 +209,39 @@ export default function ProblemWorkspacePanel({
 
   useEffect(() => {
     setActiveTab("description");
+  }, [currentProblemKey]);
+
+  // Sync view_count from problem data when problem changes
+  useEffect(() => {
+    setViewCount(problem?.view_count ?? 0);
+  }, [problem?.view_count]);
+
+  // Record view + connect WebSocket presence when problem changes
+  useEffect(() => {
+    if (!currentProblemKey) return;
+
+    // Record view (fire and forget, update local count from response)
+    arenaApi.recordView(currentProblemKey).then((res) => {
+      if (res?.view_count != null) setViewCount(res.view_count);
+    }).catch(() => {});
+
+    // WebSocket presence
+    const ws = new WebSocket(buildWsUrl(currentProblemKey));
+    wsRef.current = ws;
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.count != null) setLiveCount(msg.count);
+      } catch {}
+    };
+
+    ws.onerror = () => {};
+    ws.onclose = () => {};
+
+    return () => {
+      ws.close();
+    };
   }, [currentProblemKey]);
 
   useEffect(() => {
@@ -327,6 +369,22 @@ export default function ProblemWorkspacePanel({
             "Yechishni boshlash uchun masalani oching."
           )}
         </div>
+
+        {problem && (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <span className="inline-flex h-[26px] items-center gap-1 border border-[color:var(--border)] bg-[var(--bg-subtle)] px-2 text-[11px] text-[var(--text-secondary)]">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/>
+                <circle cx="8" cy="8" r="2"/>
+              </svg>
+              {viewCount >= 1000 ? `${(viewCount / 1000).toFixed(1)}k` : viewCount}
+            </span>
+            <span className="inline-flex h-[26px] items-center gap-1 border border-[color:var(--border)] bg-[var(--bg-subtle)] px-2 text-[11px] text-[var(--text-secondary)]">
+              <span className="h-[6px] w-[6px] rounded-full bg-emerald-400" />
+              {liveCount}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex h-[38px] shrink-0 items-end gap-1 border-b border-[color:var(--border)] bg-[var(--bg-subtle)] px-3">

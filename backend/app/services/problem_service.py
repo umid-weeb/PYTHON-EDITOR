@@ -383,6 +383,7 @@ class ProblemService:
             "visible_testcases": visible_testcases,
             "hidden_testcases": hidden_testcases,
             "hidden_testcase_count": len(hidden_testcases),
+            "view_count": problem.view_count or 0,
         }
 
     def _split_constraints(self, raw_value: str | None) -> list[str]:
@@ -506,7 +507,8 @@ class ProblemService:
             "visible_testcases": visible_testcases,
             "hidden_testcases": hidden_testcases,
             "hidden_testcase_count": len(hidden_testcases),
-            "language_code": translation["language_code"]
+            "language_code": translation["language_code"],
+            "view_count": problem.view_count or 0,
         }
 
 
