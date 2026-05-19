@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -281,10 +282,222 @@ globalThis.global = globalThis;
 
     def _run_javascript(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
         quickjs_result = self._run_javascript_quickjs(code=code, stdin=stdin, time_limit_seconds=time_limit_seconds)
-        # RCE xavfini yopish: Agar QuickJS (xavfsiz muhit) o'rnatilmagan bo'lsa, OS da 
-        # to'g'ridan-to'g'ri Node.js, C++, Java va Go orqali kod yurgizishni bekor qilamiz.
-        # Buning o'rniga kodlar editor.py orqali avtomatik ravishda Judge0 API ga yo'naltiriladi.
         return quickjs_result
+
+    @staticmethod
+    def _bin_name(stem: str) -> str:
+        return stem + (".exe" if platform.system() == "Windows" else "")
+
+    def _run_subprocess(
+        self,
+        *,
+        args: list[str],
+        stdin: str,
+        time_limit_seconds: float,
+        cwd: Path | None = None,
+    ) -> tuple[str, str, float, bool, int]:
+        started = time.perf_counter()
+        try:
+            proc = subprocess.run(
+                args,
+                input=stdin.encode("utf-8", errors="replace"),
+                capture_output=True,
+                timeout=time_limit_seconds,
+                cwd=cwd,
+            )
+            elapsed = time.perf_counter() - started
+            stdout = proc.stdout.decode("utf-8", errors="replace")
+            stderr = proc.stderr.decode("utf-8", errors="replace")
+            return stdout, stderr, elapsed, False, proc.returncode
+        except subprocess.TimeoutExpired:
+            elapsed = time.perf_counter() - started
+            return "", "", elapsed, True, -1
+
+    def _run_cpp(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
+        if not self.toolchain.gpp:
+            return None
+
+        cache_dir = self._prepare_cache_dir("cpp", code)
+        src_file = cache_dir / "main.cpp"
+        bin_file = cache_dir / self._bin_name("main")
+
+        if not src_file.exists() or src_file.read_text(encoding="utf-8") != code:
+            src_file.write_text(code, encoding="utf-8")
+            bin_file.unlink(missing_ok=True)
+
+        if not bin_file.exists():
+            started = time.perf_counter()
+            proc = subprocess.run(
+                [self.toolchain.gpp, "-O2", "-std=c++17", "-o", str(bin_file), str(src_file)],
+                capture_output=True,
+                timeout=30,
+            )
+            elapsed = time.perf_counter() - started
+            if proc.returncode != 0:
+                compile_output = proc.stderr.decode("utf-8", errors="replace")
+                return self._result_payload(
+                    status_description="Compilation Error",
+                    compile_output=compile_output,
+                    elapsed=elapsed,
+                    message="C++ kompilyatsiya xatoligi.",
+                    execution_mode="LOCAL",
+                )
+
+        stdout, stderr, elapsed, timed_out, returncode = self._run_subprocess(
+            args=[str(bin_file)],
+            stdin=stdin,
+            time_limit_seconds=time_limit_seconds,
+        )
+        if timed_out:
+            return self._result_payload(
+                status_description="Time Limit Exceeded",
+                elapsed=time_limit_seconds,
+                message="C++ bajarilishi vaqt limitidan oshdi.",
+                execution_mode="LOCAL",
+            )
+        if returncode != 0:
+            return self._result_payload(
+                status_description="Runtime Error",
+                stdout=stdout,
+                stderr=stderr,
+                elapsed=elapsed,
+                message="C++ bajarishda xatolik.",
+                execution_mode="LOCAL",
+            )
+        return self._result_payload(
+            status_description="Accepted",
+            stdout=stdout,
+            stderr=stderr,
+            elapsed=elapsed,
+            execution_mode="LOCAL",
+        )
+
+    def _run_java(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
+        if not self.toolchain.javac or not self.toolchain.java:
+            return None
+
+        pkg_match = _JAVA_PACKAGE_RE.search(code)
+        class_match = _JAVA_PUBLIC_CLASS_RE.search(code)
+        class_name = class_match.group(1) if class_match else "Main"
+
+        cache_dir = self._prepare_cache_dir("java", code)
+        src_file = cache_dir / f"{class_name}.java"
+        class_file = cache_dir / f"{class_name}.class"
+
+        if not src_file.exists() or src_file.read_text(encoding="utf-8") != code:
+            src_file.write_text(code, encoding="utf-8")
+            for f in cache_dir.glob("*.class"):
+                f.unlink(missing_ok=True)
+
+        if not class_file.exists():
+            started = time.perf_counter()
+            proc = subprocess.run(
+                [self.toolchain.javac, str(src_file)],
+                capture_output=True,
+                timeout=30,
+                cwd=cache_dir,
+            )
+            elapsed = time.perf_counter() - started
+            if proc.returncode != 0:
+                compile_output = proc.stderr.decode("utf-8", errors="replace")
+                return self._result_payload(
+                    status_description="Compilation Error",
+                    compile_output=compile_output,
+                    elapsed=elapsed,
+                    message="Java kompilyatsiya xatoligi.",
+                    execution_mode="LOCAL",
+                )
+
+        package_prefix = f"{pkg_match.group(1)}." if pkg_match else ""
+        stdout, stderr, elapsed, timed_out, returncode = self._run_subprocess(
+            args=[self.toolchain.java, f"{package_prefix}{class_name}"],
+            stdin=stdin,
+            time_limit_seconds=time_limit_seconds,
+            cwd=cache_dir,
+        )
+        if timed_out:
+            return self._result_payload(
+                status_description="Time Limit Exceeded",
+                elapsed=time_limit_seconds,
+                message="Java bajarilishi vaqt limitidan oshdi.",
+                execution_mode="LOCAL",
+            )
+        if returncode != 0:
+            return self._result_payload(
+                status_description="Runtime Error",
+                stdout=stdout,
+                stderr=stderr,
+                elapsed=elapsed,
+                message="Java bajarishda xatolik.",
+                execution_mode="LOCAL",
+            )
+        return self._result_payload(
+            status_description="Accepted",
+            stdout=stdout,
+            stderr=stderr,
+            elapsed=elapsed,
+            execution_mode="LOCAL",
+        )
+
+    def _run_go(self, *, code: str, stdin: str, time_limit_seconds: float) -> dict[str, Any] | None:
+        if not self.toolchain.go:
+            return None
+
+        cache_dir = self._prepare_cache_dir("go", code)
+        src_file = cache_dir / "main.go"
+        bin_file = cache_dir / self._bin_name("main")
+
+        if not src_file.exists() or src_file.read_text(encoding="utf-8") != code:
+            src_file.write_text(code, encoding="utf-8")
+            bin_file.unlink(missing_ok=True)
+
+        if not bin_file.exists():
+            started = time.perf_counter()
+            proc = subprocess.run(
+                [self.toolchain.go, "build", "-o", str(bin_file), str(src_file)],
+                capture_output=True,
+                timeout=60,
+                env={**os.environ, "GOCACHE": str(self.go_build_cache)},
+            )
+            elapsed = time.perf_counter() - started
+            if proc.returncode != 0:
+                compile_output = proc.stderr.decode("utf-8", errors="replace")
+                return self._result_payload(
+                    status_description="Compilation Error",
+                    compile_output=compile_output,
+                    elapsed=elapsed,
+                    message="Go kompilyatsiya xatoligi.",
+                    execution_mode="LOCAL",
+                )
+
+        stdout, stderr, elapsed, timed_out, returncode = self._run_subprocess(
+            args=[str(bin_file)],
+            stdin=stdin,
+            time_limit_seconds=time_limit_seconds,
+        )
+        if timed_out:
+            return self._result_payload(
+                status_description="Time Limit Exceeded",
+                elapsed=time_limit_seconds,
+                message="Go bajarilishi vaqt limitidan oshdi.",
+                execution_mode="LOCAL",
+            )
+        if returncode != 0:
+            return self._result_payload(
+                status_description="Runtime Error",
+                stdout=stdout,
+                stderr=stderr,
+                elapsed=elapsed,
+                message="Go bajarishda xatolik.",
+                execution_mode="LOCAL",
+            )
+        return self._result_payload(
+            status_description="Accepted",
+            stdout=stdout,
+            stderr=stderr,
+            elapsed=elapsed,
+            execution_mode="LOCAL",
+        )
 
     def warm_default_runtimes(self) -> None:
         pass
