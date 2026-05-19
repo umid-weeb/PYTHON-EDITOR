@@ -634,6 +634,12 @@ QOIDALAR:
             result["test_cases"] = verified
             result["verified"] = True
 
+        # Birinchi 3 ta test case albatta ko'rinsin (is_hidden=False)
+        tcs = result.get("test_cases", [])
+        for i, tc in enumerate(tcs):
+            tc["is_hidden"] = False if i < 3 else tc.get("is_hidden", True)
+        result["test_cases"] = tcs
+
         return result
     except json.JSONDecodeError:
         return {"test_cases": [], "error": "AI javob parse qilinmadi", "verified": False}

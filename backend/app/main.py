@@ -51,7 +51,7 @@ migrations_complete = False
 
 
 def _fill_missing_order_indexes() -> None:
-    """Mavjud admin masalalariga order_index raqam berish (bir martalik)."""
+    """Mavjud admin masalalariga order_index raqam berish (har start da)."""
     from sqlalchemy import func
     from app.models.problem import Problem
     from app.services.problem_service import build_combined_problem_order_map
@@ -61,6 +61,20 @@ def _fill_missing_order_indexes() -> None:
     max_catalog_idx = max(order_map.values(), default=0)
 
     with SessionLocal() as db:
+        # 1. leetcode_id bor bo'lsa, uni order_index qilib set qilamiz
+        with_lc = (
+            db.query(Problem)
+            .filter(Problem.order_index.is_(None))
+            .filter(~Problem.slug.in_(catalog_slugs))
+            .filter(Problem.leetcode_id.isnot(None))
+            .all()
+        )
+        for problem in with_lc:
+            problem.order_index = problem.leetcode_id
+
+        # 2. Qolgan masalalarga navbatdagi raqam berish
+        if with_lc:
+            db.flush()
         max_db_idx = db.query(func.max(Problem.order_index)).scalar() or 0
         next_idx = max(max_catalog_idx, max_db_idx) + 1
 
@@ -75,9 +89,12 @@ def _fill_missing_order_indexes() -> None:
             problem.order_index = next_idx
             next_idx += 1
 
-        if unordered:
+        if with_lc or unordered:
             db.commit()
-            logger.info("order_index: %d ta admin masalasiga raqam berildi", len(unordered))
+            logger.info(
+                "order_index: %d ta leetcode_id, %d ta navbatdagi raqam bilan to'ldirildi",
+                len(with_lc), len(unordered)
+            )
 
 
 @asynccontextmanager

@@ -461,11 +461,14 @@ def create_problem(
     raw_slug = data.slug or _slug_from_title(data.title)
     slug = _ensure_unique_slug(db, raw_slug)
 
-    # Tartib raqamini avtomatik belgilash
+    # Tartib raqamini belgilash: leetcode_id bo'lsa uni ishlatamiz, yo'qsa navbatdagi raqam
     order_map = build_combined_problem_order_map()
-    max_catalog_idx = max(order_map.values(), default=0)
-    max_db_idx = db.query(sqlfunc.max(Problem.order_index)).scalar() or 0
-    next_order_index = max(max_catalog_idx, max_db_idx) + 1
+    if data.leetcode_id:
+        next_order_index = data.leetcode_id
+    else:
+        max_catalog_idx = max(order_map.values(), default=0)
+        max_db_idx = db.query(sqlfunc.max(Problem.order_index)).scalar() or 0
+        next_order_index = max(max_catalog_idx, max_db_idx) + 1
 
     problem_id = str(uuid.uuid4())
     problem = Problem(
@@ -538,6 +541,8 @@ def update_problem(
         problem.tags_json = json.dumps(data.tags, ensure_ascii=False)
     if data.leetcode_id is not None:
         problem.leetcode_id = data.leetcode_id
+        # leetcode_id o'zgarganda order_index ham yangilansin
+        problem.order_index = data.leetcode_id
 
     db.commit()
     db.refresh(problem)
