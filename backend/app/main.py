@@ -50,6 +50,28 @@ catalog_ready = threading.Event()
 migrations_complete = False
 
 
+def _fix_all_hidden_test_cases() -> None:
+    """Admin masalalarida barcha test caselar hidden bo'lsa — birinchi 3 tasini ko'rinadigan qilish."""
+    from app.models.problem import Problem
+
+    with SessionLocal() as db:
+        problems = db.query(Problem).all()
+        fixed = 0
+        for problem in problems:
+            tcs = sorted(problem.test_cases, key=lambda t: t.sort_order)
+            if not tcs:
+                continue
+            visible = [t for t in tcs if not t.is_hidden]
+            if visible:
+                continue  # already has visible test cases
+            for tc in tcs[:3]:
+                tc.is_hidden = False
+            fixed += 1
+        if fixed:
+            db.commit()
+            logger.info("Barcha-hidden fix: %d masalada birinchi 3 test case ko'rinadigan qilindi", fixed)
+
+
 def _fill_missing_order_indexes() -> None:
     """Mavjud admin masalalariga order_index raqam berish (har start da)."""
     from sqlalchemy import func
@@ -134,6 +156,11 @@ async def lifespan(_: FastAPI):
             logger.info("Background catalog sync completed.")
         except Exception as exc:  # pragma: no cover
             logger.warning("Background catalog sync failed: %s", exc)
+
+        try:
+            _fix_all_hidden_test_cases()
+        except Exception as exc:  # pragma: no cover
+            logger.warning("all-hidden fix failed: %s", exc)
 
         try:
             _fill_missing_order_indexes()
