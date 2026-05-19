@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import tempfile
+import os
 from datetime import date
 import logging
 import re
@@ -331,6 +334,47 @@ async def editor_chat(
         )
 
     return EditorChatResponse(reply=reply, remaining=remaining, requires_auth=False)
+
+
+class EditorFormatRequest(BaseModel):
+    language: Literal["python", "javascript", "cpp", "java", "go"]
+    code: str = Field(min_length=1)
+
+
+class EditorFormatResponse(BaseModel):
+    formatted: str
+    changed: bool
+    error: str | None = None
+
+
+@router.post("/format", response_model=EditorFormatResponse)
+async def format_editor_code(payload: EditorFormatRequest) -> EditorFormatResponse:
+    code = payload.code
+
+    if payload.language == "go":
+        import shutil as _shutil
+        gofmt = _shutil.which("gofmt")
+        if not gofmt:
+            return EditorFormatResponse(formatted=code, changed=False, error="gofmt topilmadi.")
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".go", delete=False, mode="w", encoding="utf-8") as f:
+                f.write(code)
+                tmpfile = f.name
+            try:
+                proc = subprocess.run([gofmt, tmpfile], capture_output=True, timeout=10)
+                if proc.returncode != 0:
+                    return EditorFormatResponse(
+                        formatted=code, changed=False,
+                        error=proc.stderr.decode("utf-8", errors="replace"),
+                    )
+                formatted = proc.stdout.decode("utf-8", errors="replace")
+            finally:
+                os.unlink(tmpfile)
+        except Exception as exc:
+            return EditorFormatResponse(formatted=code, changed=False, error=str(exc))
+        return EditorFormatResponse(formatted=formatted, changed=formatted != code)
+
+    return EditorFormatResponse(formatted=code, changed=False, error="Bu til server-side formatlanmaydi.")
 
 
 @router.post("/run", response_model=EditorRunResponse)

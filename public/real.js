@@ -4076,34 +4076,129 @@ function renderOutputPanelInput(prompt, index) {
     scrollOutputToLatest();
 }
 
+function _formatJavaScript(code) {
+    if (typeof window.prettier === "undefined" || !window.prettierPlugins) {
+        return { ok: false, error: "Prettier yuklanmadi, iltimos sahifani yangilang." };
+    }
+    try {
+        const indentSize = getLanguageIndentUnit("javascript");
+        const formatted = window.prettier.format(code, {
+            parser: "babel",
+            plugins: [window.prettierPlugins.babel],
+            semi: true,
+            singleQuote: false,
+            tabWidth: indentSize,
+            trailingComma: "es5",
+            printWidth: 100,
+        });
+        return { ok: true, code: formatted };
+    } catch (e) {
+        return { ok: false, error: String(e.message || e) };
+    }
+}
+
+function _formatCLike(code, language) {
+    if (typeof window.js_beautify === "undefined") {
+        return { ok: false, error: "js-beautify yuklanmadi, iltimos sahifani yangilang." };
+    }
+    try {
+        const indent = getLanguageIndentUnit(language);
+        const formatted = window.js_beautify(code, {
+            indent_size: indent,
+            indent_char: " ",
+            brace_style: "k&r",
+            keep_array_indentation: false,
+            end_with_newline: true,
+            space_before_conditional: true,
+            jslint_happy: false,
+            wrap_line_length: 0,
+        });
+        return { ok: true, code: formatted };
+    } catch (e) {
+        return { ok: false, error: String(e.message || e) };
+    }
+}
+
+async function _formatGoServer(code) {
+    try {
+        const resp = await fetch("/api/editor/format", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ language: "go", code }),
+        });
+        if (!resp.ok) throw new Error(`Server xatosi: ${resp.status}`);
+        return await resp.json();
+    } catch (e) {
+        return { formatted: code, changed: false, error: String(e.message || e) };
+    }
+}
+
 async function formatEditorCode() {
-    if (currentLanguage !== "python") {
-        showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
+    const code = editor.getValue();
+    if (!code.trim()) return;
+
+    showOutput("Formatlanmoqda...", "");
+
+    if (currentLanguage === "python") {
+        if (!_workerReady) {
+            showOutput("Python muhiti ishga tushirilmoqda...", "warning");
+            try { await ensurePyodideLoaded(); } catch (e) {
+                return showOutput("Python yuklanmadi.", "error");
+            }
+        }
+        _callWorker("format", { code })
+            .then((result) => {
+                if (result.formatterAvailable) {
+                    editor.setValue(result.code);
+                    showOutput("Python (autopep8): formatlandi.", "success");
+                } else {
+                    showOutput("autopep8 yuklanmoqda, qayta urinib ko'ring.", "error");
+                }
+                setTimeout(clearOutput, 2000);
+            })
+            .catch((e) => showOutput("Xatolik: " + e.message, "error"));
         return;
     }
-    if (!_workerReady) {
-        showOutput("Python muhiti ishga tushirilmoqda...", "warning");
-        try {
-            await ensurePyodideLoaded();
-        } catch (e) {
-            return showOutput("Python yuklanmadi.", "error");
+
+    if (currentLanguage === "javascript") {
+        const result = _formatJavaScript(code);
+        if (result.ok) {
+            editor.setValue(result.code);
+            showOutput("JavaScript (Prettier): formatlandi.", "success");
+        } else {
+            showOutput("Xatolik: " + result.error, "error");
         }
+        setTimeout(clearOutput, 2000);
+        return;
     }
-    const code = editor.getValue();
-    showOutput("Formatlanmoqda...", "");
-    _callWorker("format", { code })
-        .then((result) => {
-            if (result.formatterAvailable) {
-                editor.setValue(result.code);
-                showOutput("OK: Kod formatlandi.", "success");
-            } else {
-                showOutput("Formatlash vositasi (autopep8) yuklanmoqda, iltimos qayta urinib ko'ring.", "error");
-            }
-            setTimeout(clearOutput, 2000);
-        })
-        .catch((error) => {
-            showOutput("Xatolik: " + error.message, "error");
-        });
+
+    if (currentLanguage === "cpp" || currentLanguage === "java") {
+        const result = _formatCLike(code, currentLanguage);
+        const label = currentLanguage === "cpp" ? "C++" : "Java";
+        if (result.ok) {
+            editor.setValue(result.code);
+            showOutput(`${label} (js-beautify): formatlandi.`, "success");
+        } else {
+            showOutput("Xatolik: " + result.error, "error");
+        }
+        setTimeout(clearOutput, 2000);
+        return;
+    }
+
+    if (currentLanguage === "go") {
+        const result = await _formatGoServer(code);
+        if (!result.error) {
+            if (result.changed) editor.setValue(result.formatted);
+            showOutput("Go (gofmt): formatlandi.", "success");
+        } else {
+            showOutput("Go format xatoligi: " + result.error, "error");
+        }
+        setTimeout(clearOutput, 2000);
+        return;
+    }
+
+    showOutput("Bu til uchun formatter mavjud emas.", "error");
+    setTimeout(clearOutput, 2000);
 }
 
 function debugCode() {
