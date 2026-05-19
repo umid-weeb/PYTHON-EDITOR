@@ -1,4 +1,9 @@
-let pyodide;
+let pyodide; // kept for legacy checks (null = not ready)
+let _pythonWorker = null;
+let _workerReadyPromise = null;
+let _workerReady = false;
+let _workerMsgId = 0;
+const _workerPending = {};
 let editor;
 let autoSaveInterval;
 let defaultCode = "";
@@ -1280,189 +1285,14 @@ function setupPanelResizer() {
     applySavedSplit();
 }
 
-// --- PYTHON ENVIRONMENT ---
+// --- PYTHON ENVIRONMENT (legacy stubs — real execution in pyodide-worker.js) ---
 
-async function initPyodide() {
-    const loading = document.getElementById("loading");
-    loading.classList.add("active");
+// Legacy stub — actual safe execution is in pyodide-worker.js
+async function setupSafeExecutionEnvironment() { return; }
 
-    try {
-        // Start loading Pyodide in the background
-        const pyodidePromise = loadPyodide();
+// Kept temporarily so old callers don't throw; worker handles autopep8 loading
+async function ensurePythonRuntimeTools() { return; }
 
-        // Allow user to interact with the editor while Pyodide is loading
-        loading.textContent = "Python vositalari yuklanmoqda...";
-        setTimeout(() => {
-            loading.textContent = "Editor tayyor, Python yuklanmoqda...";
-        }, 1000);
-
-        // Wait for Pyodide to load
-        pyodide = await pyodidePromise;
-
-        // Load Python runtime tools in the background
-        ensurePythonRuntimeTools().catch(error => {
-            console.warn("Python formatter vositalari yuklanmadi:", error);
-        });
-
-        // Setup safe execution environment
-        await setupSafeExecutionEnvironment();
-
-        loading.textContent = "Python tayyor!";
-        setTimeout(() => {
-            loading.classList.remove("active");
-        }, 1500);
-    } catch (error) {
-        loading.textContent = "Ogohlantirish: Python muhiti yuklanmadi, lekin editor ishlaydi.";
-        loading.style.background = "#fee2e2";
-        loading.style.color = "#991b1b";
-    }
-}
-
-async function ensurePythonRuntimeTools() {
-    try {
-        await pyodide.loadPackage("micropip");
-        await pyodide.runPythonAsync(`
-import micropip
-try:
-    import autopep8
-except ImportError:
-    await micropip.install("autopep8")
-    import autopep8
-        `);
-    } catch (error) {
-        console.warn("Python formatter vositalari yuklanmadi:", error);
-    }
-}
-
-async function setupSafeExecutionEnvironment() {
-    await pyodide.runPythonAsync(`
-import sys, ast, builtins, traceback, time
-from io import StringIO
-
-class LoopIterationError(Exception): pass
-class AwaitingInput(Exception):
-    def __init__(self, prompt="", input_index=0):
-        super().__init__(prompt)
-        self.prompt = prompt or ""
-        self.input_index = input_index
-
-class LoopTransformer(ast.NodeTransformer):
-    def visit_loop(self, node):
-        self.generic_visit(node)
-        guard = ast.Expr(ast.Call(func=ast.Name(id="_tick", ctx=ast.Load()), args=[], keywords=[]))
-        ast.copy_location(guard, node)
-        node.body.insert(0, guard)
-        return node
-    visit_For = visit_While = visit_loop
-
-def _tick():
-    if time.time() - _executor.start_time > _executor.timeout:
-        raise LoopIterationError("Vaqt chegarasi tugadi (1s). Cheksiz sikl bo'lishi mumkin.")
-
-ALLOWED_IMPORTS = {
-    "math", "cmath", "decimal", "fractions", "random", "statistics",
-    "itertools", "functools", "operator", "collections", "heapq", "bisect",
-    "string", "re", "json", "copy", "pprint", "enum", "dataclasses",
-    "typing", "abc", "io", "datetime",
-}
-
-def _blocked_import(name, *args, **kwargs):
-    if name in ALLOWED_IMPORTS:
-        return __import__(name, *args, **kwargs)
-    raise ImportError(f"'{name}' modulini import qilishga ruxsat yo'q.")
-
-class SafeExecutor:
-    def __init__(self, timeout=1.0):
-        self.timeout = timeout
-        self.start_time = None
-
-    def _serialize_error(self, error):
-        tb = traceback.extract_tb(error.__traceback__)
-        user_frame = next((f for f in reversed(tb) if f.filename == "<user_code>"), None)
-        ln = getattr(error, "lineno", user_frame.lineno if user_frame else None)
-        col = getattr(error, "offset", None)
-        txt = getattr(error, "text", user_frame.line if user_frame else None)
-        
-        return {
-            "type": type(error).__name__,
-            "message": str(error),
-            "line": ln,
-            "column": col,
-            "codeLine": txt.strip() if isinstance(txt, str) else None,
-            "traceback": "".join(traceback.format_exception(type(error), error, error.__traceback__))
-        }
-
-    def execute(self, code, inputs=None):
-        old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
-        sys.stdout = sys.stderr = StringIO()
-        inputs = [str(v) if v is not None else "" for v in (inputs or [])]
-        stdin_text = "\\n".join(inputs)
-        if inputs and inputs[-1] == "":
-            stdin_text += "\\n"
-        sys.stdin = StringIO(stdin_text)
-        consumed = 0
-
-        def m_input(prompt=""):
-            nonlocal consumed
-            line = sys.stdin.readline()
-            if line == "":
-                raise AwaitingInput(str(prompt), consumed)
-            consumed += 1
-            return line.rstrip("\\r\\n")
-
-        try:
-            tree = ast.parse(code, filename="<user_code>")
-            LoopTransformer().visit(tree)
-            ast.fix_missing_locations(tree)
-            compiled = compile(tree, filename="<user_code>", mode="exec")
-            
-            self.start_time = time.time()
-            safe_builtins = {
-                name: getattr(builtins, name)
-                for name in [
-                    "abs", "all", "any", "ascii", "bin", "bool", "bytearray", "bytes",
-                    "callable", "chr", "complex", "dict", "dir", "divmod", "enumerate",
-                    "filter", "float", "format", "frozenset", "getattr", "hasattr", "hash",
-                    "hex", "id", "int", "isinstance", "issubclass", "iter", "len", "list",
-                    "locals", "map", "max", "min", "next", "object", "oct", "ord", "pow",
-                    "print", "range", "repr", "reversed", "round", "set", "setattr",
-                    "slice", "sorted", "str", "sum", "super", "tuple", "type", "vars",
-                    "zip", "True", "False", "None",
-                    "ArithmeticError", "AssertionError", "AttributeError", "EOFError",
-                    "Exception", "FloatingPointError", "GeneratorExit", "IOError",
-                    "ImportError", "IndexError", "KeyError", "KeyboardInterrupt",
-                    "LookupError", "MemoryError", "NameError", "NotImplementedError",
-                    "OSError", "OverflowError", "RecursionError", "RuntimeError",
-                    "StopIteration", "SyntaxError", "SystemExit", "TypeError",
-                    "UnboundLocalError", "UnicodeError", "ValueError", "ZeroDivisionError",
-                    "__build_class__", "__name__",
-                ]
-                if hasattr(builtins, name)
-            }
-            safe_builtins["input"] = m_input
-            safe_builtins["__import__"] = _blocked_import
-            glbs = {"__builtins__": safe_builtins, "__name__": "__main__", "_tick": _tick}
-            exec(compiled, glbs)
-            return {"success": True, "output": sys.stdout.getvalue().rstrip()}
-        except AwaitingInput as e:
-            return {"success": False, "awaitingInput": True, "error": {"prompt": e.prompt, "inputIndex": e.input_index}, "output": sys.stdout.getvalue().rstrip()}
-        except BaseException as e:
-            return {"success": False, "error": self._serialize_error(e), "output": sys.stdout.getvalue().rstrip()}
-        finally:
-            sys.stdout, sys.stderr, sys.stdin = old_stdout, old_stderr, old_stdin
-
-_executor = SafeExecutor(timeout=1.0)
-def safe_run(code, inputs=None): return _executor.execute(code, inputs)
-
-def auto_fix_code(code):
-    try:
-        import autopep8
-        res = autopep8.fix_code(code)
-        return {"code": res, "changed": res != code, "formatterAvailable": True}
-    except:
-        return {"code": code, "changed": False, "formatterAvailable": False}
-    `);
-}
 
 function openArena() {
     window.location.href = "/zone";
@@ -1565,46 +1395,91 @@ function createIdentifierOverlay() {
     };
 }
 
-let pyodideLoadingPromise = null;
+let pyodideLoadingPromise = null; // kept for legacy guard checks
 
-async function ensurePyodideLoaded() {
-    if (pyodide) return pyodide;
-    if (pyodideLoadingPromise) return pyodideLoadingPromise;
-
+function _createPythonWorker() {
+    const worker = new Worker("/pyodide-worker.js");
     const loading = document.getElementById("loading");
-    if (loading) {
-        loading.classList.add("active");
-        loading.textContent = "Python ishga tushirilmoqda (1-marta biroz vaqt oladi)...";
-    }
 
-    pyodideLoadingPromise = (async () => {
-        try {
-            // Brauzer qotmasligi uchun ozgina pauza beramiz
-            await new Promise(r => setTimeout(r, 50));
-            pyodide = await loadPyodide();
-            
-            if (loading) loading.textContent = "Xavfsiz muhit sozlanmoqda...";
-            await new Promise(r => setTimeout(r, 50));
-            await setupSafeExecutionEnvironment();
-            
-            if (loading) {
-                loading.textContent = "Python tayyor!";
-                setTimeout(() => loading.classList.remove("active"), 1500);
+    worker.onmessage = (event) => {
+        const { type, id, result, error, message } = event.data;
+
+        if (type === "status") {
+            if (loading && currentLanguage === "python") {
+                loading.classList.add("active");
+                loading.textContent = message;
             }
-            return pyodide;
-        } catch (error) {
-            console.warn("Python muhiti yuklanmadi:", error);
+        } else if (type === "ready") {
+            _workerReady = true;
+            pyodide = true; // mark as ready for legacy checks
+            if (loading) {
+                if (currentLanguage === "python") {
+                    loading.textContent = "Python tayyor!";
+                    setTimeout(() => loading.classList.remove("active"), 1200);
+                } else {
+                    loading.classList.remove("active");
+                }
+            }
+            if (_workerPending["__ready__"]) {
+                _workerPending["__ready__"].resolve();
+                delete _workerPending["__ready__"];
+            }
+        } else if (type === "initError") {
+            console.error("Pyodide worker init error:", error);
             if (loading) {
                 loading.textContent = "Xatolik: Python yuklanmadi.";
                 loading.style.background = "#fee2e2";
                 loading.style.color = "#991b1b";
                 setTimeout(() => loading.classList.remove("active"), 4000);
             }
-            throw error;
+            if (_workerPending["__ready__"]) {
+                _workerPending["__ready__"].reject(new Error(error));
+                delete _workerPending["__ready__"];
+            }
+        } else if (type === "result" || type === "formatted") {
+            if (_workerPending[id]) {
+                _workerPending[id].resolve(result);
+                delete _workerPending[id];
+            }
+        } else if (type === "error") {
+            if (_workerPending[id]) {
+                _workerPending[id].reject(new Error(error));
+                delete _workerPending[id];
+            }
         }
-    })();
+    };
 
-    return pyodideLoadingPromise;
+    return worker;
+}
+
+function _callWorker(type, payload) {
+    return new Promise((resolve, reject) => {
+        const id = String(++_workerMsgId);
+        _workerPending[id] = { resolve, reject };
+        _pythonWorker.postMessage({ type, id, ...payload });
+    });
+}
+
+async function ensurePyodideLoaded() {
+    if (_workerReady) return true;
+    if (_workerReadyPromise) return _workerReadyPromise;
+
+    const loading = document.getElementById("loading");
+    if (loading && currentLanguage === "python") {
+        loading.classList.add("active");
+        loading.textContent = "Python ishga tushirilmoqda...";
+    }
+
+    _workerReadyPromise = new Promise((resolve, reject) => {
+        _workerPending["__ready__"] = { resolve, reject };
+    });
+    pyodideLoadingPromise = _workerReadyPromise; // legacy guard
+
+    if (!_pythonWorker) {
+        _pythonWorker = _createPythonWorker();
+    }
+
+    return _workerReadyPromise;
 }
 
 function syncLanguageSelector() {
@@ -1717,14 +1592,12 @@ function setEditorLanguage(language, options = {}) {
     // Show/hide Python loading banner based on language
     const _loading = document.getElementById("loading");
     if (nextLanguage === "python") {
-        if (!pyodide && !pyodideLoadingPromise) {
-            // Start loading Python proactively now that user is on Python
+        if (!_workerReady && !_workerReadyPromise) {
             preloadPythonEnvironment();
-        } else if (!pyodide && pyodideLoadingPromise) {
-            // Already loading, just show the banner
+        } else if (!_workerReady && _workerReadyPromise) {
             if (_loading) { _loading.classList.add("active"); _loading.textContent = "Python vositalari yuklanmoqda..."; }
         }
-        // If pyodide already loaded, banner stays hidden — nothing to do
+        // If worker already ready, banner stays hidden
     } else {
         // Switched away from Python — hide the loading banner
         if (_loading) _loading.classList.remove("active");
@@ -4072,7 +3945,7 @@ async function runCode() {
     }
 
     if (config.supportsLocalRun) {
-        if (!pyodide) {
+        if (!_workerReady) {
             showOutput("Python muhiti ishga tushirilmoqda, iltimos kuting...", "warning");
             try {
                 await ensurePyodideLoaded();
@@ -4105,8 +3978,7 @@ async function continueRunSession() {
     if (!activeRunSession) return;
     const start = performance.now();
     try {
-        const res = await pyodide.runPythonAsync(`import json; json.dumps(safe_run(${JSON.stringify(activeRunSession.code)}, ${JSON.stringify(activeRunSession.inputValues)}))`);
-        const result = JSON.parse(res);
+        const result = await _callWorker("run", { code: activeRunSession.code, inputs: activeRunSession.inputValues });
         setEditorRuntimeMode(result.execution_mode || "LOCAL");
         const time = ((performance.now() - start) / 1000).toFixed(3);
 
@@ -4197,14 +4069,12 @@ function renderOutputPanelInput(prompt, index) {
     scrollOutputToLatest();
 }
 
-let isFormatterLoaded = false;
-
 async function formatEditorCode() {
     if (currentLanguage !== "python") {
         showOutput("Formatlash hozircha faqat Python uchun mavjud.", "error");
         return;
     }
-    if (!pyodide) {
+    if (!_workerReady) {
         showOutput("Python muhiti ishga tushirilmoqda...", "warning");
         try {
             await ensurePyodideLoaded();
@@ -4213,20 +4083,14 @@ async function formatEditorCode() {
         }
     }
     const code = editor.getValue();
-    if (!isFormatterLoaded) {
-        showOutput("Formatlash vositasi yuklanmoqda (birinchi marta biroz vaqt oladi)...", "warning");
-        await ensurePythonRuntimeTools();
-        isFormatterLoaded = true;
-    }
     showOutput("Formatlanmoqda...", "");
-    pyodide.runPythonAsync(`import json; json.dumps(auto_fix_code(${JSON.stringify(code)}))`)
-        .then((res) => {
-            const result = JSON.parse(res);
+    _callWorker("format", { code })
+        .then((result) => {
             if (result.formatterAvailable) {
                 editor.setValue(result.code);
                 showOutput("OK: Kod formatlandi.", "success");
             } else {
-                showOutput("Formatlash vositasi (autopep8) mavjud emas.", "error");
+                showOutput("Formatlash vositasi (autopep8) yuklanmoqda, iltimos qayta urinib ko'ring.", "error");
             }
             setTimeout(clearOutput, 2000);
         })
@@ -4320,11 +4184,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
 // Preload Python — only called when language is Python, deferred so UI renders first
 async function preloadPythonEnvironment() {
-    if (pyodide || pyodideLoadingPromise) return;
+    if (_workerReady || _workerReadyPromise) return;
     if (currentLanguage !== "python") return;
     try {
         await ensurePyodideLoaded();
-        ensurePythonRuntimeTools().catch(err => console.warn("Python formatter yuklanmadi:", err));
     } catch (e) {
         // ensurePyodideLoaded handles its own error UI
     }
