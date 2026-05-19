@@ -268,7 +268,7 @@ body.dark-mode .container {
 .btn-run:hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
-  color: #ffffff;
+  color: #12be06;
   box-shadow: 0 16px 28px rgba(35, 83, 215, 0.28);
 }
 
@@ -2076,4 +2076,56 @@ body.dark-mode .editor-ai-input-shell {
   .editor-selection-toolbar {
     max-width: calc(100vw - 12px);
   }
+}
+
+/* CodeMirror inline search/replace dialog override */
+.CodeMirror-dialog {
+    background: #1e2433;
+    border-bottom: 1px solid #2d3650;
+    color: #c9d1e0;
+    padding: 6px 10px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.CodeMirror-dialog input {
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    color: #e5e7eb;
+    padding: 3px 8px;
+    font-size: 13px;
+    outline: none;
+    min-width: 180px;
+}
+.CodeMirror-dialog input:focus {
+    border-color: #6366f1;
+}
+.CodeMirror-dialog button {
+    background: #374151;
+    border: none;
+    border-radius: 4px;
+    color: #e5e7eb;
+    padding: 3px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.CodeMirror-dialog button:hover {
+    background: #4b5563;
+}
+body:not(.dark-mode) .CodeMirror-dialog {
+    background: #f3f4f6;
+    border-bottom-color: #d1d5db;
+    color: #111827;
+}
+body:not(.dark-mode) .CodeMirror-dialog input {
+    background: #fff;
+    border-color: #d1d5db;
+    color: #111827;
+}
+body:not(.dark-mode) .CodeMirror-dialog button {
+    background: #e5e7eb;
+    color: #111827;
 }
