@@ -419,6 +419,17 @@ export default function AdminProblemFormPage() {
     if (!description.trim()) { setError("Description kiritilishi shart"); return; }
     if (!slug.trim()) { setError("Slug kiritilishi shart"); return; }
 
+    const validTCs = testCases.filter((tc) => tc.input.trim());
+    if (validTCs.length === 0) {
+      setError("Kamida 1 ta test case qo'shilishi shart. AI Yaratsin tugmasini bosing.");
+      return;
+    }
+    const visibleTCs = validTCs.filter((tc) => !tc.is_hidden);
+    if (visibleTCs.length === 0) {
+      setError("Kamida 1 ta ko'rinadigan test case bo'lishi kerak (ba'zi test case lardan YASHIRIN checkbox ni oching).");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSuccess("");
@@ -875,6 +886,27 @@ export default function AdminProblemFormPage() {
                 </div>
               </div>
             )}
+
+            {/* Visible/hidden count warning */}
+            {(() => {
+              const filled = testCases.filter((tc) => tc.input.trim());
+              const visible = filled.filter((tc) => !tc.is_hidden);
+              if (filled.length === 0) return (
+                <div className="flex items-center gap-2 text-sm text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-lg px-4 py-2.5">
+                  ⚠ Test case yo'q — yuqoridagi "AI Yaratsin (10 ta)" tugmasini bosing
+                </div>
+              );
+              if (visible.length === 0) return (
+                <div className="flex items-center gap-2 text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5">
+                  ✗ Barcha test caselar yashirin — foydalanuvchilar "Sinash" da hech narsa ko'rmaydi. Kamida 1 tasidan YASHIRIN belgisin olib tashlang.
+                </div>
+              );
+              return (
+                <div className="text-xs text-gray-500">
+                  {visible.length} ta ko'rinadigan (Sinash) · {filled.length - visible.length} ta yashirin (Yuborish)
+                </div>
+              );
+            })()}
 
             {/* Test cases table */}
             <div className="overflow-x-auto rounded-xl border border-gray-800">

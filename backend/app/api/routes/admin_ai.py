@@ -383,57 +383,96 @@ Quyidagi JSON formatida javob ber (FAQAT JSON, boshqa hech narsa yozma):
 
 {{
   "title_uz": "Masala nomining o'zbek tilidagi tarjimasi (aniq va professional)",
-  "description": "Masala tavsifining to'liq o'zbekcha tarjimasi (markdown formatida, misollar bilan). Sodda va tushinarli tilida yoz. Atamalarni o'zbek tiliga to'g'ri o'gir.",
+  "description": "Masala tavsifining to'liq o'zbekcha tarjimasi (markdown formatida, misollar bilan). Sodda va tushinarli tilida yoz.",
   "input_format": "Kirish ma'lumotlari formati (o'zbekcha)",
   "output_format": "Chiqish ma'lumotlari formati (o'zbekcha)",
   "constraints_text": "Cheklovlar (o'zbekcha, masalan: 1 ≤ n ≤ 10^5)",
   "function_name": "yechim_uchun_funksiya_nomi_inglizcha (masalan: twoSum, maxSubarray)",
   "starter_code_python": "def function_name(params):\\n    # Yechimingizni shu yerga yozing\\n    pass",
-  "test_cases": [
-    {{"input": "kiritilgan_qiymat", "expected_output": "kutilgan_natija", "is_hidden": false}},
-    {{"input": "boshqa_kiritish", "expected_output": "boshqa_natija", "is_hidden": false}},
-    {{"input": "yashirin_test", "expected_output": "natija", "is_hidden": true}}
-  ],
   "difficulty": "{difficulty}"
 }}
 
 MUHIM:
 - Description markdown formatida bo'lsin, misollar **Ko'rinishi:** va **Natija:** bilan ko'rsatilsin
-- Test case lar haqiqiy va to'g'ri bo'lsin (LeetCode misollaridan oling)
 - function_name inglizcha camelCase yoki snake_case bo'lsin
-- Kamida 5 ta test case (2 ta ko'rinadigan, 3 ta yashirin)
 - O'zbek tilidagi tarjima grammatik to'g'ri va tushunarli bo'lsin
 """
 
     try:
-        ai_response = await _ai_complete(translate_prompt, max_tokens=3000, json_mode=True)
+        ai_response = await _ai_complete(translate_prompt, max_tokens=2500, json_mode=True)
         result = json.loads(ai_response)
     except json.JSONDecodeError:
-        # JSON ni extract qilishga urinish
         match = re.search(r"\{[\s\S]+\}", ai_response)
         if not match:
             raise HTTPException(500, "AI javob noto'g'ri formatda qaytdi.")
         result = json.loads(match.group(0))
 
-    # Test case larni normalize qilish
-    test_cases = []
-    for tc in result.get("test_cases", []):
-        if isinstance(tc, dict) and "input" in tc and "expected_output" in tc:
-            test_cases.append({
-                "input": str(tc["input"]),
-                "expected_output": str(tc["expected_output"]),
-                "is_hidden": bool(tc.get("is_hidden", False)),
-            })
+    function_name = result.get("function_name", "solve")
 
-    # LeetCode dan kelgan misollarni ham qo'shish (agar AI undan foydalanmagan bo'lsa)
-    if examples_raw and len(test_cases) < 3:
-        for line in examples_raw.strip().split("\n"):
+    # 4. 10 ta test case yaratish + reference solution bilan tekshirish
+    tc_prompt = f"""Sen dasturlash masalasi uchun test case yaratuvchi mutaxassissan.
+
+MASALA: {title_en}
+FUNKSIYA NOMI: {function_name}
+TAVSIF:
+{raw_text[:2000]}
+
+VAZIFA: Ushbu funksiya uchun 10 ta to'liq test case va reference solution yarat.
+Quyidagi JSON formatida javob ber (FAQAT JSON):
+{{
+  "reference_solution": "to'g'ri ishlaydigan Python funksiya kodi (def {function_name}(...))",
+  "test_cases": [
+    {{"input": "Python eval() da ishlaydigan argument(lar)", "expected_output": "natija string sifatida", "is_hidden": false}},
+    ...10 ta jami...
+  ]
+}}
+
+QOIDALAR:
+- input: Python eval() da ishlaydigan format (masalan: "[1,2,3]" yoki "[1,2,3], 0" ko'p arg uchun)
+- expected_output: string ko'rinishida to'g'ri natija
+- Birinchi 3 ta: oddiy, ko'rinadigan (is_hidden: false)
+- 4-7 ta: o'rtacha murakkablik (is_hidden: false)
+- 8-10 ta: murakkab edge case (is_hidden: true)
+- reference_solution to'g'ri ishlasin, barcha test caselardan o'tsin
+"""
+    verified_cases = []
+    try:
+        tc_response = await _ai_complete(tc_prompt, max_tokens=3000, json_mode=True)
+        tc_result = json.loads(tc_response)
+        raw_cases = tc_result.get("test_cases", [])
+        solution_code = tc_result.get("reference_solution", "")
+
+        # Normalize
+        normalized = []
+        for tc in raw_cases:
+            if isinstance(tc, dict) and "input" in tc and "expected_output" in tc:
+                normalized.append({
+                    "input": str(tc["input"]),
+                    "expected_output": str(tc["expected_output"]),
+                    "is_hidden": bool(tc.get("is_hidden", False)),
+                })
+
+        # Verify with reference solution
+        if solution_code and normalized:
+            verified_cases = _verify_test_cases_with_code(solution_code, function_name, normalized)
+        else:
+            verified_cases = normalized
+    except Exception:
+        verified_cases = []
+
+    # Fallback: LeetCode dan kelgan misollar
+    if not verified_cases and examples_raw:
+        for i, line in enumerate(examples_raw.strip().split("\n")):
             if line.strip():
-                test_cases.insert(0, {
+                verified_cases.append({
                     "input": line.strip(),
                     "expected_output": "",
                     "is_hidden": False,
                 })
+
+    # Birinchi 3 ta DOIM ko'rinsin
+    for i, tc in enumerate(verified_cases):
+        tc["is_hidden"] = i >= 7  # 0-6: ko'rinadi, 7-9: yashirin
 
     return LeetCodeProblemResponse(
         title=result.get("title_uz", title_en),
@@ -444,9 +483,9 @@ MUHIM:
         output_format=result.get("output_format", ""),
         constraints_text=result.get("constraints_text", ""),
         starter_code=result.get("starter_code_python", "def solve():\n    pass"),
-        function_name=result.get("function_name", "solve"),
+        function_name=function_name,
         tags=tags,
-        test_cases=test_cases,
+        test_cases=verified_cases,
         leetcode_id=lc_id,
         source_url=f"https://leetcode.com/problems/{slug}/",
     )
