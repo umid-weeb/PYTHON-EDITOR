@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { formatProblemTitle, localizeDifficultyLabel } from "../../lib/problemPresentation.js";
 import DiscussionTab from "./DiscussionTab.js";
+import { API_BASE_URL, arenaApi } from "../../lib/apiClient.js";
+
+function buildWsUrl(slug: string) {
+  const base = API_BASE_URL.replace(/^http/, "ws") || `ws://${window.location.host}`;
+  return `${base}/ws/problems/${encodeURIComponent(slug)}/presence`;
+}
 
 type VisibleTestcase = {
   name?: string;
@@ -18,6 +24,7 @@ type Problem = {
   description?: string;
   constraints?: string[];
   visible_testcases?: VisibleTestcase[];
+  view_count?: number;
 };
 
 type Props = {
@@ -46,6 +53,35 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function ProblemDescription({ problem, loading, embedded = false, siblings, onBack, onNavigate }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("description");
+  const [viewCount, setViewCount] = useState(problem?.view_count ?? 0);
+  const [liveCount, setLiveCount] = useState(1);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    setViewCount(problem?.view_count ?? 0);
+  }, [problem?.view_count]);
+
+  useEffect(() => {
+    const slug = problem?.slug || problem?.id || "";
+    if (!slug) return;
+
+    arenaApi.recordView(slug).then((res: any) => {
+      if (res?.view_count != null) setViewCount(res.view_count);
+    }).catch(() => {});
+
+    const ws = new WebSocket(buildWsUrl(slug));
+    wsRef.current = ws;
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.count != null) setLiveCount(msg.count);
+      } catch {}
+    };
+    ws.onerror = () => {};
+    ws.onclose = () => {};
+
+    return () => { ws.close(); };
+  }, [problem?.slug, problem?.id]);
 
   if (loading) {
     return (
@@ -104,6 +140,20 @@ export default function ProblemDescription({ problem, loading, embedded = false,
                 {formatProblemTitle(problem)}
               </h1>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex h-[26px] items-center gap-1 border border-[color:var(--border)] bg-[var(--bg-subtle)] px-2 text-[11px] text-[var(--text-secondary)]">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/>
+                <circle cx="8" cy="8" r="2"/>
+              </svg>
+              {viewCount >= 1000 ? `${(viewCount / 1000).toFixed(1)}k` : viewCount}
+            </span>
+            <span className="inline-flex h-[26px] items-center gap-1.5 border border-[color:var(--border)] bg-[var(--bg-subtle)] px-2 text-[11px] text-[var(--text-secondary)]">
+              <span className="h-[6px] w-[6px] rounded-full bg-emerald-400" />
+              {liveCount}
+            </span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
