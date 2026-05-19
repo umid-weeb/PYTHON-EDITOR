@@ -84,6 +84,9 @@ export const adminApi = {
   deleteProblem: (problemId) =>
     adminRequest(`/api/admin/problems/${problemId}`, { method: "DELETE" }),
 
+  toggleVisibility: (problemId) =>
+    adminRequest(`/api/admin/problems/${problemId}/toggle-visibility`, { method: "PATCH" }),
+
   // ---------------------------------------------------------------------------
   // Test Cases
   // ---------------------------------------------------------------------------

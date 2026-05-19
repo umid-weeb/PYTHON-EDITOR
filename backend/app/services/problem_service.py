@@ -86,7 +86,7 @@ class ProblemService:
                 return cached_items
 
         with SessionLocal() as db:
-            problems = db.query(Problem).all()
+            problems = db.query(Problem).filter(Problem.is_published.is_not(False)).all()
 
         problems.sort(key=lambda problem: (order_map.get(problem.slug, 10**9), str(problem.slug)))
 

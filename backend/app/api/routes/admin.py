@@ -93,6 +93,7 @@ class ProblemAdminSummary(BaseModel):
     tags: List[str]
     leetcode_id: Optional[int]
     test_case_count: int
+    is_published: bool
     created_at: datetime
 
     class Config:
@@ -427,6 +428,7 @@ def list_admin_problems(
             tags=tags,
             leetcode_id=problem.leetcode_id,
             test_case_count=int(tc_count or 0),
+            is_published=problem.is_published is not False,
             created_at=problem.created_at,
         ))
     return result
@@ -565,6 +567,23 @@ def delete_problem(
     _invalidate_cache()
     logger.info("Admin: masala o'chirildi id=%s", problem_id)
     return {"deleted": True, "id": problem_id}
+
+
+@router.patch("/problems/{problem_id}/toggle-visibility")
+def toggle_problem_visibility(
+    problem_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_admin_user),
+) -> dict:
+    """Masalani ko'rish/yashirish holatini almashtirish."""
+    problem = db.query(Problem).filter(Problem.id == problem_id).first()
+    if not problem:
+        raise HTTPException(status_code=404, detail="Masala topilmadi.")
+    problem.is_published = problem.is_published is False  # toggle: False→True, True/None→False
+    db.commit()
+    _invalidate_cache(problem_id)
+    logger.info("Admin: masala ko'rinishi o'zgartirildi id=%s is_published=%s", problem_id, problem.is_published)
+    return {"id": problem_id, "is_published": problem.is_published}
 
 
 # ---------------------------------------------------------------------------

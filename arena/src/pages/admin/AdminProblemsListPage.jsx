@@ -55,6 +55,8 @@ export default function AdminProblemsListPage() {
 
   // Inline delete state: { [problemId]: "confirming" | "deleting" | "removing" }
   const [deleteState, setDeleteState] = useState({});
+  // Visibility toggle loading state
+  const [visibilityLoading, setVisibilityLoading] = useState({});
 
   // Search debounce
   const searchTimer = useRef(null);
@@ -119,6 +121,27 @@ export default function AdminProblemsListPage() {
       delete next[problemId];
       return next;
     });
+  }
+
+  async function handleToggleVisibility(problemId) {
+    setVisibilityLoading((prev) => ({ ...prev, [problemId]: true }));
+    try {
+      const result = await adminApi.toggleVisibility(problemId);
+      setProblems((prev) =>
+        prev.map((p) =>
+          p.id === problemId ? { ...p, is_published: result.is_published } : p
+        )
+      );
+      invalidateCache();
+    } catch (err) {
+      setError("Ko'rinishni o'zgartirishda xato: " + (err.message || "Noma'lum xato"));
+    } finally {
+      setVisibilityLoading((prev) => {
+        const next = { ...prev };
+        delete next[problemId];
+        return next;
+      });
+    }
   }
 
   async function confirmDelete(problemId) {
@@ -259,6 +282,7 @@ export default function AdminProblemsListPage() {
                   <th className="text-left px-4 py-3 font-medium w-8">#</th>
                   <th className="text-left px-4 py-3 font-medium">Masala</th>
                   <th className="text-center px-4 py-3 font-medium">Qiyinlik</th>
+                  <th className="text-center px-4 py-3 font-medium">Holat</th>
                   <th className="text-center px-4 py-3 font-medium hidden sm:table-cell">
                     Test
                   </th>
@@ -318,6 +342,26 @@ export default function AdminProblemsListPage() {
                           {DIFFICULTY_LABELS[problem.difficulty] ||
                             problem.difficulty}
                         </span>
+                      </td>
+
+                      {/* Holat — publish toggle */}
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleToggleVisibility(problem.id)}
+                          disabled={!!visibilityLoading[problem.id]}
+                          title={problem.is_published ? "Yashirish" : "Ko'rsatish"}
+                          className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                            problem.is_published
+                              ? "text-green-400 bg-green-400/10 border-green-400/20 hover:bg-red-400/10 hover:text-red-400 hover:border-red-400/20"
+                              : "text-gray-500 bg-gray-700/30 border-gray-600/30 hover:bg-green-400/10 hover:text-green-400 hover:border-green-400/20"
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {visibilityLoading[problem.id]
+                            ? "..."
+                            : problem.is_published
+                            ? "Ochiq"
+                            : "Yashirin"}
+                        </button>
                       </td>
 
                       <td className="px-4 py-3 text-center hidden sm:table-cell text-gray-400">

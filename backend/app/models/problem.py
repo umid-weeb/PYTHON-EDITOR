@@ -21,6 +21,7 @@ class Problem(Base):
     function_name = Column(String(64), nullable=False, default="solve")
     tags_json = Column(Text, nullable=False, default="[]")
     leetcode_id = Column(Integer, nullable=True)
+    is_published = Column(Boolean, nullable=True, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     test_cases = relationship(

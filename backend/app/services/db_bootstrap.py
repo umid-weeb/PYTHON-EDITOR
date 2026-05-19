@@ -602,10 +602,30 @@ POSTGRES_BOOTSTRAP_SQL = [
     """
     CREATE INDEX IF NOT EXISTS idx_problems_difficulty ON problems(difficulty);
     """,
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT TRUE;
+    """,
 ]
 
 
+def _run_sqlite_migrations(engine: Engine) -> None:
+    """Add missing columns to SQLite databases (idempotent)."""
+    sqlite_columns = [
+        "ALTER TABLE problems ADD COLUMN is_published BOOLEAN DEFAULT 1",
+    ]
+    with engine.connect() as connection:
+        for stmt in sqlite_columns:
+            try:
+                connection.execute(text(stmt))
+                connection.commit()
+            except Exception:
+                pass  # Column already exists
+
+
 def run_startup_migrations(engine: Engine) -> None:
+    if engine.dialect.name == "sqlite":
+        _run_sqlite_migrations(engine)
+        return
     if engine.dialect.name != "postgresql":
         logger.info("Skipping Supabase/PostgreSQL bootstrap migrations for dialect=%s", engine.dialect.name)
         return
