@@ -34,7 +34,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anonymous+Pro:wght@400;700&family=Azeret+Mono:wght@400;500;600&family=Courier+Prime:wght@400;700&family=Fira+Code:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inconsolata:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Roboto+Mono:wght@400;500;600&family=Source+Code+Pro:wght@400;500;600&family=Space+Mono:wght@400;700&family=Ubuntu+Mono:wght@400;700&family=Victor+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Apply saved theme immediately to prevent flash of wrong background -->
+    <!-- Apply dark theme instantly before any CSS file loads — prevents ALL flash -->
     <script>
       (function(){
         try {
@@ -44,6 +44,39 @@
         } catch(e){}
       })();
     </script>
+    <style>
+      html.dark-mode-pre body {
+        background: #09111d !important;
+        color: #e5edf7 !important;
+      }
+      html.dark-mode-pre .container {
+        background: rgba(10,17,31,0.9) !important;
+        border-color: rgba(36,50,71,0.92) !important;
+      }
+      html.dark-mode-pre .header,
+      html.dark-mode-pre .panel-header,
+      html.dark-mode-pre .editor-panel,
+      html.dark-mode-pre .output-panel {
+        background: #0f172a !important;
+        border-color: #243247 !important;
+      }
+      html.dark-mode-pre .CodeMirror {
+        background: #131b2d !important;
+        color: #e5edf7 !important;
+      }
+      html.dark-mode-pre .CodeMirror-gutters {
+        background: #131b2d !important;
+        border-color: #243247 !important;
+      }
+      html.dark-mode-pre .panel-output,
+      html.dark-mode-pre .output-content {
+        background: #0b1220 !important;
+      }
+      html.dark-mode-pre .loading {
+        background: #0f172a !important;
+        color: #97a7bd !important;
+      }
+    </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/eclipse.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
