@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import DashboardShell from "../components/layout/DashboardShell.jsx";
 import { userApi } from "../lib/apiClient.js";
+import { formatMemory } from "../lib/formatters.js";
 import styles from "./TablePage.module.css";
 
 export default function SubmissionsPage() {
@@ -67,7 +68,7 @@ export default function SubmissionsPage() {
                       <td>{submission.problem_title || submission.problem_id}</td>
                       <td className={verdictClass}>{verdict}</td>
                       <td>{submission.runtime_ms ? `${submission.runtime_ms} ms` : "--"}</td>
-                      <td>{submission.memory_kb ? `${Math.round(submission.memory_kb)} KB` : "--"}</td>
+                      <td>{formatMemory(submission.memory_bytes ?? submission.memory_kb)}</td>
                       <td>{submission.created_at ? new Date(submission.created_at).toLocaleString() : "--"}</td>
                     </tr>
                   );

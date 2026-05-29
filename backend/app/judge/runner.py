@@ -170,7 +170,7 @@ try:
         "actual": result,
         "stdout": stdout_buffer.getvalue(),
         "runtime_ms": runtime_ms,
-        "memory_kb": int(peak / 1024)
+        "memory_kb": int(peak)
     }, ensure_ascii=False, default=repr))
     print("<<<JSON_END>>>")
 except LoopTimeoutError as exc:
@@ -183,7 +183,7 @@ except LoopTimeoutError as exc:
         "error": str(exc),
         "message": "Execution stopped: possible infinite loop",
         "runtime_ms": runtime_ms,
-        "memory_kb": int(peak / 1024)
+        "memory_kb": int(peak)
     }, ensure_ascii=False))
     print("<<<JSON_END>>>")
 except MemoryError as exc:
@@ -195,7 +195,7 @@ except MemoryError as exc:
         "stdout": stdout_buffer.getvalue(),
         "error": format_user_error(exc),
         "runtime_ms": runtime_ms,
-        "memory_kb": int(peak / 1024)
+        "memory_kb": int(peak)
     }, ensure_ascii=False))
     print("<<<JSON_END>>>")
 except Exception as exc:
@@ -207,7 +207,7 @@ except Exception as exc:
         "stdout": stdout_buffer.getvalue(),
         "error": format_user_error(exc),
         "runtime_ms": runtime_ms,
-        "memory_kb": int(peak / 1024)
+        "memory_kb": int(peak)
     }, ensure_ascii=False))
     print("<<<JSON_END>>>")
 finally:
@@ -272,7 +272,7 @@ class JudgeRunner:
         for testcase in selected:
             execution = self._execute_case(problem, code, testcase, is_extended=is_extended)
             runtime_total += execution.get("runtime_ms", 0) or 0
-            memory_peak = max(memory_peak, execution.get("memory_kb", 0) or 0)
+            memory_peak = max(memory_peak, execution.get("memory_bytes") or execution.get("memory_kb", 0) or 0)
 
             is_hidden = bool(testcase.get("hidden")) and mode == "submit"
             case_result = {
@@ -280,6 +280,7 @@ class JudgeRunner:
                 "verdict": execution["verdict"],
                 "passed": execution["passed"],
                 "runtime_ms": execution.get("runtime_ms"),
+                "memory_bytes": execution.get("memory_bytes") or execution.get("memory_kb"),
                 "memory_kb": execution.get("memory_kb"),
                 "input": None if is_hidden else testcase.get("input"),
                 "expected_output": None if is_hidden else testcase.get("expected_output"),
@@ -302,6 +303,7 @@ class JudgeRunner:
         return {
             "verdict": verdict,
             "runtime_ms": runtime_total,
+            "memory_bytes": memory_peak,
             "memory_kb": memory_peak,
             "passed_count": passed_count,
             "total_count": len(selected),
@@ -382,12 +384,14 @@ class JudgeRunner:
             status = (payload.get("status") or {}).get("description", "")
             time_ms = int(float(payload.get("time") or 0) * 1000)
             memory_kb = int(payload.get("memory") or 0)
+            memory_bytes = memory_kb
 
             if status.lower().startswith("time limit"):
                 return {
                     "verdict": "Time Limit Exceeded",
                     "passed": False,
                     "runtime_ms": time_ms,
+                    "memory_bytes": memory_bytes,
                     "memory_kb": memory_kb,
                     "actual_output": stdout,
                     "error": stderr or status,
@@ -398,6 +402,7 @@ class JudgeRunner:
                     "verdict": "Memory Limit Exceeded",
                     "passed": False,
                     "runtime_ms": time_ms,
+                    "memory_bytes": memory_bytes,
                     "memory_kb": memory_kb,
                     "actual_output": stdout,
                     "error": stderr or status,
@@ -408,6 +413,7 @@ class JudgeRunner:
                     "verdict": "Runtime Error",
                     "passed": False,
                     "runtime_ms": time_ms,
+                    "memory_bytes": memory_bytes,
                     "memory_kb": memory_kb,
                     "actual_output": stdout,
                     "error": stderr or status,
@@ -417,6 +423,7 @@ class JudgeRunner:
                 "verdict": "Accepted",
                 "passed": True,
                 "runtime_ms": time_ms,
+                "memory_bytes": memory_bytes,
                 "memory_kb": memory_kb,
                 "actual_output": stdout,
                 "error": None,
@@ -639,7 +646,9 @@ class JudgeRunner:
             }
 
         payload["passed"] = payload.get("verdict") == "Accepted"
-        
+        payload["memory_bytes"] = int(payload.get("memory_bytes") or payload.get("memory_kb") or 0)
+        payload["memory_kb"] = payload["memory_bytes"]
+
         actual_val = payload.get("actual")
         payload["actual_output"] = None if actual_val is None else stringify_value(actual_val)
         

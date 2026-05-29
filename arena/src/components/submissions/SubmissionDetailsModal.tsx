@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { arenaApi } from "../../lib/apiClient";
+import { formatMemory } from "../../lib/formatters";
 import Editor from "@monaco-editor/react";
 
 type Props = {
@@ -113,7 +114,7 @@ export default function SubmissionDetailsModal({ submissionId, onClose }: Props)
                     </div>
                     <div className="rounded-lg border border-[color:var(--border)] bg-[var(--bg-surface)] p-3 shadow-sm">
                       <div className="text-[10px] uppercase text-[var(--text-muted)] mb-1">Memory</div>
-                      <div className="text-sm font-bold font-mono">{details.memory_kb ? (details.memory_kb / 1024).toFixed(2) : "--"} MB</div>
+                      <div className="text-sm font-bold font-mono">{formatMemory(details.memory_bytes ?? details.memory_kb)}</div>
                     </div>
                   </div>
 
@@ -134,7 +135,7 @@ export default function SubmissionDetailsModal({ submissionId, onClose }: Props)
                           </span>
                         </div>
                         <div className="text-[10px] font-mono text-[var(--text-muted)]">
-                          {res.runtime_ms}ms · {(res.memory_kb / 1024).toFixed(1)}MB
+                          {res.runtime_ms}ms · {formatMemory(res.memory_bytes ?? res.memory_kb)}
                         </div>
                       </div>
                     ))}

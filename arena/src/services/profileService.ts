@@ -39,6 +39,7 @@ export type SubmissionRow = {
   verdict?: string | null;
   status?: string | null;
   runtime_ms?: number | null;
+  memory_bytes?: number | null;
   memory_kb?: number | null;
   created_at?: string | null;
 };
@@ -114,6 +115,7 @@ export async function hydrateSubmissionRows(rows: SubmissionRow[]): Promise<Subm
             status: normalizeLiveStatus(live),
             verdict: live?.verdict || row.verdict || null,
             runtime_ms: live?.runtime_ms ?? row.runtime_ms ?? null,
+            memory_bytes: live?.memory_bytes ?? row.memory_bytes ?? null,
             memory_kb: live?.memory_kb ?? row.memory_kb ?? null,
           },
         ] as const;

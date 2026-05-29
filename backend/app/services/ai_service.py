@@ -45,8 +45,16 @@ def _extract_code_block(text: str) -> str:
     return cleaned
 
 
+def _normalize_code_text(code: str) -> str:
+    return textwrap.dedent(code or "").strip()
+
+
+def _is_echoed_solution(candidate: str, original: str) -> bool:
+    return _normalize_code_text(candidate) == _normalize_code_text(original)
+
+
 def _validate_python_snippet(code: str) -> list[str]:
-    snippet = textwrap.dedent(code or "").strip()
+    snippet = _normalize_code_text(code)
     if not snippet:
         return ["Kod bo'sh. Iltimos, yechimni qayta yozing."]
     try:
@@ -358,11 +366,12 @@ Masala sharti:
 Cheklovlar:
 {constraints or 'Maxsus cheklovlar berilmagan.'}
 
-Mavjud kod (agar mavjud bo'lsa):
+Foydalanuvchi yozgan kodi (faqat kontekst uchun; uni takrorlamang):
 {code or "Hali yechim mavjud emas; agar kerak bo'lsa, to'liq yangi yechim yozing."}
 
 QOIDALAR:
 - Faqat Python kodini yozing. Hech qanday izoh, markdown yoki tushuntirish bermang.
+- Foydalanuvchi yozgan kodni qayta takrorlamang va copy-paste qilmang; yangi yechim yozing.
 - Kod faqat ishlaydigan, qisqa va to'g'ri yechim bo'lsin.
 - Agar ma'lumot yetarli bo'lmasa, taxmin qilmasdan "No reliable solution available" deb yozing.
 - Koddan keyin 1-2 ta qisqa test holatini ham yozing.
@@ -378,6 +387,10 @@ JSON shakli:
         payload = await self._generate_json_payload(prompt, max_tokens=700)
         if payload is not None:
             payload["code"] = _extract_code_block(payload.get("code", ""))
+            if _is_echoed_solution(payload.get("code", ""), code):
+                payload["code"] = ""
+                payload["validation_errors"] = ["Foydalanuvchi yozgan kodni takrorlamang; yangi yechim yozing."]
+                return payload
             errors = _validate_python_snippet(payload.get("code", ""))
             if errors and payload.get("code"):
                 fix_prompt = f"""

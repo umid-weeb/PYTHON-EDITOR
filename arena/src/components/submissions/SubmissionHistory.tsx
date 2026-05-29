@@ -10,6 +10,7 @@ type Submission = {
   verdict: string;
   status: string;
   runtime_ms: number | null;
+  memory_bytes?: number | null;
   memory_kb: number | null;
   created_at: string;
 };
@@ -108,7 +109,7 @@ export default function SubmissionHistory({ problemId, lastSubmissionId, onViewS
                   {formatRuntime(s.runtime_ms)}
                 </td>
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">
-                  {formatMemory(s.memory_kb)}
+                  {formatMemory(s.memory_bytes ?? s.memory_kb)}
                 </td>
                 <td className="hidden px-4 py-2.5 text-[var(--text-muted)] md:table-cell">
                   {new Date(s.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}

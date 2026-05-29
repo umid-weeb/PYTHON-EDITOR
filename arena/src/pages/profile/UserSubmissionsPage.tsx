@@ -116,7 +116,7 @@ export default function UserSubmissionsPage() {
                     <td className="px-4 py-3 text-arena-muted">{submission.language || "--"}</td>
                     <td className={cx("px-4 py-3 font-medium", tone)}>{verdict}</td>
                     <td className="px-4 py-3 text-arena-muted">{formatRuntime(submission.runtime_ms)}</td>
-                    <td className="px-4 py-3 text-arena-muted">{formatMemory(submission.memory_kb)}</td>
+                    <td className="px-4 py-3 text-arena-muted">{formatMemory(submission.memory_bytes ?? submission.memory_kb)}</td>
                     <td className="px-4 py-3 text-arena-muted">
                       {submission.created_at ? new Date(submission.created_at).toLocaleString() : "--"}
                     </td>

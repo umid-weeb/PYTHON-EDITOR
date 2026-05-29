@@ -156,7 +156,7 @@ function SubmissionPanel({ username, rows, status }) {
                     Vaqt: <span className="font-medium text-[var(--text-primary)]">{formatRuntime(submission.runtime_ms)}</span>
                   </div>
                   <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
-                    Xotira: <span className="font-medium text-[var(--text-primary)]">{formatMemory(submission.memory_kb)}</span>
+                    Xotira: <span className="font-medium text-[var(--text-primary)]">{formatMemory(submission.memory_bytes ?? submission.memory_kb)}</span>
                   </div>
                   <div className="border border-[color:var(--border)] bg-[var(--bg-surface)] px-3 py-2">
                     Qiyinlik: <span className="font-medium text-[var(--text-primary)]">{localizeDifficultyLabel(submission.difficulty)}</span>

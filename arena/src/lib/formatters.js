@@ -11,10 +11,11 @@ export function formatRuntime(runtimeMs) {
   return `${runtimeMs} ms`;
 }
 
-export function formatMemory(memoryKb) {
-  if (memoryKb == null) return "--";
-  if (memoryKb >= 1024) return `${(memoryKb / 1024).toFixed(1)} MB`;
-  return `${Math.round(memoryKb)} KB`;
+export function formatMemory(memoryBytes) {
+  if (memoryBytes == null) return "--";
+  if (memoryBytes >= 1024 * 1024) return `${(memoryBytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (memoryBytes >= 1024) return `${(memoryBytes / 1024).toFixed(1)} KB`;
+  return `${Math.round(memoryBytes)} B`;
 }
 
 export function localizeVerdictLabel(verdict) {
@@ -34,6 +35,14 @@ export function localizeVerdictLabel(verdict) {
   return verdict;
 }
 
+export function getMemoryBytes(value) {
+  if (value == null) return null;
+  if (typeof value === "object") {
+    return value.memory_bytes ?? value.memory_kb ?? null;
+  }
+  return value;
+}
+
 export function formatCaseResults(cases = []) {
   if (!cases.length) return [];
   return cases.map((entry, index) => {
@@ -47,7 +56,7 @@ export function formatCaseResults(cases = []) {
       verdict: entry.error ? `${verdict}: ${entry.error}` : verdictText,
       rawVerdict: rawVerdict,
       runtime: formatRuntime(entry.runtime_ms),
-      memory: formatMemory(entry.memory_kb),
+      memory: formatMemory(getMemoryBytes(entry)),
       input: entry.input,
       expected: entry.expected_output,
       actual: entry.actual_output,
@@ -153,7 +162,7 @@ export function buildResultState(payload, mode = "run") {
   }
   
   const runtime = formatRuntime(payload.runtime_ms);
-  const memory = formatMemory(payload.memory_kb);
+  const memory = formatMemory(getMemoryBytes(payload));
   
   if (runtime !== "--") summaryParts.push(`Vaqt: ${runtime}`);
   if (memory !== "--") summaryParts.push(`Xotira: ${memory}`);
