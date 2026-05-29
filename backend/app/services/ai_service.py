@@ -27,7 +27,12 @@ def _normalize_review_result(result: Any) -> Dict[str, Any]:
     base.setdefault("overall_score", 60)
     base.setdefault("beats", "Bu yechim 60/100 ballga yaqin; kichik yaxshilanishlar bilan natija sezilarli yaxshilanadi.")
     base.setdefault("summary", "Yechimning asosiy kuchli va zaif tomonlari haqida qisqacha xulosa.")
-    base.setdefault("alternative", "Yechimni yaxshilash uchun eng sodda yondashuvni oddiy so'zlar bilan ayting: asosiy g'oya, maqsad, va qaysi kichik takomillashtirishlar kerakligini izohlang.")
+    # Never allow code in alternative: only plain Uzbek text, no code block, no def, no for, no return, no =
+    alt = str(base.get("alternative") or "")
+    if ("```" in alt or "def " in alt or "for " in alt or "return " in alt or " = " in alt):
+        base["alternative"] = "Muqobil yondashuv: kod yozmang, faqat oddiy so'zlar bilan asosiy g'oyani va qaysi vosita (masalan dict yoki set) ishlatilishini tushuntiring."
+    else:
+        base["alternative"] = alt
     base.setdefault("edge_cases", ["Chekka holatlar va kiritish hajmi kichik bo'lsa ham to'g'ri ishlashi tekshirilishi kerak."])
     base.setdefault("code_style", ["Kod o'qilishi va saqlanishi oson bo'lishi kerak."])
     base["time_complexity"] = time_complexity
@@ -360,7 +365,6 @@ JSON shakli:
         language: str,
         problem_description: str = "",
         constraints: str = "",
-    ) -> Dict[str, Any]:
         prompt = f"""
 Siz {language} tilida "{problem_title}" masalasining to'g'ri yechimini yozuvchi mutaxassis dasturchisiz.
 
@@ -373,37 +377,27 @@ Cheklovlar:
 Foydalanuvchi yozgan kodi (faqat kontekst uchun; uni takrorlamang):
 {code or "Hali yechim mavjud emas; agar kerak bo'lsa, to'liq yangi yechim yozing."}
 
-QOIDALAR:
-- Faqat Python kodini yozing. Hech qanday izoh, markdown yoki tushuntirish bermang.
-- Foydalanuvchi yozgan kodni qayta takrorlamang va copy-paste qilmang; yangi yechim yozing.
-- Kod faqat ishlaydigan, qisqa va to'g'ri yechim bo'lsin.
-- Agar ma'lumot yetarli bo'lmasa, taxmin qilmasdan "No reliable solution available" deb yozing.
+        ) -> Dict[str, Any]:
+                prompt = f"""
+Siz {language} tilida "{problem_title}" masalasining to'g'ri yechimini yozuvchi mutaxassis dasturchisiz.
+
+Masala sharti:
+{problem_description or 'Masala tavsifi berilmagan.'}
+
+Cheklovlar:
+{constraints or 'Maxsus cheklovlar berilmagan.'}
+
+Foydalanuvchi yozgan kodi (faqat kontekst uchun; uni takrorlamang):
+{code or "Hali yechim mavjud emas; agar kerak bo'lsa, to'liq yangi yechim yozing."}
+
 - Koddan keyin 1-2 ta qisqa test holatini ham yozing.
 
 JSON shakli:
 {{
-  "code": "<to'liq yechim kodi>",
-  "summary": "<o'zbekcha qisqa xulosa>",
-  "tests": ["<test holati 1>", "<test holati 2>"]
+    "code": "<to'liq yechim kodi>",
+    "summary": "<o'zbekcha qisqa xulosa>",
+    "tests": ["<test holati 1>", "<test holati 2>"]
 }}
-"""
-
-        payload = await self._generate_json_payload(prompt, max_tokens=700)
-        if payload is not None:
-            payload["code"] = _extract_code_block(payload.get("code", ""))
-            if _is_echoed_solution(payload.get("code", ""), code):
-                payload["code"] = ""
-                payload["validation_errors"] = ["Foydalanuvchi yozgan kodni takrorlamang; yangi yechim yozing."]
-                return payload
-            errors = _validate_python_snippet(payload.get("code", ""))
-            if errors and payload.get("code"):
-                fix_prompt = f"""
-Siz oldingi Python yechimni tuzatuvchi mutaxassis dasturchisiz.
-Muammo xatolari: {errors}
-Oldingi kod:
-{payload['code']}
-
-QOIDALAR:
 - Faqat to'g'ri Python kodini qaytaring.
 - Xatolarni tuzating.
 - Hech qanday izoh bermang.
@@ -415,7 +409,6 @@ JSON shakli:
                 if fixed is not None:
                     fixed["code"] = _extract_code_block(fixed.get("code", ""))
                     fixed_errors = _validate_python_snippet(fixed.get("code", ""))
-                    if not fixed_errors:
                         payload = fixed
                     else:
                         payload["validation_errors"] = errors + fixed_errors
@@ -428,21 +421,15 @@ JSON shakli:
         return {
             "code": "",
             "summary": "AI kod yaratish xizmati hozircha mavjud emas.",
-            "tests": [],
-            "validation_errors": ["AI xizmat vaqtincha mavjud emas."],
-        }
-
-    # ----------------------------------------------------------------------- #
-    #  Chat (multi-turn tutor)                                                  #
     # ----------------------------------------------------------------------- #
     async def get_chat_response(
         self,
         user_message: str,
         conversation_history: List[Dict[str, str]],
         problem_title: str,
-        problem_description: str,
         constraints: str,
         code: str,
+                    prompt = f"""
         language: str,
     ) -> str:
         problem_context = (
@@ -452,45 +439,21 @@ JSON shakli:
         )
 
         system_prompt = _CHAT_SYSTEM_PROMPT.format(
-            problem_context=problem_context,
-            language=language,
-            code=code.strip() if code.strip() else "(Hali kod yozilmagan)",
-        )
-
-        # Build flat prompt with conversation history
-        lines = [system_prompt, ""]
-        for msg in conversation_history:
-            label = "Foydalanuvchi" if msg["role"] == "user" else "AI Ustoz"
-            lines.append(f"{label}: {msg['content']}")
-        lines.append(f"Foydalanuvchi: {user_message}")
-        lines.append("AI Ustoz:")
         full_prompt = "\n".join(lines)
 
-        errors: list[str] = []
 
         # Helper: build messages list for OpenAI-compatible clients
         def build_messages() -> list:
             msgs = [{"role": "system", "content": system_prompt}]
             for msg in conversation_history:
                 msgs.append({"role": msg["role"], "content": msg["content"]})
+        prompt = f"""
             msgs.append({"role": "user", "content": user_message})
             return msgs
 
         # 1. Groq (primary — free, 30 RPM, LLaMA 3.3 70B)
         if self.groq_client:
-            try:
-                resp = self.groq_client.chat.completions.create(
-                    model=_GROQ_MODEL,
-                    messages=build_messages(),
-                    max_tokens=400,
-                )
                 return resp.choices[0].message.content.strip()
-            except Exception as e:
-                err = str(e)
-                logger.warning(f"Groq Chat: {err}")
-                errors.append(f"Groq: {err}")
-
-        # 2. Gemini REST fallback
         if self.api_key:
             for model in _GEMINI_MODELS:
                 try:
@@ -499,6 +462,7 @@ JSON shakli:
                     err = str(e)
                     logger.warning(f"Gemini Chat {model}: {err}")
                     errors.append(f"{model}: {err}")
+        prompt = f"""
                     continue
 
         # 3. OpenAI fallback
@@ -511,12 +475,6 @@ JSON shakli:
                 )
                 return resp.choices[0].message.content.strip()
             except Exception as e:
-                err = str(e)
-                logger.warning(f"OpenAI Chat: {err}")
-                errors.append(f"OpenAI: {err}")
-
-        return f"Texnik xatolik: AI bilan bog'lanib bo'lmadi ({'; '.join(errors)}). Keyinroq qayta urining."
-
     # ----------------------------------------------------------------------- #
     #  Online editor chat                                                      #
     # ----------------------------------------------------------------------- #
