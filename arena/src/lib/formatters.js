@@ -7,8 +7,9 @@ export function formatJoinedDate(value) {
 
 export function formatRuntime(runtimeMs) {
   if (runtimeMs == null) return "--";
-  if (runtimeMs >= 1000) return `${(runtimeMs / 1000).toFixed(2)} s`;
-  return `${runtimeMs} ms`;
+  const seconds = runtimeMs / 1000;
+  if (seconds >= 1) return `${seconds.toFixed(2)} s`;
+  return `${seconds.toFixed(3)} s`;
 }
 
 export function formatMemory(memoryBytes) {

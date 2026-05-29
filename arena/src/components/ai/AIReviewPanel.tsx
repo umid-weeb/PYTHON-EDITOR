@@ -109,9 +109,9 @@ export default function AIReviewPanel({ problemId, code, language }: Props) {
           <span className="text-xl">🤖</span> AI Analiz Natijasi
         </h3>
         <div className="flex items-center gap-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Umumiy Ball:</span>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[color:var(--accent)] bg-[var(--bg-surface)] text-lg font-black text-[var(--accent)]">
-            {review.overall_score}
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Beats</span>
+          <div className="flex min-h-10 min-w-10 items-center justify-center rounded-full border-2 border-[color:var(--accent)] bg-[var(--bg-surface)] px-2 text-sm font-black text-[var(--accent)]">
+            {review.overall_score ?? 0}/100
           </div>
         </div>
       </div>
@@ -174,6 +174,7 @@ export default function AIReviewPanel({ problemId, code, language }: Props) {
             <p className="text-[12px] leading-relaxed text-[var(--text-primary)]">
               {review.alternative}
             </p>
+            {review.beats ? <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{review.beats}</p> : null}
           </div>
         )}
       </div>

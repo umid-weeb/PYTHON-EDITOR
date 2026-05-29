@@ -24,9 +24,10 @@ def _normalize_review_result(result: Any) -> Dict[str, Any]:
     space_complexity.setdefault("detected", "Ma'lumot yo'q")
     space_complexity.setdefault("suggestion", "Xotira sarfini Big-O yoki bayt bo'yicha ayting; KB/MB o'rniga aniq birlikdan foydalaning.")
 
-    base.setdefault("overall_score", 0)
+    base.setdefault("overall_score", 60)
+    base.setdefault("beats", "Bu yechim 60/100 ballga yaqin; kichik yaxshilanishlar bilan natija sezilarli yaxshilanadi.")
     base.setdefault("summary", "Yechimning asosiy kuchli va zaif tomonlari haqida qisqacha xulosa.")
-    base.setdefault("alternative", "Yechimni yaxshilash uchun eng sodda yondashuv: masala shartini ko'rib, takrorlanishlarni kamaytirish va chekka holatlarni tekshirish.")
+    base.setdefault("alternative", "Yechimni yaxshilash uchun eng sodda yondashuvni oddiy so'zlar bilan ayting: asosiy g'oya, maqsad, va qaysi kichik takomillashtirishlar kerakligini izohlang.")
     base.setdefault("edge_cases", ["Chekka holatlar va kiritish hajmi kichik bo'lsa ham to'g'ri ishlashi tekshirilishi kerak."])
     base.setdefault("code_style", ["Kod o'qilishi va saqlanishi oson bo'lishi kerak."])
     base["time_complexity"] = time_complexity
@@ -231,19 +232,22 @@ Joriy yechim (agar mavjud bo'lsa):
 QOIDALAR:
 - Faqat STRICT JSON qaytaring (markdown yoki matn bo'lmasin).
 - Vaqt murakkabligini faqat Big-O ko'rinishida yozing: O(1), O(log n), O(n), O(n log n), O(n^2) va h.k.
-- Vaqtni ms yoki sekund bilan ko'rsatmaslikka harakat qiling; bu algoritmik murakkablik emas.
-- Xotira murakkabligini Big-O yoki baytlar bilan ayting, lekin KB/MB kabi birliklarni noto'g'ri ko'rsatmaslikka harakat qiling.
-- Tavsiyalar va xulosalar o'zbek tilida bo'lsin, oddiy va aniq bo'lsin.
+- Xotira murakkabligini Big-O yoki baytlar bilan ayting; KB/MB kabi birliklarni noto'g'ri ko'rsatmaslikka harakat qiling.
+- Muqobil yondashuvni har doim oddiy so'zlar bilan ayting; kod blokini yozmang, faqat g'oya va qaysi vosita (masalan dict yoki set) ishlatilishi kerakligini ayting.
+- overall_score 0-100 orasida bo'lsin; 100 — to'liq ishonchli va tez yechim, 0 — juda zaif yechim.
+- Tavsiyalar va xulosalar o'zbek tilida bo'lsin, oddiy, muloyim va amaliy bo'lsin.
 
 JSON shakli:
 {{
-  "overall_score": <int 1-10>,
+  "overall_score": <int 0-100>,
+  "beats": "<str>",
   "summary": "<o'zbekcha qisqa xulosa>",
   "time_complexity": {{"detected": "<str>", "optimal": "<str>", "suggestion": "<str>"}},
   "space_complexity": {{"detected": "<str>", "suggestion": "<str>"}},
   "edge_cases": ["<str>", ...],
   "code_style": ["<str>", ...],
-  "alternative": "<str>"
+  "alternative": "<str>",
+  "beats": "<str>"
 }}
 """
         # 1. Groq (primary — free, fast)

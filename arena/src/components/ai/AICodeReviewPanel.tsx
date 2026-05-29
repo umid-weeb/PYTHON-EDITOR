@@ -24,9 +24,9 @@ export default function AICodeReviewPanel() {
           <span>🤖</span> AI Code Review
         </h3>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400 font-medium">Overall Score:</span>
+          <span className="text-sm text-gray-400 font-medium">Beats:</span>
           <div className="text-2xl font-black text-indigo-400">
-            {aiReview.overall_score}/10
+            {aiReview.overall_score ?? 0}/100
           </div>
         </div>
       </div>
