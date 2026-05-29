@@ -1,11 +1,63 @@
 import json
 import logging
+import tempfile
+import textwrap
 import httpx
 from openai import OpenAI
 from typing import Any, Dict, List, Optional
 from app.core.config import get_settings
 
 logger = logging.getLogger("pyzone.ai")
+
+
+def _normalize_review_result(result: Any) -> Dict[str, Any]:
+    """Ensure review output is usable and consistently phrased in Uzbek."""
+    base = dict(result or {})
+
+    time_complexity = dict(base.get("time_complexity") or {})
+    space_complexity = dict(base.get("space_complexity") or {})
+
+    time_complexity.setdefault("detected", "Ma'lumot yo'q")
+    time_complexity.setdefault("optimal", "O(n) yoki yaxshiroq")
+    time_complexity.setdefault("suggestion", "Vaqt murakkabligini Big-O ko'rinishida yozing; ms kabi birliklarni ishlatmang.")
+
+    space_complexity.setdefault("detected", "Ma'lumot yo'q")
+    space_complexity.setdefault("suggestion", "Xotira sarfini Big-O yoki bayt bo'yicha ayting; KB/MB o'rniga aniq birlikdan foydalaning.")
+
+    base.setdefault("overall_score", 0)
+    base.setdefault("summary", "Yechimning asosiy kuchli va zaif tomonlari haqida qisqacha xulosa.")
+    base.setdefault("alternative", "Yechimni yaxshilash uchun eng sodda yondashuv: masala shartini ko'rib, takrorlanishlarni kamaytirish va chekka holatlarni tekshirish.")
+    base.setdefault("edge_cases", ["Chekka holatlar va kiritish hajmi kichik bo'lsa ham to'g'ri ishlashi tekshirilishi kerak."])
+    base.setdefault("code_style", ["Kod o'qilishi va saqlanishi oson bo'lishi kerak."])
+    base["time_complexity"] = time_complexity
+    base["space_complexity"] = space_complexity
+
+    return base
+
+
+def _extract_code_block(text: str) -> str:
+    cleaned = (text or "").strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if len(lines) >= 2:
+            candidate = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+            return candidate.strip()
+    return cleaned
+
+
+def _validate_python_snippet(code: str) -> list[str]:
+    snippet = textwrap.dedent(code or "").strip()
+    if not snippet:
+        return ["Kod bo'sh. Iltimos, yechimni qayta yozing."]
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as handle:
+            handle.write(snippet)
+            path = handle.name
+        compile(snippet, path, "exec")
+    except Exception as exc:
+        return [f"Syntax xatosi: {exc}"]
+    return []
+
 
 # Gemini REST API — v1
 _GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1/models"
@@ -134,21 +186,51 @@ class AIService:
     # ----------------------------------------------------------------------- #
     #  Code Review                                                              #
     # ----------------------------------------------------------------------- #
-    async def review_code(self, code: str, problem_title: str, language: str) -> Dict[str, Any]:
+    async def review_code(
+        self,
+        code: str,
+        problem_title: str,
+        language: str,
+        problem_description: str = "",
+        constraints: str = "",
+    ) -> Dict[str, Any]:
         import hashlib
-        cache_key = hashlib.md5(f"{problem_title}:{language}:{code}".encode()).hexdigest()
+        code_snapshot = code.strip() if isinstance(code, str) else ""
+        cache_key = hashlib.md5(
+            f"{problem_title}:{language}:{code_snapshot}:{problem_description}:{constraints}".encode()
+        ).hexdigest()
         if cache_key in self._review_cache:
             return self._review_cache[cache_key]
 
+        code_text = code.strip() or (
+            'Hali hech qanday yechim yuborilmagan. Masala shartiga asoslanib, eng yaxshi '
+            'algoritmik yo\'nalishni, vaqt va xotira murakkabligini, chekka holatlarni va '
+            'takomillashtirish tavsiyalarini bering.'
+        )
+
         prompt = f"""
-As an expert software engineer, review this {language} code for the problem "{problem_title}".
+Siz {language} tilidagi "{problem_title}" masalasining yechimi uchun mutaxassis dasturchisiz.
 
-CODE:
-{code}
+Masala sharti:
+{problem_description or 'Masala tavsifi berilmagan.'}
 
-Return STRICT JSON only (no markdown):
+Cheklovlar:
+{constraints or 'Maxsus cheklovlar berilmagan.'}
+
+Joriy yechim (agar mavjud bo'lsa):
+{code_text}
+
+QOIDALAR:
+- Faqat STRICT JSON qaytaring (markdown yoki matn bo'lmasin).
+- Vaqt murakkabligini faqat Big-O ko'rinishida yozing: O(1), O(log n), O(n), O(n log n), O(n^2) va h.k.
+- Vaqtni ms yoki sekund bilan ko'rsatmaslikka harakat qiling; bu algoritmik murakkablik emas.
+- Xotira murakkabligini Big-O yoki baytlar bilan ayting, lekin KB/MB kabi birliklarni noto'g'ri ko'rsatmaslikka harakat qiling.
+- Tavsiyalar va xulosalar o'zbek tilida bo'lsin, oddiy va aniq bo'lsin.
+
+JSON shakli:
 {{
   "overall_score": <int 1-10>,
+  "summary": "<o'zbekcha qisqa xulosa>",
   "time_complexity": {{"detected": "<str>", "optimal": "<str>", "suggestion": "<str>"}},
   "space_complexity": {{"detected": "<str>", "suggestion": "<str>"}},
   "edge_cases": ["<str>", ...],
@@ -165,7 +247,7 @@ Return STRICT JSON only (no markdown):
                     response_format={"type": "json_object"},
                     max_tokens=512,
                 )
-                result = json.loads(resp.choices[0].message.content)
+                result = _normalize_review_result(json.loads(resp.choices[0].message.content))
                 self._review_cache[cache_key] = result
                 return result
             except Exception as e:
@@ -181,7 +263,7 @@ Return STRICT JSON only (no markdown):
                         if text.startswith("json"):
                             text = text[4:]
                         text = text.split("```")[0].strip()
-                    result = json.loads(text)
+                    result = _normalize_review_result(json.loads(text))
                     self._review_cache[cache_key] = result
                     return result
                 except Exception as e:
@@ -196,20 +278,120 @@ Return STRICT JSON only (no markdown):
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
                 )
-                result = json.loads(resp.choices[0].message.content)
+                result = _normalize_review_result(json.loads(resp.choices[0].message.content))
                 self._review_cache[cache_key] = result
                 return result
             except Exception as e:
                 logger.warning(f"OpenAI Review: {e}")
 
-        return {
+        return _normalize_review_result({
             "overall_score": 0,
-            "error": "All AI models failed",
-            "time_complexity": {"detected": "Error", "optimal": "N/A", "suggestion": "Xizmat vaqtincha mavjud emas."},
-            "space_complexity": {"detected": "Error", "suggestion": ""},
-            "edge_cases": ["Texnik xatolik: AI bilan bog'lanib bo'lmadi."],
-            "code_style": [],
-            "alternative": "",
+            "error": "AI xizmat vaqtincha mavjud emas",
+            "summary": "AI tahlili hozircha mavjud emas. Masalani o'zingiz tahlil qilib, vaqt murakkabligini Big-O ko'rinishida va xotira sarfini aniq belgilang.",
+            "time_complexity": {
+                "detected": "Noma'lum",
+                "optimal": "O(n) yoki yaxshiroq",
+                "suggestion": "Vaqt murakkabligini ms o'rniga Big-O ko'rinishida yozing.",
+            },
+            "space_complexity": {
+                "detected": "Noma'lum",
+                "suggestion": "Xotira sarfini baytlar yoki Big-O bilan tasvirlang; KB/MB ishlatmang.",
+            },
+            "edge_cases": ["AI tahlili vaqtincha mavjud emas, shuning uchun chekka holatlar va testlar o'zingiz tekshiring."],
+            "code_style": ["Kodni o'qilishi va tushunarli bo'lishi kerak."],
+            "alternative": "Masalani hal qilish uchun eng sodda yondashuvni tanlang va chekka holatlarni alohida tekshiring.",
+        })
+
+    # ----------------------------------------------------------------------- #
+    #  Code generation (code-first, validation-aware)                         #
+    # ----------------------------------------------------------------------- #
+    async def generate_solution(
+        self,
+        code: str,
+        problem_title: str,
+        language: str,
+        problem_description: str = "",
+        constraints: str = "",
+    ) -> Dict[str, Any]:
+        prompt = f"""
+Siz {language} tilida "{problem_title}" masalasining to'g'ri yechimini yozuvchi mutaxassis dasturchisiz.
+
+Masala sharti:
+{problem_description or 'Masala tavsifi berilmagan.'}
+
+Cheklovlar:
+{constraints or 'Maxsus cheklovlar berilmagan.'}
+
+Mavjud kod (agar mavjud bo'lsa):
+{code or "Hali yechim mavjud emas; agar kerak bo'lsa, to'liq yangi yechim yozing."}
+
+QOIDALAR:
+- Faqat Python kodini yozing. Hech qanday izoh, markdown yoki tushuntirish bermang.
+- Kod faqat ishlaydigan, qisqa va to'g'ri yechim bo'lsin.
+- Agar ma'lumot yetarli bo'lmasa, taxmin qilmasdan "No reliable solution available" deb yozing.
+- Koddan keyin 1-2 ta qisqa test holatini ham yozing.
+
+JSON shakli:
+{{
+  "code": "<to'liq yechim kodi>",
+  "summary": "<o'zbekcha qisqa xulosa>",
+  "tests": ["<test holati 1>", "<test holati 2>"]
+}}
+"""
+
+        if self.groq_client:
+            try:
+                resp = self.groq_client.chat.completions.create(
+                    model=_GROQ_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    max_tokens=700,
+                )
+                payload = json.loads(resp.choices[0].message.content)
+                payload["code"] = _extract_code_block(payload.get("code", ""))
+                errors = _validate_python_snippet(payload.get("code", ""))
+                if errors:
+                    payload["validation_errors"] = errors
+                return payload
+            except Exception as exc:
+                logger.warning(f"Groq code generation failed: {exc}")
+
+        if self.api_key:
+            for model in _GEMINI_MODELS:
+                try:
+                    text = await self._gemini_generate(model, prompt)
+                    payload = json.loads(_extract_code_block(text))
+                    payload["code"] = _extract_code_block(payload.get("code", ""))
+                    errors = _validate_python_snippet(payload.get("code", ""))
+                    if errors:
+                        payload["validation_errors"] = errors
+                    return payload
+                except Exception as exc:
+                    logger.warning(f"Gemini code generation failed for {model}: {exc}")
+                    continue
+
+        if self.openai_client:
+            try:
+                resp = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    max_tokens=700,
+                )
+                payload = json.loads(resp.choices[0].message.content)
+                payload["code"] = _extract_code_block(payload.get("code", ""))
+                errors = _validate_python_snippet(payload.get("code", ""))
+                if errors:
+                    payload["validation_errors"] = errors
+                return payload
+            except Exception as exc:
+                logger.warning(f"OpenAI code generation failed: {exc}")
+
+        return {
+            "code": "",
+            "summary": "AI kod yaratish xizmati hozircha mavjud emas.",
+            "tests": [],
+            "validation_errors": ["AI xizmat vaqtincha mavjud emas."],
         }
 
     # ----------------------------------------------------------------------- #

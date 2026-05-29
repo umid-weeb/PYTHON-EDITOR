@@ -141,6 +141,8 @@ async def review_code(
             code=request.code,
             problem_title=problem.title,
             language=request.language,
+            problem_description=getattr(problem, "description", "") or "",
+            constraints=getattr(problem, "constraints_text", "") or "",
         )
         return review_data
     except HTTPException:
@@ -151,6 +153,33 @@ async def review_code(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI analizida xatolik yuz berdi: {str(e)}",
         )
+
+
+@router.post("/solve")
+async def generate_solution(
+    request: AIReviewRequest,
+    current_user: User | None = Depends(get_optional_user),
+    ai_service: AIService = Depends(get_ai_service),
+    problem_service: ProblemService = Depends(get_problem_service),
+):
+    try:
+        problem = await problem_service.get_problem(request.problem_slug)
+        if not problem:
+            raise HTTPException(status_code=404, detail="Problem topilmadi")
+
+        result = await ai_service.generate_solution(
+            code=request.code,
+            problem_title=problem.title,
+            language=request.language,
+            problem_description=getattr(problem, "description", "") or "",
+            constraints=getattr(problem, "constraints_text", "") or "",
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Error in AI solve route: {exc}")
+        raise HTTPException(status_code=500, detail="AI yechim yaratishda xatolik yuz berdi")
 
 
 @router.post("/chat")

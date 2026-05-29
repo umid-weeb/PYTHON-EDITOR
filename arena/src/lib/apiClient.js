@@ -278,6 +278,12 @@ export const aiApi = {
       body: JSON.stringify(payload),
     });
   },
+  async generateSolution(payload) {
+    return request("/api/ai/solve", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   /**
    * Multi-turn AI tutor chat.
    * payload: { code, problem_slug, language, user_message, conversation_history }
