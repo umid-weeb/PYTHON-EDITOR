@@ -302,6 +302,42 @@ JSON shakli:
             "alternative": "Masalani hal qilish uchun eng sodda yondashuvni tanlang va chekka holatlarni alohida tekshiring.",
         })
 
+    async def _generate_json_payload(self, prompt: str, max_tokens: int = 700) -> Dict[str, Any] | None:
+        if self.groq_client:
+            try:
+                resp = self.groq_client.chat.completions.create(
+                    model=_GROQ_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    max_tokens=max_tokens,
+                )
+                return json.loads(resp.choices[0].message.content)
+            except Exception as exc:
+                logger.warning(f"Groq code generation failed: {exc}")
+
+        if self.api_key:
+            for model in _GEMINI_MODELS:
+                try:
+                    text = await self._gemini_generate(model, prompt)
+                    return json.loads(_extract_code_block(text))
+                except Exception as exc:
+                    logger.warning(f"Gemini code generation failed for {model}: {exc}")
+                    continue
+
+        if self.openai_client:
+            try:
+                resp = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    max_tokens=max_tokens,
+                )
+                return json.loads(resp.choices[0].message.content)
+            except Exception as exc:
+                logger.warning(f"OpenAI code generation failed: {exc}")
+
+        return None
+
     # ----------------------------------------------------------------------- #
     #  Code generation (code-first, validation-aware)                         #
     # ----------------------------------------------------------------------- #
@@ -339,53 +375,38 @@ JSON shakli:
 }}
 """
 
-        if self.groq_client:
-            try:
-                resp = self.groq_client.chat.completions.create(
-                    model=_GROQ_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"},
-                    max_tokens=700,
-                )
-                payload = json.loads(resp.choices[0].message.content)
-                payload["code"] = _extract_code_block(payload.get("code", ""))
-                errors = _validate_python_snippet(payload.get("code", ""))
-                if errors:
-                    payload["validation_errors"] = errors
-                return payload
-            except Exception as exc:
-                logger.warning(f"Groq code generation failed: {exc}")
+        payload = await self._generate_json_payload(prompt, max_tokens=700)
+        if payload is not None:
+            payload["code"] = _extract_code_block(payload.get("code", ""))
+            errors = _validate_python_snippet(payload.get("code", ""))
+            if errors and payload.get("code"):
+                fix_prompt = f"""
+Siz oldingi Python yechimni tuzatuvchi mutaxassis dasturchisiz.
+Muammo xatolari: {errors}
+Oldingi kod:
+{payload['code']}
 
-        if self.api_key:
-            for model in _GEMINI_MODELS:
-                try:
-                    text = await self._gemini_generate(model, prompt)
-                    payload = json.loads(_extract_code_block(text))
-                    payload["code"] = _extract_code_block(payload.get("code", ""))
-                    errors = _validate_python_snippet(payload.get("code", ""))
-                    if errors:
-                        payload["validation_errors"] = errors
-                    return payload
-                except Exception as exc:
-                    logger.warning(f"Gemini code generation failed for {model}: {exc}")
-                    continue
+QOIDALAR:
+- Faqat to'g'ri Python kodini qaytaring.
+- Xatolarni tuzating.
+- Hech qanday izoh bermang.
 
-        if self.openai_client:
-            try:
-                resp = self.openai_client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"},
-                    max_tokens=700,
-                )
-                payload = json.loads(resp.choices[0].message.content)
-                payload["code"] = _extract_code_block(payload.get("code", ""))
-                errors = _validate_python_snippet(payload.get("code", ""))
-                if errors:
+JSON shakli:
+{{"code": "<to'g'irlangan kod>", "summary": "<qisqa xulosa>", "tests": ["<test>"]}}
+"""
+                fixed = await self._generate_json_payload(fix_prompt, max_tokens=700)
+                if fixed is not None:
+                    fixed["code"] = _extract_code_block(fixed.get("code", ""))
+                    fixed_errors = _validate_python_snippet(fixed.get("code", ""))
+                    if not fixed_errors:
+                        payload = fixed
+                    else:
+                        payload["validation_errors"] = errors + fixed_errors
+                else:
                     payload["validation_errors"] = errors
-                return payload
-            except Exception as exc:
-                logger.warning(f"OpenAI code generation failed: {exc}")
+            elif errors:
+                payload["validation_errors"] = errors
+            return payload
 
         return {
             "code": "",

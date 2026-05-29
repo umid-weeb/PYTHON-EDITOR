@@ -181,8 +181,14 @@ export default function AIReviewPanel({ problemId, code, language }: Props) {
       {solution && (
         <div className="mt-6 rounded-xl border border-[color:var(--accent)]/10 bg-[color:var(--accent)]/5 p-4 shadow-sm">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">🧩 Taklif qilingan yechim</div>
-          <pre className="overflow-x-auto rounded-lg bg-[var(--bg-surface)] p-3 text-[11px] leading-relaxed text-[var(--text-primary)]">{solution.code || "Yechim yo'q."}</pre>
+          <pre className="overflow-x-auto rounded-lg bg-[var(--bg-surface)] p-3 text-[11px] leading-relaxed text-[var(--text-primary)]">{solution.code || "Yechim yo'q. AI ishonchli yechim bera olmadi."}</pre>
           {solution.summary ? <p className="mt-3 text-[11px] text-[var(--text-secondary)]">{solution.summary}</p> : null}
+          {solution.validation_errors?.length ? (
+            <p className="mt-2 text-[11px] text-[var(--danger)]">Tekshiruv xatolari: {solution.validation_errors.join(" • ")}</p>
+          ) : null}
+          {solution.tests?.length ? (
+            <p className="mt-2 text-[11px] text-[var(--text-secondary)]">Test takliflari: {solution.tests.join(" | ")}</p>
+          ) : null}
         </div>
       )}
 
