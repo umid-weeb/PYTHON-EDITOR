@@ -1,20 +1,20 @@
-export default function ResizeHandle({ orientation = "vertical", id, ...props }) {
+export default function ResizeHandle({ orientation = "vertical", id, className = "", ...props }) {
   const isVertical = orientation === "vertical";
 
   return (
     <div
       id={id}
       className={[
-        "group relative flex shrink-0 items-center justify-center bg-[var(--bg-surface)] transition-colors hover:bg-[var(--accent-subtle)]/30",
-        isVertical ? "w-2 z-10" : "h-2 z-10",
-        props.className || ""
+        "group relative flex shrink-0 items-center justify-center rounded-full transition-colors duration-150",
+        isVertical ? "z-10 w-4 cursor-col-resize" : "z-10 h-4 cursor-row-resize",
+        className,
       ].join(" ")}
       {...props}
     >
       <div
         className={[
-          "rounded-[var(--radius-pill)] bg-[var(--border)] transition-all duration-200 group-hover:bg-[var(--accent)] group-active:bg-[var(--accent)]",
-          isVertical ? "h-8 w-[2px] group-hover:h-full" : "w-8 h-[2px] group-hover:w-full",
+          "rounded-full bg-[var(--arena-border)] transition-colors duration-150 group-hover:bg-[var(--arena-border-strong)] group-active:bg-[var(--arena-border-strong)]",
+          isVertical ? "h-full w-px" : "h-px w-full",
         ].join(" ")}
       />
     </div>

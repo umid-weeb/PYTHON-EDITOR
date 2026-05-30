@@ -27,6 +27,7 @@ async function request(path, options = {}) {
     method: options.method || "GET",
     headers,
     body: options.body,
+    signal: options.signal,
   });
 
   const raw = await response.text();
@@ -122,6 +123,17 @@ export const authApi = {
 };
 
 export const arenaApi = {
+  async listProblems(params = {}, options = {}) {
+    const query = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      query.set(key, String(value));
+    });
+
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request(`/api/problems${suffix}`, options);
+  },
   async getProblems() {
     const data = await request("/api/problems?per_page=200");
     return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];

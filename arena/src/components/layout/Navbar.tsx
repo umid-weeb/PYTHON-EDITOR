@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import UserMenu from "../UserMenu.tsx";
-import ThemeToggle from "../ui/ThemeToggle.tsx";
 
 const NAV_ITEMS = [
   { to: "/online-editor", label: "Editor" },
@@ -17,34 +16,31 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   const username = user?.username || "";
-  
-  // Show exit button when deep in the Arena
   const showExitToMain = location.pathname.startsWith("/problems/") || location.pathname === "/online-editor";
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + "/");
+  const navButtonClass = (path: string) =>
+    [
+      "inline-flex h-14 shrink-0 items-center border-b-2 px-3 text-sm transition",
+      isActive(path)
+        ? "border-arena-primary font-medium text-white"
+        : "border-transparent text-arena-muted hover:text-white",
+    ].join(" ");
 
   return (
-    <header className="fixed inset-x-0 top-0 z-[var(--z-nav)] border-b border-[color:var(--border)] bg-[color:var(--bg-surface)]/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-[var(--h-navbar)] w-full max-w-[1400px] items-center gap-3 px-4 md:px-5">
-        <Link
-          className="flex shrink-0 items-center text-[15px] font-bold tracking-[-0.02em] text-[var(--text-primary)]"
-          to="/"
-        >
-          Pyzone<span className="text-[var(--accent)]">Arena</span>
+    <header className="fixed inset-x-0 top-0 z-[10000] border-b border-arena-border bg-[#0b1220]/95 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 w-full max-w-[1500px] items-center gap-4 px-4 md:px-6">
+        <Link className="flex shrink-0 items-center text-lg font-bold text-white" to="/problems">
+          Pyzone<span className="text-arena-primary">Arena</span>
         </Link>
 
-        <div className="hidden h-4 w-px shrink-0 bg-[color:var(--border)] md:block" />
+        <div className="hidden h-4 w-px shrink-0 bg-arena-border md:block" />
 
-        <nav className="flex min-w-0 flex-1 items-center gap-[2px] overflow-x-auto text-[13px]">
+        <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.to}
-              className={[
-                "inline-flex h-[var(--h-navbar)] shrink-0 items-center border-b-2 px-3 transition",
-                isActive(item.to)
-                  ? "border-[color:var(--accent)] text-[var(--text-primary)]"
-                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-              ].join(" ")}
+              className={navButtonClass(item.to)}
               type="button"
               onClick={() => navigate(item.to)}
             >
@@ -53,12 +49,7 @@ export default function Navbar() {
           ))}
           {username ? (
             <button
-              className={[
-                "inline-flex h-[var(--h-navbar)] shrink-0 items-center border-b-2 px-3 transition",
-                isActive("/profile")
-                  ? "border-[color:var(--accent)] text-[var(--text-primary)]"
-                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-              ].join(" ")}
+              className={navButtonClass("/profile")}
               type="button"
               onClick={() => navigate(`/profile/${encodeURIComponent(username)}`)}
             >
@@ -71,13 +62,12 @@ export default function Navbar() {
           {showExitToMain ? (
             <a
               href="/"
-              className="inline-flex h-[var(--h-btn-md)] items-center gap-2 rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-subtle)] px-3 text-[12px] font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
             >
-              <span aria-hidden="true" className="text-[14px] leading-none">←</span>
+              <span aria-hidden="true">{"<-"}</span>
               <span>Asosiy Muharrir</span>
             </a>
           ) : null}
-          <ThemeToggle />
           <UserMenu
             user={user}
             onProfile={() => navigate(`/profile/${encodeURIComponent(username)}`)}

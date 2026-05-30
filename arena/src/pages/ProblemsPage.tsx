@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { API_BASE_URL, arenaApi, userApi } from "../lib/apiClient.js";
+import { arenaApi, userApi } from "../lib/apiClient.js";
 import { formatProblemTitle, localizeDifficultyLabel, localizeTagLabel } from "../lib/problemPresentation.js";
 import { readStoredToken } from "../lib/storage.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -50,9 +50,46 @@ type StreakPayload = {
 };
 
 const SQL_SECTION_TAGS = new Set(["sql", "postgresql", "basic-joins", "aggregation", "grouping", "subqueries"]);
+const PROBLEMS_REQUEST_TIMEOUT_MS = 30000;
+const PROBLEMS_REQUEST_RETRY_DELAY_MS = 1200;
+const PROBLEMS_REQUEST_MAX_ATTEMPTS = 2;
 
 function isSqlProblem(problem: Problem): boolean {
   return (problem.tags || []).some((tag) => SQL_SECTION_TAGS.has(tag.toLowerCase()));
+}
+
+function isRetryableProblemsError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  if (typeof error === "object" && error && "status" in error) {
+    const status = Number((error as { status?: number }).status);
+    return [408, 429, 502, 503, 504].includes(status);
+  }
+  return false;
+}
+
+function formatProblemsLoadError(error: unknown): string {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Server juda sekin javob berdi. Birozdan keyin qayta urinib ko'ring.";
+  }
+
+  if (typeof error === "object" && error) {
+    const { status, message } = error as { status?: number; message?: string };
+    if (status === 422) {
+      return "So'rov parametrlari noto'g'ri keldi. Sahifa havolasini tekshirib qayta urinib ko'ring.";
+    }
+    if (typeof status === "number" && status >= 500) {
+      return "Server vaqtincha javob bermadi. Sahifani yangilang yoki birozdan keyin qayta urinib ko'ring.";
+    }
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return "Masalalarni yuklab bo'lmadi. Sahifani yangilang yoki birozdan keyin qayta urining.";
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function DifficultyBadge({ difficulty }: { difficulty: string }) {
@@ -205,8 +242,10 @@ export default function ProblemsPage() {
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallengePayload | null>(null);
   const [streak, setStreak] = useState<StreakPayload | null>(null);
 
-  const currentPage = parseInt(searchParams.get("page") || "1", 10);
-  const perPage = parseInt(searchParams.get("per_page") || "50", 10);
+  const currentPageParam = parseInt(searchParams.get("page") || "1", 10);
+  const perPageParam = parseInt(searchParams.get("per_page") || "50", 10);
+  const currentPage = Number.isFinite(currentPageParam) && currentPageParam > 0 ? currentPageParam : 1;
+  const perPage = Number.isFinite(perPageParam) && perPageParam > 0 ? perPageParam : 50;
   const searchQuery = searchParams.get("search") || "";
   const difficultyFilter = searchParams.get("difficulty") || "";
   const statusFilter = searchParams.get("status") || "";
@@ -235,37 +274,44 @@ export default function ProblemsPage() {
   const fetchProblems = useCallback(async () => {
     setLoading(true);
     setLoadError("");
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+    const params = {
+      page: currentPage,
+      per_page: perPage,
+      q: searchQuery || undefined,
+      difficulty: difficultyFilter || undefined,
+      tags: selectedTags.length > 0 ? selectedTags.join(",") : undefined,
+    };
+
+    let lastError: unknown = null;
+
     try {
-      const params = new URLSearchParams();
-      params.set("page", String(currentPage));
-      params.set("per_page", String(perPage));
-      if (searchQuery) params.set("q", searchQuery);
-      if (difficultyFilter) params.set("difficulty", difficultyFilter);
-      if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
+      for (let attempt = 1; attempt <= PROBLEMS_REQUEST_MAX_ATTEMPTS; attempt += 1) {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), PROBLEMS_REQUEST_TIMEOUT_MS);
 
-      const token = readStoredToken();
-      const headers: Record<string, string> = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-
-      const response = await fetch(`${API_BASE_URL}/api/problems?${params.toString()}`, {
-        headers,
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        try {
+          const data = (await arenaApi.listProblems(params, {
+            signal: controller.signal,
+          })) as PaginatedResponse;
+          setProblems(data.items || []);
+          setTotal(data.total || 0);
+          return;
+        } catch (error) {
+          lastError = error;
+          if (attempt >= PROBLEMS_REQUEST_MAX_ATTEMPTS || !isRetryableProblemsError(error)) {
+            throw error;
+          }
+          await delay(PROBLEMS_REQUEST_RETRY_DELAY_MS);
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
       }
-      const data: PaginatedResponse = await response.json();
-      setProblems(data.items || []);
-      setTotal(data.total || 0);
     } catch (error) {
       console.error("Failed to fetch problems:", error);
       setProblems([]);
       setTotal(0);
-      setLoadError("Masalalarni yuklab bo'lmadi. Sahifani yangilang yoki birozdan keyin qayta urining.");
+      setLoadError(formatProblemsLoadError(lastError || error));
     } finally {
-      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [currentPage, difficultyFilter, perPage, searchQuery, selectedTags]);
