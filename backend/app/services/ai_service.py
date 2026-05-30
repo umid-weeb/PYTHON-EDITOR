@@ -261,7 +261,10 @@ JSON shakli:
                     response_format={"type": "json_object"},
                     max_tokens=512,
                 )
-                result = _normalize_review_result(json.loads(resp.choices[0].message.content))
+                raw_content = resp.choices[0].message.content
+                if "```json" in raw_content:
+                    raw_content = raw_content.split("```json")[1].split("```")[0].strip()
+                result = _normalize_review_result(json.loads(raw_content))
                 self._review_cache[cache_key] = result
                 return result
             except Exception as exc:
