@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import TestCasePanel from "../results/TestCasePanel.jsx";
 import ResultPanel from "../results/ResultPanel.jsx";
 import SubmissionHistory from "../submissions/SubmissionHistory.tsx";
+import AIHintPanel from "../ai/AIHintPanel.tsx";
 import AIReviewPanel from "../ai/AIReviewPanel.tsx";
 import SolutionsPanel from "../results/SolutionsPanel.tsx";
 
@@ -30,7 +31,7 @@ type Props = {
   onViewSubmission?: (id: string) => void;
 };
 
-type Tab = "cases" | "result" | "console" | "history" | "ai" | "solutions";
+type Tab = "cases" | "result" | "console" | "history" | "hint" | "ai" | "solutions";
 
 export default function TestTabs({ cases, activeIndex, onSelect, result, busy, problemId, code, language, onViewSubmission }: Props) {
   const [active, setActive] = useState<Tab>("cases");
@@ -61,6 +62,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
           { key: "cases", label: "Testlar" },
           { key: "result", label: "Natija" },
           { key: "history", label: "Tarix" },
+          { key: "hint", label: "AI Shama" },
           { key: "ai", label: "AI Analiz (Beta)" },
           { key: "solutions", label: "Yechimlar" },
           { key: "console", label: "Konsol" },
@@ -85,6 +87,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
         {active === "cases" ? <TestCasePanel activeIndex={activeIndex} cases={cases} onSelect={onSelect} /> : null}
         {active === "result" ? <ResultPanel busy={busy} result={result} /> : null}
         {active === "history" ? <SubmissionHistory problemId={problemId} lastSubmissionId={lastSubmissionId} onViewSubmission={onViewSubmission} /> : null}
+        {active === "hint" ? <AIHintPanel code={code} language={language} problemId={problemId} /> : null}
         {active === "ai" ? <AIReviewPanel code={code} language={language} problemId={problemId} /> : null}
         {active === "solutions" ? <SolutionsPanel problemId={problemId} /> : null}
         {active === "console" ? (

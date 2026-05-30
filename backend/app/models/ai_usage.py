@@ -26,3 +26,22 @@ class AIChatUsage(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class AIHintLog(Base):
+    """Tracks individual one-shot AI hint requests."""
+
+    __tablename__ = "ai_hint_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    ip_address = Column(String(45), nullable=True, index=True)
+    problem_slug = Column(String(255), nullable=False, index=True)
+    code_snapshot = Column(Text, nullable=True)
+    model_response = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

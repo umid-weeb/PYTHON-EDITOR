@@ -1,7 +1,8 @@
 {
   "verdict": "Runtime Error",
-  "runtime_ms": 2,
-  "memory_kb": 1,
+  "runtime_ms": 0,
+  "memory_bytes": 1407,
+  "memory_kb": 1407,
   "passed_count": 0,
   "total_count": 1,
   "error_text": "Traceback (most recent call last):\n  File \"solution.py\", line 3, in solve\n    print(i) # NameError\nNameError: name 'i' is not defined",
@@ -10,11 +11,13 @@
       "name": "Case",
       "verdict": "Runtime Error",
       "passed": false,
-      "runtime_ms": 2,
-      "memory_kb": 1,
+      "runtime_ms": 0,
+      "memory_bytes": 1407,
+      "memory_kb": 1407,
       "input": "[1, 2, 3]",
       "expected_output": "6",
       "actual_output": null,
+      "stdout": "",
       "hidden": false,
       "error": "Traceback (most recent call last):\n  File \"solution.py\", line 3, in solve\n    print(i) # NameError\nNameError: name 'i' is not defined"
     }

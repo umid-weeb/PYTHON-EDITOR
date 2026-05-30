@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.auth import get_optional_user
 from app.database import get_db
-from app.models.ai_usage import AIChatUsage
+from app.models.ai_usage import AIChatUsage, AIHintLog
 from app.models.user import User
 from app.services.ai_service import AIService, get_ai_service
 from app.services.problem_service import ProblemService, get_problem_service
@@ -31,6 +31,7 @@ class AIReviewRequest(BaseModel):
     code: str
     problem_slug: str
     language: str
+    user_id: int | None = None
 
 
 class ChatMessage(BaseModel):
@@ -266,10 +267,36 @@ async def ai_chat(
 @router.post("/hint")
 async def get_hint(
     request: AIReviewRequest,
+    raw_request: Request,
     current_user: User | None = Depends(get_optional_user),
     ai_service: AIService = Depends(get_ai_service),
     problem_service: ProblemService = Depends(get_problem_service),
+    db: Session = Depends(get_db),
 ):
+    ip = _get_client_ip(raw_request)
+    user_id = current_user.id if current_user else None
+
+    # Rate limit check — hint requests share AI usage limits
+    allowed = True
+    try:
+        allowed, remaining, is_guest_limit = _check_and_increment(db, user_id, ip, request.problem_slug)
+    except Exception as exc:
+        logger.error(f"Hint rate limit DB error (non-fatal): {exc}")
+        allowed = True
+        remaining = None
+        is_guest_limit = False
+
+    if not allowed:
+        if is_guest_limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Bugunlik AI shama (hint) so'rovlarining limiti tugadi. Iltimos, keyinroq qayta urinib ko'ring.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Bugunlik AI shama so'rovlarining limiti tugadi. Ertaga yana foydalanishingiz mumkin.",
+        )
+
     try:
         problem = await problem_service.get_problem(request.problem_slug)
         if not problem:
@@ -280,6 +307,21 @@ async def get_hint(
             problem_title=problem.title,
             language=request.language,
         )
+
+        try:
+            log_entry = AIHintLog(
+                user_id=user_id,
+                ip_address=ip,
+                problem_slug=request.problem_slug,
+                code_snapshot=request.code,
+                model_response=hint,
+            )
+            db.add(log_entry)
+            db.commit()
+        except Exception as log_exc:
+            logger.error(f"AI hint log failed: {log_exc}")
+            db.rollback()
+
         return {"hint": hint}
     except HTTPException:
         raise

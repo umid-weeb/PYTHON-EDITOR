@@ -614,6 +614,17 @@ POSTGRES_BOOTSTRAP_SQL = [
     """
     ALTER TABLE problems ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0;
     """,
+    """
+    CREATE TABLE IF NOT EXISTS ai_hint_log (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      ip_address VARCHAR(45),
+      problem_slug VARCHAR(255) NOT NULL,
+      code_snapshot TEXT,
+      model_response TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    """,
 ]
 
 

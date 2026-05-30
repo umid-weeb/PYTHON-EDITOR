@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { aiApi } from "../../lib/apiClient";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { useToast } from "../common/ToastProvider.tsx";
 
 type Props = {
   problemId: string;
@@ -8,9 +10,11 @@ type Props = {
 };
 
 export default function AIHintPanel({ problemId, code, language }: Props) {
+  const { user } = useAuth();
   const [hint, setHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const handleRequestHint = async () => {
     setLoading(true);
@@ -19,12 +23,15 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
       const data = await aiApi.getHint({
         code,
         problem_slug: problemId,
-        language
+        language,
+        user_id: user?.id ?? null,
       });
       setHint(data.hint);
+      toast.push({ type: "success", title: "AI Shama", message: "Shama muvaffaqiyatli olindi." });
     } catch (err: any) {
       console.error("AI Hint failed:", err);
-      setError(err.message || "Shama yaratishda xatolik yuz berdi.");
+      setError(err?.message || "Shama yaratishda xatolik yuz berdi.");
+      toast.push({ type: "error", title: "Xatolik", message: err?.message || "Tarmoq yoki limit xatosi." });
     } finally {
       setLoading(false);
     }
@@ -92,9 +99,10 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
       </div>
       <button
         onClick={handleRequestHint}
-        className="rounded-lg bg-indigo-500 px-6 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:bg-indigo-600 active:scale-95"
+        disabled={loading}
+        className="inline-flex items-center justify-center rounded-lg bg-indigo-500 px-6 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:bg-indigo-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Shama (Hint) so'rash
+        {loading ? "AI shama so'ralmoqda..." : "Shama (Hint) so'rash"}
       </button>
     </div>
   );
