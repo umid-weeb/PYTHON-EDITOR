@@ -201,3 +201,60 @@ def test_finalize_success_runs_first_solve_side_effects_once(monkeypatch) -> Non
     assert int(stats.rating or 1200) > 1200
     assert len(history) == 1
     assert history[0].submission_id == str(submission_id)
+
+
+def test_finalize_nonaccepted_submission_records_learning_failure(monkeypatch) -> None:
+    engine = _make_engine()
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
+    Base.metadata.create_all(bind=engine)
+    monkeypatch.setattr(submission_service_module, "SessionLocal", Session)
+    monkeypatch.setattr(problem_service_module, "SessionLocal", Session)
+    get_problem_service.cache_clear()
+
+    with Session() as db:
+        user = User(username="failure_user", password_hash="hashed")
+        problem = _build_problem("problem-99")
+        problem.tags_json = '["dfs"]'
+        db.add_all([user, problem])
+        db.flush()
+        db.add(
+            Submission(
+                user_id=user.id,
+                problem_id=problem.id,
+                code="class Solution:\n    def solve(self):\n        return None\n",
+                language="python",
+                mode="submit",
+                status="pending",
+                case_results_json="[]",
+            )
+        )
+        db.commit()
+        submission_id = 1
+        user_id = user.id
+
+    service = SubmissionService()
+    monkeypatch.setattr(service, "_sync_contest_submission", lambda *args, **kwargs: None)
+    monkeypatch.setattr(submission_service_module.engagement_service, "touch_last_active", lambda *args, **kwargs: None)
+
+    recorded: list[tuple[int, str]] = []
+    def fake_record_failure(db, user_id: int, topic: str):
+        recorded.append((user_id, topic))
+        return {"user_id": user_id, "topic": topic, "fail_count": 1, "mastery_score": 0, "is_locked": False}
+
+    monkeypatch.setattr(submission_service_module, "record_failure", fake_record_failure)
+
+    result = service._finalize_success(
+        submission_id,
+        {
+            "verdict": "Wrong Answer",
+            "runtime_ms": 10,
+            "memory_kb": 64,
+            "passed_count": 0,
+            "total_count": 1,
+            "error_text": None,
+            "case_results": [],
+        },
+    )
+
+    assert result is not None
+    assert recorded == [(user_id, "dfs")]

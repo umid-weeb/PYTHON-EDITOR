@@ -14,6 +14,7 @@ from app.models.contest import ContestEntry, ContestSubmission
 from app.models.schemas import SubmissionRequest
 from app.repositories.submission_tracking import submission_tracking_repository
 from app.services.engagement_service import engagement_service
+from app.services.learning_service import infer_topic_from_tags, record_failure
 from app.services.problem_service import ProblemService, get_problem_service, problem_language_from_slug_and_tags
 from app.services.profile_service import profile_service
 from app.services.rating_service import rating_service
@@ -329,6 +330,9 @@ class SubmissionService:
                     first_solve,
                 )
 
+            if not is_accepted and submission.user_id is not None:
+                self._record_learning_failure_if_applicable(db, submission)
+
             self._sync_contest_submission(
                 db,
                 submission_id=str(submission.id),
@@ -390,6 +394,7 @@ class SubmissionService:
                 is_first_solve=False,
                 is_accepted=False,
             )
+            self._record_learning_failure_if_applicable(db, submission)
             db.commit()
 
     def _run_first_solve_side_effects(
@@ -456,6 +461,33 @@ class SubmissionService:
         )
         worker.start()
         return True
+
+    def _record_learning_failure_if_applicable(self, db, submission) -> None:
+        if not submission or submission.user_id is None:
+            return
+        if str(getattr(submission, "mode", "")).strip().lower() != "submit":
+            return
+        if str(getattr(submission, "verdict", "")).strip().lower() == "accepted":
+            return
+
+        problem = self.repository.resolve_problem(db, submission.problem_id)
+        if problem is None:
+            return
+
+        topic = infer_topic_from_tags(self.problem_service._load_tags(getattr(problem, "tags_json", None)), getattr(problem, "slug", None))
+        if not topic:
+            return
+
+        try:
+            record_failure(db, int(submission.user_id), topic)
+        except Exception as exc:
+            self.logger.warning(
+                "submission.learning_failure_record_error submission_id=%s user_id=%s topic=%s error=%s",
+                getattr(submission, "id", None),
+                getattr(submission, "user_id", None),
+                topic,
+                exc,
+            )
 
     def _ensure_submission_processing(self, submission) -> None:
         normalized_status = str(submission.status or "").strip().lower()

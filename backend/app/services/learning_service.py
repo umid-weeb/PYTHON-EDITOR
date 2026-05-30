@@ -5,7 +5,14 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-ALLOWED_TOPICS = {"binary_search", "trees", "linked_list", "bfs", "dfs"}
+TOPIC_ALIASES: dict[str, set[str]] = {
+    "binary_search": {"binary_search", "binary search", "binarysearch"},
+    "trees": {"trees", "tree"},
+    "linked_list": {"linked_list", "linked list", "linkedlist"},
+    "bfs": {"bfs", "breadth first search", "breadth-first search", "breadthfirstsearch"},
+    "dfs": {"dfs", "depth first search", "depth-first search", "depthfirstsearch"},
+}
+ALLOWED_TOPICS = set(TOPIC_ALIASES)
 
 FALLBACK_REMEDIATION: dict[str, Any] = {
     "binary_search": {
@@ -94,6 +101,21 @@ FALLBACK_REMEDIATION: dict[str, Any] = {
         ],
     },
 }
+
+
+def _normalize_topic_tag(topic: str) -> str:
+    return str(topic or "").strip().lower().replace("-", " ").replace("_", " ")
+
+
+def infer_topic_from_tags(tags: list[str] | None, slug: str | None = None) -> str | None:
+    normalized_tags = { _normalize_topic_tag(tag) for tag in (tags or []) }
+    if slug:
+        normalized_tags.add(_normalize_topic_tag(slug))
+
+    for topic, aliases in TOPIC_ALIASES.items():
+        if normalized_tags & aliases:
+            return topic
+    return None
 
 
 def _validate_topic(topic: str) -> str:
