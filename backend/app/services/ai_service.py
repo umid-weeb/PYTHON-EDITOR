@@ -2,16 +2,17 @@ import json
 import logging
 import tempfile
 import textwrap
+from typing import Any, Dict, List, Optional
+
 import httpx
 from openai import OpenAI
-from typing import Any, Dict, List, Optional
+
 from app.core.config import get_settings
 
 logger = logging.getLogger("pyzone.ai")
 
 
 def _normalize_review_result(result: Any) -> Dict[str, Any]:
-    """Ensure review output is usable and consistently phrased in Uzbek."""
     base = dict(result or {})
 
     time_complexity = dict(base.get("time_complexity") or {})
@@ -19,25 +20,43 @@ def _normalize_review_result(result: Any) -> Dict[str, Any]:
 
     time_complexity.setdefault("detected", "Ma'lumot yo'q")
     time_complexity.setdefault("optimal", "O(n) yoki yaxshiroq")
-    time_complexity.setdefault("suggestion", "Vaqt murakkabligini Big-O ko'rinishida yozing; ms kabi birliklarni ishlatmang.")
+    time_complexity.setdefault(
+        "suggestion",
+        "Vaqt murakkabligini Big-O ko'rinishida yozing; ms kabi birliklarni ishlatmang.",
+    )
 
     space_complexity.setdefault("detected", "Ma'lumot yo'q")
-    space_complexity.setdefault("suggestion", "Xotira sarfini Big-O yoki bayt bo'yicha ayting; KB/MB o'rniga aniq birlikdan foydalaning.")
+    space_complexity.setdefault(
+        "suggestion",
+        "Xotira sarfini Big-O yoki bayt bo'yicha ayting; KB/MB o'rniga aniq birlikdan foydalaning.",
+    )
 
     base.setdefault("overall_score", 60)
-    base.setdefault("beats", "Bu yechim 60/100 ballga yaqin; kichik yaxshilanishlar bilan natija sezilarli yaxshilanadi.")
-    base.setdefault("summary", "Yechimning asosiy kuchli va zaif tomonlari haqida qisqacha xulosa.")
-    # Never allow code in alternative: only plain Uzbek text, no code block, no def, no for, no return, no =
+    base.setdefault(
+        "beats",
+        "Bu yechim 60/100 ballga yaqin; kichik yaxshilanishlar bilan natija sezilarli yaxshilanadi.",
+    )
+    base.setdefault(
+        "summary",
+        "Yechimning asosiy kuchli va zaif tomonlari haqida qisqacha xulosa.",
+    )
+
     alt = str(base.get("alternative") or "")
-    if ("```" in alt or "def " in alt or "for " in alt or "return " in alt or " = " in alt):
-        base["alternative"] = "Muqobil yondashuv: kod yozmang, faqat oddiy so'zlar bilan asosiy g'oyani va qaysi vosita (masalan dict yoki set) ishlatilishini tushuntiring."
+    if "```" in alt or "def " in alt or "for " in alt or "return " in alt or " = " in alt:
+        base["alternative"] = (
+            "Muqobil yondashuv: kod yozmang, faqat oddiy so'zlar bilan asosiy g'oyani va "
+            "qaysi vosita (masalan dict yoki set) ishlatilishini tushuntiring."
+        )
     else:
         base["alternative"] = alt
-    base.setdefault("edge_cases", ["Chekka holatlar va kiritish hajmi kichik bo'lsa ham to'g'ri ishlashi tekshirilishi kerak."])
+
+    base.setdefault(
+        "edge_cases",
+        ["Chekka holatlar va kiritish hajmi kichik bo'lsa ham to'g'ri ishlashi tekshirilishi kerak."],
+    )
     base.setdefault("code_style", ["Kod o'qilishi va saqlanishi oson bo'lishi kerak."])
     base["time_complexity"] = time_complexity
     base["space_complexity"] = space_complexity
-
     return base
 
 
@@ -73,40 +92,22 @@ def _validate_python_snippet(code: str) -> list[str]:
     return []
 
 
-# Gemini REST API — v1
 _GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1/models"
 _GEMINI_MODELS = [
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
 ]
 
-# Groq models (OpenAI-compatible, free tier: 30 RPM, 14400 RPD)
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 _GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# --------------------------------------------------------------------------- #
-#  System prompt for the AI tutor chatbot                                      #
-# --------------------------------------------------------------------------- #
-_CHAT_SYSTEM_PROMPT = """Sen "Pyzone Arena" platformasining AI Ustozi — algoritmlar bo'yicha o'qituvchisan.
+_CHAT_SYSTEM_PROMPT = """Sen "Pyzone Arena" platformasining AI Ustozi - algoritmlar bo'yicha o'qituvchisan.
 
-!!! MUTLAQ TAQIQ — BUZILMAYDI !!!
-KOD YOZMA. Hech qachon. Hech qanday sharoitda.
-`def`, `class`, `for`, `while`, `return`, ` = ` kabi Python sintaksisini YOZMA.
-Kod bloki (``` yoki `...`) YOZMA.
-Faqat SO'Z bilan tushuntir. Faqat PSEUDOCODE (ingliz/o'zbek so'zlari bilan algoritm tavsifi).
-
-AGAR FOYDALANUVCHI "KOD YOZ" / "YECHIM BER" / "TO'G'RI KOD" SO'RASA:
-Faqat nima xato ekanini SO'Z bilan ayt. Masalan:
-  YOMON: `if mid > target: right = mid - 1`
-  YAXSHI: "mid indeksidagi qiymat targetdan katta bo'lsa, o'ng chegarani mid-1 ga o'zgartir"
-
-JAVOB FORMATI:
-- Faqat O'ZBEK tilida
-- 3-5 jumla, qisqa
-- Xatoni toping, yo'nalish bering, savol bering
-
-RUXSAT: algoritmlar, Big O, masala mantiqiy tahlili, debugging (faqat so'z bilan)
-TAQIQ: to'liq kod, hayotiy suhbat, boshqa fanlar
+MUTLAQ QOIDA:
+- Kod yozma.
+- Kod bloklari ishlatma.
+- Faqat o'zbek tilida, 3-5 qisqa jumlada javob ber.
+- Agar foydalanuvchi to'liq yechim so'rasa ham, faqat yo'nalish va tahlil ber.
 
 MASALA KONTEKSTI:
 {problem_context}
@@ -146,7 +147,7 @@ NATIJA PANELI:
 
 
 class AIService:
-    def __init__(self):
+    def __init__(self) -> None:
         settings = get_settings()
         self.api_key = settings.ai_api_key
         self.openai_key = settings.openai_api_key
@@ -154,16 +155,12 @@ class AIService:
 
         self._review_cache: Dict[str, Any] = {}
 
-        # Groq client (OpenAI-compatible)
-        self.groq_client = None
+        self.groq_client: Optional[OpenAI] = None
         if self.groq_key:
             logger.info("Groq initialized")
-            self.groq_client = OpenAI(
-                api_key=self.groq_key,
-                base_url=_GROQ_BASE_URL,
-            )
+            self.groq_client = OpenAI(api_key=self.groq_key, base_url=_GROQ_BASE_URL)
 
-        self.openai_client = None
+        self.openai_client: Optional[OpenAI] = None
         if self.openai_key:
             logger.info("OpenAI initialized")
             self.openai_client = OpenAI(api_key=self.openai_key)
@@ -171,9 +168,6 @@ class AIService:
         if self.api_key:
             logger.info("Gemini REST API initialized")
 
-    # ----------------------------------------------------------------------- #
-    #  Gemini via direct REST (bypasses v1beta SDK issue)                      #
-    # ----------------------------------------------------------------------- #
     async def _gemini_generate(self, model: str, prompt: str) -> str:
         return await self._gemini_generate_ext(model, prompt, max_tokens=512)
 
@@ -197,9 +191,6 @@ class AIService:
             data = resp.json()
             return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-    # ----------------------------------------------------------------------- #
-    #  Code Review                                                              #
-    # ----------------------------------------------------------------------- #
     async def review_code(
         self,
         code: str,
@@ -209,6 +200,7 @@ class AIService:
         constraints: str = "",
     ) -> Dict[str, Any]:
         import hashlib
+
         code_snapshot = code.strip() if isinstance(code, str) else ""
         cache_key = hashlib.md5(
             f"{problem_title}:{language}:{code_snapshot}:{problem_description}:{constraints}".encode()
@@ -217,9 +209,9 @@ class AIService:
             return self._review_cache[cache_key]
 
         code_text = code.strip() or (
-            'Hali hech qanday yechim yuborilmagan. Masala shartiga asoslanib, eng yaxshi '
-            'algoritmik yo\'nalishni, vaqt va xotira murakkabligini, chekka holatlarni va '
-            'takomillashtirish tavsiyalarini bering.'
+            "Hali hech qanday yechim yuborilmagan. Masala shartiga asoslanib, eng yaxshi "
+            "algoritmik yo'nalishni, vaqt va xotira murakkabligini, chekka holatlarni va "
+            "takomillashtirish tavsiyalarini bering."
         )
 
         prompt = f"""
@@ -235,27 +227,25 @@ Joriy yechim (agar mavjud bo'lsa):
 {code_text}
 
 QOIDALAR:
-- Faqat STRICT JSON qaytaring (markdown yoki matn bo'lmasin).
-- Vaqt murakkabligini faqat Big-O ko'rinishida yozing: O(1), O(log n), O(n), O(n log n), O(n^2) va h.k.
-- Xotira murakkabligini Big-O yoki baytlar bilan ayting; KB/MB kabi birliklarni noto'g'ri ko'rsatmaslikka harakat qiling.
-- Muqobil yondashuvni har doim oddiy so'zlar bilan ayting; kod blokini yozmang, faqat g'oya va qaysi vosita (masalan dict yoki set) ishlatilishi kerakligini ayting.
-- overall_score 0-100 orasida bo'lsin; 100 — to'liq ishonchli va tez yechim, 0 — juda zaif yechim.
-- Tavsiyalar va xulosalar o'zbek tilida bo'lsin, oddiy, muloyim va amaliy bo'lsin.
+- Faqat STRICT JSON qaytaring.
+- Vaqt murakkabligini Big-O ko'rinishida yozing.
+- Xotira murakkabligini Big-O yoki baytlar bilan ayting.
+- Muqobil yondashuvni oddiy so'zlar bilan ayting, kod yozmang.
+- Tavsiyalar va xulosalar o'zbek tilida bo'lsin.
 
 JSON shakli:
 {{
   "overall_score": <int 0-100>,
   "beats": "<str>",
   "summary": "<o'zbekcha qisqa xulosa>",
-  "time_complexity": {{"detected": "<str>", "optimal": "<str>", "suggestion": "<str>"}},
-  "space_complexity": {{"detected": "<str>", "suggestion": "<str>"}},
-  "edge_cases": ["<str>", ...],
-  "code_style": ["<str>", ...],
-  "alternative": "<str>",
-  "beats": "<str>"
+  "time_complexity": {{"detected": "<str>", "optimal": "<str>", "suggestion": "<str>" }},
+  "space_complexity": {{"detected": "<str>", "suggestion": "<str>" }},
+  "edge_cases": ["<str>", "..."],
+  "code_style": ["<str>", "..."],
+  "alternative": "<str>"
 }}
 """
-        # 1. Groq (primary — free, fast)
+
         if self.groq_client:
             try:
                 resp = self.groq_client.chat.completions.create(
@@ -267,10 +257,9 @@ JSON shakli:
                 result = _normalize_review_result(json.loads(resp.choices[0].message.content))
                 self._review_cache[cache_key] = result
                 return result
-            except Exception as e:
-                logger.warning(f"Groq Review: {e}")
+            except Exception as exc:
+                logger.warning(f"Groq Review: {exc}")
 
-        # 2. Gemini REST fallback
         if self.api_key:
             for model in _GEMINI_MODELS:
                 try:
@@ -283,11 +272,10 @@ JSON shakli:
                     result = _normalize_review_result(json.loads(text))
                     self._review_cache[cache_key] = result
                     return result
-                except Exception as e:
-                    logger.warning(f"Gemini Review {model}: {e}")
+                except Exception as exc:
+                    logger.warning(f"Gemini Review {model}: {exc}")
                     continue
 
-        # 3. OpenAI fallback
         if self.openai_client:
             try:
                 resp = self.openai_client.chat.completions.create(
@@ -298,26 +286,30 @@ JSON shakli:
                 result = _normalize_review_result(json.loads(resp.choices[0].message.content))
                 self._review_cache[cache_key] = result
                 return result
-            except Exception as e:
-                logger.warning(f"OpenAI Review: {e}")
+            except Exception as exc:
+                logger.warning(f"OpenAI Review: {exc}")
 
-        return _normalize_review_result({
-            "overall_score": 0,
-            "error": "AI xizmat vaqtincha mavjud emas",
-            "summary": "AI tahlili hozircha mavjud emas. Masalani o'zingiz tahlil qilib, vaqt murakkabligini Big-O ko'rinishida va xotira sarfini aniq belgilang.",
-            "time_complexity": {
-                "detected": "Noma'lum",
-                "optimal": "O(n) yoki yaxshiroq",
-                "suggestion": "Vaqt murakkabligini ms o'rniga Big-O ko'rinishida yozing.",
-            },
-            "space_complexity": {
-                "detected": "Noma'lum",
-                "suggestion": "Xotira sarfini baytlar yoki Big-O bilan tasvirlang; KB/MB ishlatmang.",
-            },
-            "edge_cases": ["AI tahlili vaqtincha mavjud emas, shuning uchun chekka holatlar va testlar o'zingiz tekshiring."],
-            "code_style": ["Kodni o'qilishi va tushunarli bo'lishi kerak."],
-            "alternative": "Masalani hal qilish uchun eng sodda yondashuvni tanlang va chekka holatlarni alohida tekshiring.",
-        })
+        return _normalize_review_result(
+            {
+                "overall_score": 0,
+                "error": "AI xizmat vaqtincha mavjud emas",
+                "summary": "AI tahlili hozircha mavjud emas. Masalani o'zingiz tahlil qilib, vaqt murakkabligini Big-O ko'rinishida va xotira sarfini aniq belgilang.",
+                "time_complexity": {
+                    "detected": "Noma'lum",
+                    "optimal": "O(n) yoki yaxshiroq",
+                    "suggestion": "Vaqt murakkabligini ms o'rniga Big-O ko'rinishida yozing.",
+                },
+                "space_complexity": {
+                    "detected": "Noma'lum",
+                    "suggestion": "Xotira sarfini baytlar yoki Big-O bilan tasvirlang; KB/MB ishlatmang.",
+                },
+                "edge_cases": [
+                    "AI tahlili vaqtincha mavjud emas, shuning uchun chekka holatlar va testlar o'zingiz tekshiring."
+                ],
+                "code_style": ["Kodni o'qilishi va tushunarli bo'lishi kerak."],
+                "alternative": "Masalani hal qilish uchun eng sodda yondashuvni tanlang va chekka holatlarni alohida tekshiring.",
+            }
+        )
 
     async def _generate_json_payload(self, prompt: str, max_tokens: int = 700) -> Dict[str, Any] | None:
         if self.groq_client:
@@ -355,9 +347,6 @@ JSON shakli:
 
         return None
 
-    # ----------------------------------------------------------------------- #
-    #  Code generation (code-first, validation-aware)                         #
-    # ----------------------------------------------------------------------- #
     async def generate_solution(
         self,
         code: str,
@@ -365,6 +354,7 @@ JSON shakli:
         language: str,
         problem_description: str = "",
         constraints: str = "",
+    ) -> Dict[str, Any]:
         prompt = f"""
 Siz {language} tilida "{problem_title}" masalasining to'g'ri yechimini yozuvchi mutaxassis dasturchisiz.
 
@@ -377,27 +367,38 @@ Cheklovlar:
 Foydalanuvchi yozgan kodi (faqat kontekst uchun; uni takrorlamang):
 {code or "Hali yechim mavjud emas; agar kerak bo'lsa, to'liq yangi yechim yozing."}
 
-        ) -> Dict[str, Any]:
-                prompt = f"""
-Siz {language} tilida "{problem_title}" masalasining to'g'ri yechimini yozuvchi mutaxassis dasturchisiz.
-
-Masala sharti:
-{problem_description or 'Masala tavsifi berilmagan.'}
-
-Cheklovlar:
-{constraints or 'Maxsus cheklovlar berilmagan.'}
-
-Foydalanuvchi yozgan kodi (faqat kontekst uchun; uni takrorlamang):
-{code or "Hali yechim mavjud emas; agar kerak bo'lsa, to'liq yangi yechim yozing."}
-
+QOIDALAR:
+- Faqat Python kodini yozing. Hech qanday izoh, markdown yoki tushuntirish bermang.
+- Foydalanuvchi yozgan kodni qayta takrorlamang va copy-paste qilmang; yangi yechim yozing.
+- Kod faqat ishlaydigan, qisqa va to'g'ri yechim bo'lsin.
+- Agar ma'lumot yetarli bo'lmasa, taxmin qilmasdan "No reliable solution available" deb yozing.
 - Koddan keyin 1-2 ta qisqa test holatini ham yozing.
 
 JSON shakli:
 {{
-    "code": "<to'liq yechim kodi>",
-    "summary": "<o'zbekcha qisqa xulosa>",
-    "tests": ["<test holati 1>", "<test holati 2>"]
+  "code": "<to'liq yechim kodi>",
+  "summary": "<o'zbekcha qisqa xulosa>",
+  "tests": ["<test holati 1>", "<test holati 2>"]
 }}
+"""
+
+        payload = await self._generate_json_payload(prompt, max_tokens=700)
+        if payload is not None:
+            payload["code"] = _extract_code_block(payload.get("code", ""))
+            if _is_echoed_solution(payload.get("code", ""), code):
+                payload["code"] = ""
+                payload["validation_errors"] = ["Foydalanuvchi yozgan kodni takrorlamang; yangi yechim yozing."]
+                return payload
+
+            errors = _validate_python_snippet(payload.get("code", ""))
+            if errors and payload.get("code"):
+                fix_prompt = f"""
+Siz oldingi Python yechimni tuzatuvchi mutaxassis dasturchisiz.
+Muammo xatolari: {errors}
+Oldingi kod:
+{payload['code']}
+
+QOIDALAR:
 - Faqat to'g'ri Python kodini qaytaring.
 - Xatolarni tuzating.
 - Hech qanday izoh bermang.
@@ -409,6 +410,7 @@ JSON shakli:
                 if fixed is not None:
                     fixed["code"] = _extract_code_block(fixed.get("code", ""))
                     fixed_errors = _validate_python_snippet(fixed.get("code", ""))
+                    if not fixed_errors:
                         payload = fixed
                     else:
                         payload["validation_errors"] = errors + fixed_errors
@@ -421,15 +423,18 @@ JSON shakli:
         return {
             "code": "",
             "summary": "AI kod yaratish xizmati hozircha mavjud emas.",
-    # ----------------------------------------------------------------------- #
+            "tests": [],
+            "validation_errors": ["AI xizmat vaqtincha mavjud emas."],
+        }
+
     async def get_chat_response(
         self,
         user_message: str,
         conversation_history: List[Dict[str, str]],
         problem_title: str,
+        problem_description: str,
         constraints: str,
         code: str,
-                    prompt = f"""
         language: str,
     ) -> str:
         problem_context = (
@@ -439,33 +444,51 @@ JSON shakli:
         )
 
         system_prompt = _CHAT_SYSTEM_PROMPT.format(
+            problem_context=problem_context,
+            language=language,
+            code=code.strip() if code.strip() else "(Hali kod yozilmagan)",
+        )
+
+        lines = [system_prompt, ""]
+        for msg in conversation_history:
+            label = "Foydalanuvchi" if msg["role"] == "user" else "AI Ustoz"
+            lines.append(f"{label}: {msg['content']}")
+        lines.append(f"Foydalanuvchi: {user_message}")
+        lines.append("AI Ustoz:")
         full_prompt = "\n".join(lines)
 
+        errors: list[str] = []
 
-        # Helper: build messages list for OpenAI-compatible clients
         def build_messages() -> list:
-            msgs = [{"role": "system", "content": system_prompt}]
+            messages = [{"role": "system", "content": system_prompt}]
             for msg in conversation_history:
-                msgs.append({"role": msg["role"], "content": msg["content"]})
-        prompt = f"""
-            msgs.append({"role": "user", "content": user_message})
-            return msgs
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            messages.append({"role": "user", "content": user_message})
+            return messages
 
-        # 1. Groq (primary — free, 30 RPM, LLaMA 3.3 70B)
         if self.groq_client:
+            try:
+                resp = self.groq_client.chat.completions.create(
+                    model=_GROQ_MODEL,
+                    messages=build_messages(),
+                    max_tokens=400,
+                )
                 return resp.choices[0].message.content.strip()
+            except Exception as exc:
+                err = str(exc)
+                logger.warning(f"Groq Chat: {err}")
+                errors.append(f"Groq: {err}")
+
         if self.api_key:
             for model in _GEMINI_MODELS:
                 try:
                     return await self._gemini_generate(model, full_prompt)
-                except Exception as e:
-                    err = str(e)
+                except Exception as exc:
+                    err = str(exc)
                     logger.warning(f"Gemini Chat {model}: {err}")
                     errors.append(f"{model}: {err}")
-        prompt = f"""
                     continue
 
-        # 3. OpenAI fallback
         if self.openai_client:
             try:
                 resp = self.openai_client.chat.completions.create(
@@ -474,10 +497,13 @@ JSON shakli:
                     max_tokens=400,
                 )
                 return resp.choices[0].message.content.strip()
-            except Exception as e:
-    # ----------------------------------------------------------------------- #
-    #  Online editor chat                                                      #
-    # ----------------------------------------------------------------------- #
+            except Exception as exc:
+                err = str(exc)
+                logger.warning(f"OpenAI Chat: {err}")
+                errors.append(f"OpenAI: {err}")
+
+        return f"Texnik xatolik: AI bilan bog'lanib bo'lmadi ({'; '.join(errors)}). Keyinroq qayta urining."
+
     async def get_editor_chat_response(
         self,
         user_message: str,
@@ -526,11 +552,11 @@ JSON shakli:
         full_prompt = "\n".join(history_lines)
 
         def build_messages() -> list:
-            msgs = [{"role": "system", "content": system_prompt}]
+            messages = [{"role": "system", "content": system_prompt}]
             for msg in conversation_history:
-                msgs.append({"role": msg["role"], "content": msg["content"]})
-            msgs.append({"role": "user", "content": user_message})
-            return msgs
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            messages.append({"role": "user", "content": user_message})
+            return messages
 
         errors: list[str] = []
 
@@ -542,8 +568,8 @@ JSON shakli:
                     max_tokens=420,
                 )
                 return resp.choices[0].message.content.strip()
-            except Exception as e:
-                err = str(e)
+            except Exception as exc:
+                err = str(exc)
                 logger.warning(f"Groq Editor Chat: {err}")
                 errors.append(f"Groq: {err}")
 
@@ -551,8 +577,8 @@ JSON shakli:
             for model in _GEMINI_MODELS:
                 try:
                     return await self._gemini_generate(model, full_prompt)
-                except Exception as e:
-                    err = str(e)
+                except Exception as exc:
+                    err = str(exc)
                     logger.warning(f"Gemini Editor Chat {model}: {err}")
                     errors.append(f"{model}: {err}")
                     continue
@@ -565,14 +591,13 @@ JSON shakli:
                     max_tokens=420,
                 )
                 return resp.choices[0].message.content.strip()
-            except Exception as e:
-                err = str(e)
+            except Exception as exc:
+                err = str(exc)
                 logger.warning(f"OpenAI Editor Chat: {err}")
                 errors.append(f"OpenAI: {err}")
 
         return f"Texnik xatolik: AI bilan bog'lanib bo'lmadi ({'; '.join(errors)}). Keyinroq qayta urining."
 
-    # Legacy hint (backward compat)
     async def get_hint(self, code: str, problem_title: str, language: str) -> str:
         return await self.get_chat_response(
             user_message="Menga bu masalada bitta kichik shama bering.",
