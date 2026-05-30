@@ -18,6 +18,7 @@ from app.api.routes.editor import router as editor_router
 from app.api.routes.contests import router as contest_router, ws_router as contest_ws_router
 from app.api.routes.engagement import router as engagement_router
 from app.api.routes.ai import router as ai_router
+from app.api.routes.learning import router as learning_router
 from app.api.routes.admin import router as admin_router
 from app.api.routes.admin_ai import router as admin_ai_router
 from app.core.config import get_settings
@@ -299,6 +300,7 @@ app.include_router(problem_ws_router)
 app.include_router(submission_router, prefix=settings.api_prefix)
 app.include_router(editor_router, prefix=f"{settings.api_prefix}/editor")
 app.include_router(ai_router, prefix=f"{settings.api_prefix}/ai")
+app.include_router(learning_router, prefix=settings.api_prefix)
 app.include_router(contest_router, prefix=settings.api_prefix)
 app.include_router(contest_ws_router)
 app.include_router(engagement_router, prefix=settings.api_prefix)

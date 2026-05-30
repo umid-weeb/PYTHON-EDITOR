@@ -24,6 +24,11 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      if (user) {
+        setStatus("ready");
+        return;
+      }
+
       setStatus("loading");
       try {
         const me = await authApi.me(token);
@@ -52,24 +57,31 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, user]);
 
   const value = useMemo(
     () => ({
       token,
       user,
       status,
-      isAuthenticated: Boolean(token),
+      isAuthenticated: Boolean(user),
       isAdmin: Boolean(user?.is_admin),
       isOwner: Boolean(user?.is_owner),
       async login(username, password) {
         setStatus("loading");
         try {
           const payload = await authApi.login({ username, password });
-          // setToken triggers the useEffect which calls authApi.me
-          setToken(payload.token);
+          const token = payload.token;
+          setToken(token);
+          const me = payload.user ? payload.user : await authApi.me(token);
+          setUser(me);
+          writeStoredUsername(me.username);
+          setStatus("ready");
           return payload;
         } catch (error) {
+          clearStoredToken();
+          setToken("");
+          setUser(null);
           setStatus("ready");
           throw error;
         }
@@ -78,9 +90,17 @@ export function AuthProvider({ children }) {
         setStatus("loading");
         try {
           const payload = await authApi.register(data);
-          setToken(payload.token);
+          const token = payload.token;
+          setToken(token);
+          const me = payload.user ? payload.user : await authApi.me(token);
+          setUser(me);
+          writeStoredUsername(me.username);
+          setStatus("ready");
           return payload;
         } catch (error) {
+          clearStoredToken();
+          setToken("");
+          setUser(null);
           setStatus("ready");
           throw error;
         }

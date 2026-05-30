@@ -176,9 +176,44 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class AuthResponse(TokenResponse):
+    user: MeResponse | None = None
+
+
 class GoogleConfigResponse(BaseModel):
     enabled: bool
     client_id: str | None = None
+
+
+def build_auth_user_profile(user: User) -> MeResponse:
+    return MeResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        display_name=getattr(user, "display_name", None),
+        country=user.country,
+        created_at=user.created_at,
+        avatar_url=getattr(user, "avatar_url", None),
+        bio=getattr(user, "bio", None),
+        solved_total=0,
+        solved_easy=0,
+        solved_medium=0,
+        solved_hard=0,
+        rating=1200,
+        global_rank=None,
+        level=getattr(user, "level", None),
+        goal=getattr(user, "goal", None),
+        weekly_hours=getattr(user, "weekly_hours", None),
+        streak=int(getattr(user, "streak", 0) or 0),
+        longest_streak=int(getattr(user, "longest_streak", 0) or 0),
+        streak_freeze=int(getattr(user, "streak_freeze", 0) or 0),
+        timezone=getattr(user, "timezone", None) or "Asia/Tashkent",
+        problem_bank_total=0,
+        problem_bank_easy=0,
+        problem_bank_medium=0,
+        problem_bank_hard=0,
+        is_admin=bool(getattr(user, "is_admin", False)),
+    )
 
 
 class GoogleAuthResponse(BaseModel):
@@ -353,8 +388,8 @@ def calculate_user_stats(db: Session, user_id: int) -> dict:
     }
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
     try:
         username = normalize_username(payload.username)
         email = payload.email.strip().lower() if payload.email else None
@@ -392,7 +427,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
         db.refresh(user)
 
         token = create_access_token(user)
-        return TokenResponse(token=token, access_token=token)
+        return AuthResponse(token=token, access_token=token, user=build_auth_user_profile(user))
     except HTTPException:
         raise
     except Exception as exc:
@@ -409,8 +444,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.post("/login")
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@router.post("/login", response_model=AuthResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
     try:
         identifier = normalize_username(payload.username)
         # Allow login by username or email
@@ -428,7 +463,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
         user.last_login_provider = "local"
         db.commit()
         token = create_access_token(user)
-        return TokenResponse(token=token, access_token=token)
+        return AuthResponse(token=token, access_token=token, user=build_auth_user_profile(user))
     except HTTPException:
         raise
     except Exception as exc:
