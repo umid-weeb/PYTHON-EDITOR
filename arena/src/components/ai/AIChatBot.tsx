@@ -313,7 +313,7 @@ export default function AIChatBot({ problemId, problemTitle, code, language }: P
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Savol yozing yoki shama so'rang..."
+                placeholder="Savol yozing yoki yo'nalish so'rang..."
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

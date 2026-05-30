@@ -62,7 +62,7 @@ export default function TestTabs({ cases, activeIndex, onSelect, result, busy, p
           { key: "cases", label: "Testlar" },
           { key: "result", label: "Natija" },
           { key: "history", label: "Tarix" },
-          { key: "hint", label: "AI Shama" },
+          { key: "hint", label: "AI Yo'nalish" },
           { key: "ai", label: "AI Analiz (Beta)" },
           { key: "solutions", label: "Yechimlar" },
           { key: "console", label: "Konsol" },

@@ -7,9 +7,21 @@
     <meta
       name="description"
       content="Pyzone Arena is a modern competitive coding workspace for solving, testing, and submitting programming problems."
-    />
-    <script type="module" crossorigin src="/zone/assets/index-mUfcPIVa.js"></script>
-    <link rel="stylesheet" crossorigin href="/zone/assets/index-DS5hlYxg.css">
+    />
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("pyzone-theme");
+          var system = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", saved || system);
+        } catch (error) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/zone/assets/index-BPqhDfFP.js"></script>
+    <link rel="stylesheet" crossorigin href="/zone/assets/index-Dar-KOfq.css">
   </head>
   <body>
     <div id="root"></div>

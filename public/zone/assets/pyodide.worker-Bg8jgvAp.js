@@ -1,0 +1,3 @@
+(function(){"use strict";importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js");let t=null;async function i(){return t||(t=await loadPyodide({indexURL:"https://cdn.jsdelivr.net/pyodide/v0.23.4/full/"}),t)}self.onmessage=async a=>{const{code:c,type:n,id:s}=a.data;if(n==="init"){try{await i(),self.postMessage({type:"initialized",id:s})}catch(e){self.postMessage({type:"init_error",error:e.message,id:s})}return}if(n==="run")try{const e=await i();let d=[],o=[];e.setStdout({batched:r=>{d.push(r)}}),e.setStderr({batched:r=>{o.push(r)}}),await e.runPythonAsync(c),self.postMessage({type:"success",stdout:d.join(`
+`),stderr:o.join(`
+`),id:s})}catch(e){self.postMessage({type:"error",error:e.message,id:s})}}})();

@@ -9,7 +9,7 @@ class DummyProblemService:
 
 class DummyAIService:
     async def get_hint(self, code: str, problem_title: str, language: str) -> str:
-        return "Bu test shama"
+        return "Bu test yo'nalish"
 
 
 def test_ai_hint_endpoint(monkeypatch):
@@ -25,4 +25,4 @@ def test_ai_hint_endpoint(monkeypatch):
     resp = client.post("/api/ai/hint", json=payload)
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert data.get("hint") == "Bu test shama"
+    assert data.get("hint") == "Bu test yo'nalish"

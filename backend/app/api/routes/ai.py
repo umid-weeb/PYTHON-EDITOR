@@ -156,33 +156,6 @@ async def review_code(
         )
 
 
-@router.post("/solve")
-async def generate_solution(
-    request: AIReviewRequest,
-    current_user: User | None = Depends(get_optional_user),
-    ai_service: AIService = Depends(get_ai_service),
-    problem_service: ProblemService = Depends(get_problem_service),
-):
-    try:
-        problem = await problem_service.get_problem(request.problem_slug)
-        if not problem:
-            raise HTTPException(status_code=404, detail="Problem topilmadi")
-
-        result = await ai_service.generate_solution(
-            code=request.code,
-            problem_title=problem.title,
-            language=request.language,
-            problem_description=getattr(problem, "description", "") or "",
-            constraints=getattr(problem, "constraints_text", "") or "",
-        )
-        return result
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error(f"Error in AI solve route: {exc}")
-        raise HTTPException(status_code=500, detail="AI yechim yaratishda xatolik yuz berdi")
-
-
 @router.post("/chat")
 async def ai_chat(
     request_data: AIChatRequest,
@@ -290,11 +263,11 @@ async def get_hint(
         if is_guest_limit:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Bugunlik AI shama (hint) so'rovlarining limiti tugadi. Iltimos, keyinroq qayta urinib ko'ring.",
+                detail="Bugunlik AI yo'nalish (hint) so'rovlarining limiti tugadi. Iltimos, keyinroq qayta urinib ko'ring.",
             )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Bugunlik AI shama so'rovlarining limiti tugadi. Ertaga yana foydalanishingiz mumkin.",
+            detail="Bugunlik AI yo'nalish so'rovlarining limiti tugadi. Ertaga yana foydalanishingiz mumkin.",
         )
 
     try:
@@ -329,5 +302,5 @@ async def get_hint(
         logger.error(f"Error in AI hint route: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI shama yaratishda xatolik: {str(e)}",
+            detail=f"AI yo'nalish yaratishda xatolik: {str(e)}",
         )

@@ -27,10 +27,10 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
         user_id: user?.id ?? null,
       });
       setHint(data.hint);
-      toast.push({ type: "success", title: "AI Shama", message: "Shama muvaffaqiyatli olindi." });
+      toast.push({ type: "success", title: "AI Yo'nalish", message: "Yo'nalish muvaffaqiyatli olindi." });
     } catch (err: any) {
       console.error("AI Hint failed:", err);
-      setError(err?.message || "Shama yaratishda xatolik yuz berdi.");
+      setError(err?.message || "Yo'nalish olishda xatolik yuz berdi.");
       toast.push({ type: "error", title: "Xatolik", message: err?.message || "Tarmoq yoki limit xatosi." });
     } finally {
       setLoading(false);
@@ -41,7 +41,7 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
     return (
       <div className="flex h-full flex-col items-center justify-center space-y-4 p-8">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
-        <p className="animate-pulse text-sm text-gray-400">🤖 AI shama tayyorlamoqda...</p>
+        <p className="animate-pulse text-sm text-gray-400">🤖 AI yo'nalish tayyorlanmoqda...</p>
       </div>
     );
   }
@@ -66,13 +66,13 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
       <div className="h-full overflow-y-auto p-4 font-sans">
         <div className="mb-6 flex items-center justify-between rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
           <h3 className="flex items-center gap-2.5 text-sm font-bold text-indigo-300">
-            <span className="text-xl">🤖</span> AI Shama (Hint)
+            <span className="text-xl">🤖</span> AI Yo'nalish
           </h3>
         </div>
 
         <div className="rounded-xl border border-indigo-500/10 bg-white/5 p-6 shadow-sm">
           <p className="text-sm leading-relaxed text-gray-200 italic">
-            "{hint}"
+            {hint}
           </p>
         </div>
 
@@ -81,7 +81,7 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
             onClick={() => setHint(null)}
             className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 hover:text-indigo-400 transition"
           >
-            Yangi shama so'rash
+            Yangi yo'nalish so'rash
           </button>
         </div>
       </div>
@@ -94,7 +94,7 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
       <div className="max-w-xs space-y-2">
         <h3 className="text-base font-bold text-gray-200">AI Ustoz (Tutor)</h3>
         <p className="text-xs text-gray-400">
-          Agar masalani echishda qiynalayotgan bo'lsangiz, AI Ustozdan shama (hint) so'rashingiz mumkin.
+          Agar masalani echishda qiynalayotgan bo'lsangiz, AI Ustozdan yo'nalish olishingiz mumkin.
         </p>
       </div>
       <button
@@ -102,7 +102,7 @@ export default function AIHintPanel({ problemId, code, language }: Props) {
         disabled={loading}
         className="inline-flex items-center justify-center rounded-lg bg-indigo-500 px-6 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:bg-indigo-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? "AI shama so'ralmoqda..." : "Shama (Hint) so'rash"}
+        {loading ? "AI yo'nalish so'ralmoqda..." : "Yo'nalish so'rash"}
       </button>
     </div>
   );

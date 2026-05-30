@@ -9,7 +9,6 @@ type Props = {
 
 export default function AIReviewPanel({ problemId, code, language }: Props) {
   const [review, setReview] = useState<any>(null);
-  const [solution, setSolution] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,30 +19,12 @@ export default function AIReviewPanel({ problemId, code, language }: Props) {
       const data = await aiApi.getReview({
         code,
         problem_slug: problemId,
-        language
+        language,
       });
       setReview(data);
     } catch (err: any) {
       console.error("AI Review failed:", err);
       setError(err.message || "AI analizida xatolik yuz berdi.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGenerateSolution = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await aiApi.generateSolution({
-        code,
-        problem_slug: problemId,
-        language,
-      });
-      setSolution(data);
-    } catch (err: any) {
-      console.error("AI solution generation failed:", err);
-      setError(err.message || "AI yechim yaratishda xatolik yuz berdi.");
     } finally {
       setLoading(false);
     }
@@ -89,12 +70,6 @@ export default function AIReviewPanel({ problemId, code, language }: Props) {
             className="rounded-[var(--radius-xs)] bg-[var(--accent)] px-6 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:bg-[var(--accent-hover)] active:scale-95"
           >
             AI bilan analiz qilish
-          </button>
-          <button
-            onClick={handleGenerateSolution}
-            className="rounded-[var(--radius-xs)] border border-[color:var(--accent)]/30 bg-[var(--bg-surface)] px-6 py-2.5 text-xs font-semibold text-[var(--text-primary)] shadow-sm transition hover:border-[color:var(--accent)]/60"
-          >
-            Yechim yaratish
           </button>
         </div>
       </div>
@@ -179,23 +154,9 @@ export default function AIReviewPanel({ problemId, code, language }: Props) {
         )}
       </div>
 
-      {solution && (
-        <div className="mt-6 rounded-xl border border-[color:var(--accent)]/10 bg-[color:var(--accent)]/5 p-4 shadow-sm">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">🧩 Taklif qilingan yechim</div>
-          <pre className="overflow-x-auto rounded-lg bg-[var(--bg-surface)] p-3 text-[11px] leading-relaxed text-[var(--text-primary)]">{solution.code || "Yechim yo'q. AI ishonchli yechim bera olmadi."}</pre>
-          {solution.summary ? <p className="mt-3 text-[11px] text-[var(--text-secondary)]">{solution.summary}</p> : null}
-          {solution.validation_errors?.length ? (
-            <p className="mt-2 text-[11px] text-[var(--danger)]">Tekshiruv xatolari: {solution.validation_errors.join(" • ")}</p>
-          ) : null}
-          {solution.tests?.length ? (
-            <p className="mt-2 text-[11px] text-[var(--text-secondary)]">Test takliflari: {solution.tests.join(" | ")}</p>
-          ) : null}
-        </div>
-      )}
-
       <div className="mt-8 text-center">
         <button
-          onClick={() => { setReview(null); setSolution(null); }}
+          onClick={() => setReview(null)}
           className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--accent)] transition"
         >
           Yangi analiz qilish

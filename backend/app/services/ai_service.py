@@ -600,7 +600,7 @@ JSON shakli:
 
     async def get_hint(self, code: str, problem_title: str, language: str) -> str:
         return await self.get_chat_response(
-            user_message="Menga bu masalada bitta kichik shama bering.",
+            user_message="Menga bu masalada bitta kichik yo'nalish bering.",
             conversation_history=[],
             problem_title=problem_title,
             problem_description="",
