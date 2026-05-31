@@ -19,10 +19,12 @@ jobs:
           key: ${{ secrets.AWS_SSH_KEY }}
           port: 22
           script: |
+            set -e
             cd ~/PYTHON-EDITOR
             # Serverdagi har qanday lokal o'zgarishlarni o'chirib, GitHub-dagi kodni majburan olish
             git fetch origin main
             git reset --hard origin/main
             # Backend papkasiga kirish va konteynerlarni qayta qurish
             cd backend
-            docker-compose up --build -d
+            docker compose up --build -d
+            docker image prune -f
