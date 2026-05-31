@@ -20,8 +20,9 @@ jobs:
           port: 22
           script: |
             cd ~/PYTHON-EDITOR
-            # Mahalliy o'zgarishlarni o'chirib, GitHub-dagi kodni majburan olish
+            # Serverdagi har qanday lokal o'zgarishlarni o'chirib, GitHub-dagi kodni majburan olish
             git fetch origin main
             git reset --hard origin/main
+            # Backend papkasiga kirish va konteynerlarni qayta qurish
             cd backend
             docker-compose up --build -d
