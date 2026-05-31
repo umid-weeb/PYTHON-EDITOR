@@ -569,16 +569,16 @@ def _templates() -> list[TemplateDefinition]:
         ),
         TemplateDefinition(
             slug_prefix="distinct-sort",
-            build_title=lambda index: f"Takrorlarsiz saralash ({'o' if index % 2 == 0 else 'ka'} tartibida)",
+            build_title=lambda index: f"Takrorlarsiz saralash ({'o\'sish' if index % 2 == 0 else 'kamayish'} tartibida)",
             difficulty="easy",
             tags=["sorting", "array"],
             build_description=lambda index: _problem_description(
-                title=f"Takrorlarsiz saralash ({'o' if index % 2 == 0 else 'ka'} tartibida)",
+                title=f"Takrorlarsiz saralash ({'o\'sish' if index % 2 == 0 else 'kamayish'} tartibida)",
                 summary="Massivdagi takroriy butun sonlarni olib tashlang va qolgan qiymatlarni berilgan tartibda qaytaring.",
                 steps=[
                     "Har bir butun sondan faqat bittasini qoldiring.",
                     "Noyob qiymatlarni saralang.",
-                    f"Ularni {'o' if index % 2 == 0 else 'ka'} tartibida qaytaring.",
+                    f"Ularni {'o\'sish' if index % 2 == 0 else 'kamayish'} tartibida qaytaring.",
                 ],
                 examples=[
                     "- [4, 1, 4, 2] o'sish tartibida [1, 2, 4] bo'ladi.",
@@ -591,7 +591,7 @@ def _templates() -> list[TemplateDefinition]:
             build_constraints=lambda index: [
                 "1 <= nums dagi elementlar soni <= 150",
                 "-500 <= nums[i] <= 500",
-                f"Bu variantda {'o' if index % 2 == 0 else 'ka'} tartibi ishlatiladi.",
+                f"Bu variantda {'o\'sish' if index % 2 == 0 else 'kamayish'} tartibi ishlatiladi.",
             ],
             build_starter_code=lambda index: _starter("nums"),
             build_test_cases=lambda index: _mk_cases(
