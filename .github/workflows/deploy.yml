@@ -27,4 +27,6 @@ jobs:
             # Backend papkasiga kirish va konteynerlarni qayta qurish
             cd backend
             docker compose up --build -d
-            docker image prune -f
+            # Ishlatilmayotgan barcha imijlar va build keshini agressiv tozalash
+            docker image prune -af
+            docker builder prune -f
