@@ -66,7 +66,7 @@ WHERE email IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS submissions (
   id SERIAL PRIMARY KEY,
-  external_submission_id TEXT UNIQUE NOT NULL,
+  external_submission_id TEXT UNIQUE,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   problem_id VARCHAR(36) REFERENCES problems(id) ON DELETE SET NULL,
   code TEXT NOT NULL,
