@@ -5,12 +5,13 @@
  * trip) against the problem's VISIBLE test cases, and returns a payload shaped
  * exactly like the backend judge so the existing result formatting/UI is reused.
  *
- * Phase 2 pilot: JavaScript only. More languages plug in here as their workers
- * land (typescript -> transpile-then-JS, python -> pyodide, ...).
+ * Languages: JavaScript runs directly; TypeScript is transpiled to JS first
+ * (sucrase) and then judged by the same JS worker. More plug in here (python ->
+ * pyodide, ...).
  */
 
 // Languages judged in the browser. Everything else still goes to the backend.
-export const CLIENT_SIDE_LANGUAGES = new Set(["javascript"]);
+export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript"]);
 
 export function isClientSideLanguage(language) {
   return CLIENT_SIDE_LANGUAGES.has(String(language || "").toLowerCase());
@@ -102,8 +103,35 @@ export function runJavascript({ code, functionName, cases, timeLimitMs = 5000 })
   });
 }
 
+/**
+ * TypeScript: strip types to JavaScript (sucrase, lazy-loaded) then judge it
+ * with the same JS worker.
+ */
+export async function runTypescript(args) {
+  let jsCode;
+  try {
+    const { transform } = await import("sucrase");
+    jsCode = transform(args.code || "", {
+      transforms: ["typescript"],
+      disableESTransforms: true,
+    }).code;
+  } catch (err) {
+    return {
+      verdict: "Runtime Error",
+      passed_count: 0,
+      total_count: (args.cases || []).length,
+      runtime_ms: 0,
+      memory_bytes: null,
+      error_text: `TypeScript xatosi: ${String((err && err.message) || err)}`,
+      case_results: [],
+    };
+  }
+  return runJavascript({ ...args, code: jsCode });
+}
+
 export function runClientSide(language, args) {
   const lang = String(language || "").toLowerCase();
   if (lang === "javascript") return runJavascript(args);
+  if (lang === "typescript") return runTypescript(args);
   return Promise.reject(new Error(`Client-side execution not supported for: ${language}`));
 }
