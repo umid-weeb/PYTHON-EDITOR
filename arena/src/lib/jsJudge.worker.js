@@ -112,12 +112,11 @@ self.onmessage = (event) => {
     const expected = parseValue(testcase.expected_output);
     const passed = error === null && deepEqual(actual, expected);
 
-    // Real JS-heap delta when the browser exposes it (Chrome), else estimate
-    // from the data the solution touched so a sensible number always shows.
-    let memoryBytes = heapAfter - heapBefore;
-    if (!(memoryBytes > 0)) {
-      memoryBytes = 1024 + byteSize(args) + byteSize(actual) + logs.join("\n").length;
-    }
+    // Memory: take the larger of the real JS-heap delta (Chrome) and a
+    // data-size estimate. The estimate has a ~1KB floor so the value is always
+    // reported in KB (not a tiny, noisy byte count).
+    const estimate = 1024 + byteSize(args) + byteSize(actual) + logs.join("\n").length;
+    const memoryBytes = Math.max(heapAfter - heapBefore, estimate);
 
     results.push({
       name: testcase.name || `Test ${i + 1}`,

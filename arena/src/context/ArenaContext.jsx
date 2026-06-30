@@ -15,6 +15,26 @@ import {
 } from "../lib/storage.js";
 
 const DEFAULT_CODE = `class Solution:\n    def solve(self):\n        pass\n`;
+
+// Minimal, syntactically-clean placeholder per language. Used before a problem
+// has loaded (and as a last-resort fallback) so a JavaScript editor never shows
+// Python code with red errors during the brief load window.
+const LANG_DEFAULTS = {
+  python: DEFAULT_CODE,
+  sql: "SELECT 1;\n",
+  javascript: "var solve = function() {\n    \n};\n",
+  typescript: "function solve(): void {\n    \n}\n",
+  java: "class Solution {\n    \n}\n",
+  cpp: "class Solution {\npublic:\n    \n};\n",
+  c: "\n",
+  csharp: "public class Solution {\n    \n}\n",
+  go: "func solve() {\n    \n}\n",
+};
+
+function defaultCodeFor(language) {
+  return LANG_DEFAULTS[String(language || "").toLowerCase()] || DEFAULT_CODE;
+}
+
 const SQL_TAGS = new Set(["sql", "postgresql", "basic-joins", "aggregation", "grouping", "subqueries"]);
 
 function isSqlProblem(problem) {
@@ -33,9 +53,13 @@ function resolveProblemLanguage(problem, currentLanguage, fallbackLanguage = "py
 // Per-language starter stub for a problem. Falls back to the legacy single
 // starter_code (e.g. SQL problems) and finally to the generic default.
 function getStarterForLanguage(problem, language) {
-  if (!problem) return DEFAULT_CODE;
+  if (!problem) return defaultCodeFor(language);
   const map = problem.starter_codes || problem.starterCodes || {};
-  return map[language] || problem.starter_code || DEFAULT_CODE;
+  if (map[language]) return map[language];
+  // The legacy single starter_code is Python/SQL; only use it for those.
+  const lang = String(language || "").toLowerCase();
+  if (lang === "python" || lang === "sql") return problem.starter_code || defaultCodeFor(language);
+  return defaultCodeFor(language);
 }
 
 const ArenaContext = createContext(null);
@@ -49,7 +73,7 @@ export function ArenaProvider({ children }) {
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState("all");
   const [language, setLanguageState] = useState(() => readLanguage());
-  const [code, setCode] = useState(DEFAULT_CODE);
+  const [code, setCode] = useState(() => defaultCodeFor(readLanguage()));
   const [result, setResult] = useState({
     tone: "info",
     chip: "Ma'lumot",
