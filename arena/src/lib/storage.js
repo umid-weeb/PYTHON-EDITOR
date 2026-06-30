@@ -17,24 +17,35 @@ export function clearStoredToken() {
   TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
 }
 
-export function getDraftKey(problemId) {
+export function getDraftKey(problemId, language) {
   const username = readStoredUsername() || "anonymous";
-  return `arena_draft_${username}_${problemId}`;
+  const base = `arena_draft_${username}_${problemId}`;
+  return language ? `${base}_${language}` : base;
 }
 
-export function readDraft(problemId, fallback = "") {
+export function readDraft(problemId, fallback = "", language) {
   if (!problemId) return fallback;
+  if (language) {
+    const value = localStorage.getItem(getDraftKey(problemId, language));
+    if (value != null) return value;
+    // Back-compat: legacy drafts had no language suffix; treat them as python.
+    if (language === "python") {
+      const legacy = localStorage.getItem(getDraftKey(problemId));
+      if (legacy != null) return legacy;
+    }
+    return fallback;
+  }
   return localStorage.getItem(getDraftKey(problemId)) || fallback;
 }
 
-export function writeDraft(problemId, code) {
+export function writeDraft(problemId, code, language) {
   if (!problemId) return;
-  localStorage.setItem(getDraftKey(problemId), code || "");
+  localStorage.setItem(getDraftKey(problemId, language), code || "");
 }
 
-export function clearDraft(problemId) {
+export function clearDraft(problemId, language) {
   if (!problemId) return;
-  localStorage.removeItem(getDraftKey(problemId));
+  localStorage.removeItem(getDraftKey(problemId, language));
 }
 
 export function readLanguage() {

@@ -625,6 +625,24 @@ POSTGRES_BOOTSTRAP_SQL = [
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     """,
+    # --- Multi-language starter code (LeetCode-style) ---
+    # Language-agnostic signature spec (source of truth) on the problem itself.
+    """
+    ALTER TABLE problems ADD COLUMN IF NOT EXISTS signature_json TEXT;
+    """,
+    # Per-(problem, programming-language) starter stub. Generated from the
+    # signature spec; is_custom protects manual overrides on regeneration.
+    """
+    CREATE TABLE IF NOT EXISTS problem_starter_codes (
+      id BIGSERIAL PRIMARY KEY,
+      problem_id VARCHAR(36) NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+      language VARCHAR(20) NOT NULL,
+      code TEXT NOT NULL,
+      is_custom BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT uq_problem_starter_lang UNIQUE (problem_id, language)
+    );
+    """,
 ]
 
 
@@ -634,6 +652,7 @@ def _run_sqlite_migrations(engine: Engine) -> None:
         "ALTER TABLE problems ADD COLUMN is_published BOOLEAN DEFAULT 1",
         "ALTER TABLE problems ADD COLUMN order_index INTEGER",
         "ALTER TABLE problems ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE problems ADD COLUMN signature_json TEXT",
     ]
     with engine.connect() as connection:
         for stmt in sqlite_columns:

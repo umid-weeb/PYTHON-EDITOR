@@ -29,6 +29,14 @@ function resolveProblemLanguage(problem, currentLanguage, fallbackLanguage = "py
   return String(currentLanguage || "").toLowerCase() === "sql" ? fallbackLanguage : currentLanguage;
 }
 
+// Per-language starter stub for a problem. Falls back to the legacy single
+// starter_code (e.g. SQL problems) and finally to the generic default.
+function getStarterForLanguage(problem, language) {
+  if (!problem) return DEFAULT_CODE;
+  const map = problem.starter_codes || problem.starterCodes || {};
+  return map[language] || problem.starter_code || DEFAULT_CODE;
+}
+
 const ArenaContext = createContext(null);
 
 export function ArenaProvider({ children }) {
@@ -100,9 +108,9 @@ export function ArenaProvider({ children }) {
     if (cacheRef.current.has(problemId)) {
       const cached = cacheRef.current.get(problemId);
       setSelectedProblem(cached);
-      setCode(readDraft(problemId, cached.starter_code || DEFAULT_CODE));
-      setActiveCaseIndex(0);
       const nextLanguage = resolveProblemLanguage(cached, language, lastNonSqlLanguageRef.current || "python");
+      setCode(readDraft(problemId, getStarterForLanguage(cached, nextLanguage), nextLanguage));
+      setActiveCaseIndex(0);
       if (nextLanguage !== language) {
         setLanguageState(nextLanguage);
         if (String(nextLanguage || "").toLowerCase() !== "sql") {
@@ -124,9 +132,9 @@ export function ArenaProvider({ children }) {
       const payload = await arenaApi.getProblem(problemId);
       cacheRef.current.set(problemId, payload);
       setSelectedProblem(payload);
-      setCode(readDraft(problemId, payload.starter_code || DEFAULT_CODE));
-      setActiveCaseIndex(0);
       const nextLanguage = resolveProblemLanguage(payload, language, lastNonSqlLanguageRef.current || "python");
+      setCode(readDraft(problemId, getStarterForLanguage(payload, nextLanguage), nextLanguage));
+      setActiveCaseIndex(0);
       if (nextLanguage !== language) {
         setLanguageState(nextLanguage);
         if (String(nextLanguage || "").toLowerCase() !== "sql") {
@@ -158,9 +166,9 @@ export function ArenaProvider({ children }) {
   const persistDraft = useCallback(
     (problemId = selectedProblemId, value = code) => {
       if (!problemId) return;
-      writeDraft(problemId, value);
+      writeDraft(problemId, value, language);
     },
-    [code, selectedProblemId]
+    [code, selectedProblemId, language]
   );
 
   const setLanguage = useCallback((nextLanguage) => {
@@ -169,12 +177,18 @@ export function ArenaProvider({ children }) {
       nextLanguage,
       lastNonSqlLanguageRef.current || "python"
     );
+    if (resolvedLanguage === language) return;
+    // Save the current editor content under the language we're leaving,
+    // then load the draft (or starter stub) for the language we switch to.
+    if (selectedProblemId) writeDraft(selectedProblemId, code, language);
+    const starter = getStarterForLanguage(selectedProblem, resolvedLanguage);
+    setCode(selectedProblemId ? readDraft(selectedProblemId, starter, resolvedLanguage) : starter);
     setLanguageState(resolvedLanguage);
     if (String(resolvedLanguage || "").toLowerCase() !== "sql") {
       lastNonSqlLanguageRef.current = resolvedLanguage;
     }
     writeLanguage(resolvedLanguage);
-  }, [selectedProblem]);
+  }, [selectedProblem, selectedProblemId, language, code]);
 
   const runCode = useCallback(async (isExtended = false) => {
     const submissionProblemKey = getSubmissionProblemKey();
@@ -420,7 +434,7 @@ export function ArenaProvider({ children }) {
       setLanguage,
       setCode: (value) => {
         setCode(value);
-        if (selectedProblemId) writeDraft(selectedProblemId, value);
+        if (selectedProblemId) writeDraft(selectedProblemId, value, language);
       },
       setActiveCaseIndex,
       loadProblems,

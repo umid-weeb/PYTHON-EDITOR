@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from functools import lru_cache
 from typing import Any
 
@@ -18,6 +19,8 @@ from app.services.problem_cache import ProblemCache
 from app.services.problem_catalog import build_problem_order_map
 from app.services.sql_problem_catalog import build_sql_problem_order_map
 
+
+logger = logging.getLogger("pyzone.arena.problem_service")
 
 _DIFFICULTY_SORT_ORDER = {"easy": 0, "medium": 1, "hard": 2}
 _SQL_MARKER_TAGS = {"sql", "postgresql"}
@@ -305,7 +308,7 @@ class ProblemService:
         with SessionLocal() as db:
             problem = (
                 db.query(Problem)
-                .options(joinedload(Problem.test_cases))
+                .options(joinedload(Problem.test_cases), joinedload(Problem.starter_codes))
                 .filter(or_(Problem.slug == problem_key, Problem.id == problem_key))
                 .first()
             )
@@ -363,6 +366,7 @@ class ProblemService:
 
         constraints = self._split_constraints(problem.constraints_text)
         tags = self._load_tags(problem.tags_json)
+        signature, starter_codes = self._starter_codes_for(problem, problem.starter_code)
 
         return {
             "id": problem.id,
@@ -372,6 +376,8 @@ class ProblemService:
             "difficulty": problem.difficulty.lower(),
             "description": problem.description,
             "starter_code": problem.starter_code,
+            "starter_codes": starter_codes,
+            "signature": signature,
             "function_name": problem.function_name or "solve",
             "input_format": problem.input_format,
             "output_format": problem.output_format,
@@ -401,6 +407,41 @@ class ProblemService:
         except json.JSONDecodeError:
             pass
         return [item.strip() for item in str(raw_value).split(",") if item.strip()]
+
+    def _starter_codes_for(self, problem: Problem, python_starter: str | None) -> tuple[dict, dict]:
+        """Resolve the signature spec + the full per-language stub map.
+
+        Persisted ``problem_starter_codes`` rows win; missing languages are
+        generated on the fly so the editor always has all 9 languages even
+        before the backfill pass has run. Requires ``problem.test_cases`` and
+        ``problem.starter_codes`` to be loaded (eager or within a live session).
+        """
+        from app.services.starter_code_service import (
+            build_starter_codes_map,
+            persisted_map_from_rows,
+            resolve_signature,
+        )
+
+        try:
+            test_cases = [
+                {"input": tc.input, "expected_output": tc.expected_output}
+                for tc in (problem.test_cases or [])
+            ]
+            spec = resolve_signature(
+                signature_json=problem.signature_json,
+                function_name=problem.function_name,
+                starter_code=problem.starter_code,
+                test_cases=test_cases,
+            )
+            persisted = persisted_map_from_rows(problem.starter_codes or [])
+            codes = build_starter_codes_map(
+                signature=spec, persisted=persisted, python_fallback=python_starter
+            )
+            return spec, codes
+        except Exception:  # pragma: no cover - never break problem loading
+            logger.exception("starter_codes generation failed for %s", getattr(problem, "slug", "?"))
+            fallback = {"python": python_starter} if python_starter else {}
+            return None, fallback
 
     def _get_problem_translation(self, problem: Problem, language_code: str = "uz") -> dict[str, Any]:
         """Get problem content in specified language with fallback to English."""
@@ -487,6 +528,7 @@ class ProblemService:
 
         constraints = self._split_constraints(translation["constraints"])
         tags = self._load_tags(problem.tags_json)
+        signature, starter_codes = self._starter_codes_for(problem, translation["starter_code"])
 
         return {
             "id": problem.id,
@@ -496,6 +538,8 @@ class ProblemService:
             "difficulty": problem.difficulty.lower(),
             "description": translation["description"],
             "starter_code": translation["starter_code"],
+            "starter_codes": starter_codes,
+            "signature": signature,
             "function_name": problem.function_name or "solve",
             "input_format": translation["input_format"],
             "output_format": translation["output_format"],

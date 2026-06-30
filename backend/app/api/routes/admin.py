@@ -110,6 +110,8 @@ class ProblemAdminDetail(BaseModel):
     output_format: Optional[str]
     constraints_text: Optional[str]
     starter_code: str
+    starter_codes: dict = {}
+    signature: Optional[dict] = None
     function_name: str
     tags: List[str]
     leetcode_id: Optional[int]
@@ -226,6 +228,13 @@ def _problem_to_summary(problem: Problem) -> ProblemAdminSummary:
 
 
 def _problem_to_detail(problem: Problem) -> ProblemAdminDetail:
+    signature = None
+    if problem.signature_json:
+        try:
+            signature = json.loads(problem.signature_json)
+        except (ValueError, TypeError):
+            signature = None
+    starter_codes = {sc.language: sc.code for sc in (problem.starter_codes or [])}
     return ProblemAdminDetail(
         id=problem.id,
         title=problem.title,
@@ -236,6 +245,8 @@ def _problem_to_detail(problem: Problem) -> ProblemAdminDetail:
         output_format=problem.output_format,
         constraints_text=problem.constraints_text,
         starter_code=problem.starter_code,
+        starter_codes=starter_codes,
+        signature=signature,
         function_name=problem.function_name,
         tags=_parse_tags(problem),
         leetcode_id=problem.leetcode_id,
@@ -501,6 +512,15 @@ def create_problem(
 
     db.commit()
     db.refresh(problem)
+
+    # Auto-generate per-language starter stubs (9 languages) so a freshly added
+    # problem — whether typed by hand or imported via AI — is immediately
+    # solvable in every language. Idempotent and preserves manual overrides.
+    from app.services.starter_code_service import backfill_problem
+    backfill_problem(db, problem)
+    db.commit()
+    db.refresh(problem)
+
     _invalidate_cache()
     logger.info("Admin: yangi masala yaratildi id=%s slug=%s", problem_id, slug)
     return _problem_to_detail(problem)
@@ -517,6 +537,9 @@ def update_problem(
     problem = db.query(Problem).filter(Problem.id == problem_id).first()
     if not problem:
         raise HTTPException(status_code=404, detail="Masala topilmadi.")
+
+    old_function_name = problem.function_name
+    old_starter = problem.starter_code
 
     if data.title is not None:
         problem.title = data.title
@@ -544,10 +567,53 @@ def update_problem(
         # leetcode_id o'zgarganda order_index ham yangilansin
         problem.order_index = data.leetcode_id
 
+    # If the signature-defining fields changed, re-infer the spec so the
+    # generated per-language stubs stay consistent (manual overrides kept).
+    signature_dirty = (
+        (data.function_name is not None and data.function_name != old_function_name)
+        or (data.starter_code is not None and data.starter_code != old_starter)
+    )
+
+    db.commit()
+    db.refresh(problem)
+
+    from app.services.starter_code_service import backfill_problem
+    if signature_dirty:
+        problem.signature_json = None  # force re-inference from the updated data
+    backfill_problem(db, problem)
+    db.commit()
+    db.refresh(problem)
+
+    _invalidate_cache()
+    logger.info("Admin: masala yangilandi id=%s", problem_id)
+    return _problem_to_detail(problem)
+
+
+@router.post("/problems/{problem_id}/regenerate-starters", response_model=ProblemAdminDetail)
+def regenerate_starter_codes(
+    problem_id: str,
+    reinfer: bool = False,
+    overwrite_custom: bool = False,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_admin_user),
+) -> ProblemAdminDetail:
+    """Regenerate the per-language starter stubs for a problem.
+
+    reinfer=True           -> re-derive the signature from the Python starter + tests
+    overwrite_custom=True  -> also replace manually-edited (is_custom) stubs
+    """
+    problem = db.query(Problem).filter(Problem.id == problem_id).first()
+    if not problem:
+        raise HTTPException(status_code=404, detail="Masala topilmadi.")
+
+    from app.services.starter_code_service import backfill_problem
+    if reinfer:
+        problem.signature_json = None
+    backfill_problem(db, problem, overwrite_custom=overwrite_custom)
     db.commit()
     db.refresh(problem)
     _invalidate_cache()
-    logger.info("Admin: masala yangilandi id=%s", problem_id)
+    logger.info("Admin: starter kodlar qayta generatsiya qilindi id=%s reinfer=%s", problem_id, reinfer)
     return _problem_to_detail(problem)
 
 

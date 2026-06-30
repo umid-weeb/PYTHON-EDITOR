@@ -129,6 +129,11 @@ export default function AdminProblemFormPage() {
 
   const [functionName, setFunctionName] = useState("solve");
   const [starterCode, setStarterCode] = useState("def solve():\n    # Yechimingizni shu yerga yozing\n    pass");
+  // Per-language generated starter stubs (read-only preview while editing).
+  const [starterCodes, setStarterCodes] = useState({});
+  const [signature, setSignature] = useState(null);
+  const [previewLang, setPreviewLang] = useState("cpp");
+  const [regenLoading, setRegenLoading] = useState(false);
 
   const [testCases, setTestCases] = useState([
     { input: "", expected_output: "", is_hidden: false },
@@ -167,6 +172,8 @@ export default function AdminProblemFormPage() {
         setConstraintsText(p.constraints_text || "");
         setFunctionName(p.function_name || "solve");
         setStarterCode(p.starter_code || "def solve():\n    pass");
+        setStarterCodes(p.starter_codes || {});
+        setSignature(p.signature || null);
         setTestCases(
           p.test_cases?.length
             ? p.test_cases.map((tc) => ({
@@ -323,6 +330,25 @@ export default function AdminProblemFormPage() {
       setError("AI starter code yarata olmadi: " + err.message);
     } finally {
       setAiLoading((p) => ({ ...p, starter: false }));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Regenerate per-language starter stubs from the signature spec
+  // ---------------------------------------------------------------------------
+  async function handleRegenerateStarters(reinfer) {
+    if (!problemId) return;
+    setRegenLoading(true);
+    setError("");
+    try {
+      const p = await adminApi.regenerateStarters(problemId, { reinfer });
+      setStarterCodes(p.starter_codes || {});
+      setSignature(p.signature || null);
+      setSuccess("Barcha tillar uchun starter kodlar qayta generatsiya qilindi.");
+    } catch (err) {
+      setError("Qayta generatsiya xatosi: " + err.message);
+    } finally {
+      setRegenLoading(false);
     }
   }
 
@@ -820,8 +846,8 @@ export default function AdminProblemFormPage() {
             </Field>
 
             <Field
-              label="Starter code"
-              hint="Foydalanuvchiga beriladigan boshlang'ich kod skeleti"
+              label="Starter code (Python)"
+              hint="Python uchun boshlang'ich skelet. Boshqa tillar imzodan avtomatik yasaladi."
             >
               <Textarea
                 value={starterCode}
@@ -830,6 +856,60 @@ export default function AdminProblemFormPage() {
                 placeholder="def solve():\n    pass"
               />
             </Field>
+
+            {isEditing && (
+              <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-200">Tillar bo'yicha starter (avto-generatsiya)</div>
+                    <div className="text-xs text-gray-500">
+                      Imzo spetsidan 8 til uchun avtomatik yasaladi. "Saqlash"da yangilanadi.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={regenLoading}
+                      onClick={() => handleRegenerateStarters(false)}
+                      className="rounded-md border border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      {regenLoading ? "..." : "Qayta generatsiya"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={regenLoading}
+                      onClick={() => handleRegenerateStarters(true)}
+                      title="Imzoni test case lardan qayta xulosalab generatsiya qiladi"
+                      className="rounded-md border border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      Imzodan qayta
+                    </button>
+                  </div>
+                </div>
+
+                {signature && (
+                  <div className="font-mono text-xs text-gray-400">
+                    {signature.function_name}(
+                    {(signature.params || []).map((p) => `${p.name}: ${p.type}`).join(", ")}
+                    ){signature.returns?.type ? ` → ${signature.returns.type}` : ""}
+                  </div>
+                )}
+
+                <select
+                  value={previewLang}
+                  onChange={(e) => setPreviewLang(e.target.value)}
+                  className="rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-gray-200"
+                >
+                  {["python", "javascript", "typescript", "java", "cpp", "c", "csharp", "go"].map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+
+                <pre className="max-h-64 overflow-auto rounded bg-black/40 p-3 font-mono text-xs whitespace-pre text-gray-200">
+                  {starterCodes[previewLang] || "— (Saqlangandan keyin generatsiya bo'ladi)"}
+                </pre>
+              </div>
+            )}
           </div>
         </Section>
 

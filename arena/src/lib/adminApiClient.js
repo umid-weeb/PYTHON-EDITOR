@@ -84,6 +84,12 @@ export const adminApi = {
   deleteProblem: (problemId) =>
     adminRequest(`/api/admin/problems/${problemId}`, { method: "DELETE" }),
 
+  regenerateStarters: (problemId, { reinfer = false, overwriteCustom = false } = {}) =>
+    adminRequest(
+      `/api/admin/problems/${problemId}/regenerate-starters?reinfer=${reinfer}&overwrite_custom=${overwriteCustom}`,
+      { method: "POST" }
+    ),
+
   toggleVisibility: (problemId) =>
     adminRequest(`/api/admin/problems/${problemId}/toggle-visibility`, { method: "PATCH" }),
 

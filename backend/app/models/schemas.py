@@ -35,6 +35,11 @@ class VisibleTestcase(BaseModel):
 class ProblemDetail(ProblemSummary):
     description: str
     starter_code: str
+    # Per-language starter stubs (LeetCode-style). Keyed by language id
+    # (python, javascript, typescript, java, cpp, c, csharp, go).
+    starter_codes: dict[str, str] = Field(default_factory=dict)
+    # Language-agnostic signature spec the stubs were generated from.
+    signature: dict | None = None
     function_name: str
     input_format: str | None = None
     output_format: str | None = None

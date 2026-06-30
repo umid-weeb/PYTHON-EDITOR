@@ -2,11 +2,15 @@ import Editor from "@monaco-editor/react";
 import { useRef } from "react";
 import { useTheme } from "../../providers/ThemeProvider.tsx";
 
+// Maps our language id -> Monaco editor language id for syntax highlighting.
 const languageMap = {
   python: "python",
   javascript: "javascript",
-  cpp: "cpp",
+  typescript: "typescript",
   java: "java",
+  cpp: "cpp",
+  c: "c",
+  csharp: "csharp",
   go: "go",
   sql: "sql",
 };
@@ -14,8 +18,11 @@ const languageMap = {
 const languageBadges = {
   python: { label: "Py", className: "bg-[#3776AB]/15 text-[#89B8FF]" },
   javascript: { label: "JS", className: "bg-[#F7DF1E]/15 text-[#E7CF22]" },
-  cpp: { label: "C++", className: "bg-[#00599C]/15 text-[#8DBBFF]" },
+  typescript: { label: "TS", className: "bg-[#3178C6]/15 text-[#7AB4FF]" },
   java: { label: "Java", className: "bg-[#F89820]/15 text-[#FFBF73]" },
+  cpp: { label: "C++", className: "bg-[#00599C]/15 text-[#8DBBFF]" },
+  c: { label: "C", className: "bg-[#5C6BC0]/15 text-[#A7B6FF]" },
+  csharp: { label: "C#", className: "bg-[#68217A]/15 text-[#D58CE6]" },
   go: { label: "Go", className: "bg-[#00ADD8]/15 text-[#5CCFE6]" },
   sql: { label: "SQL", className: "bg-emerald-500/15 text-emerald-300" },
 };
@@ -71,8 +78,11 @@ export default function CodeEditorPanel({
           >
             <option value="python">Python 3.11</option>
             <option value="javascript">JavaScript</option>
-            <option value="cpp">C++17</option>
+            <option value="typescript">TypeScript</option>
             <option value="java">Java</option>
+            <option value="cpp">C++17</option>
+            <option value="c">C</option>
+            <option value="csharp">C#</option>
             <option value="go">Go</option>
             <option value="sql">PostgreSQL</option>
           </select>

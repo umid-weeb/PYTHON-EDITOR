@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -19,6 +19,9 @@ class Problem(Base):
     constraints_text = Column("constraints", Text, nullable=True)
     starter_code = Column(Text, nullable=False)
     function_name = Column(String(64), nullable=False, default="solve")
+    # Language-agnostic signature spec (source of truth for per-language stubs):
+    # {"function_name": str, "params": [{"name", "type"}], "returns": {"type"}}
+    signature_json = Column(Text, nullable=True)
     tags_json = Column(Text, nullable=False, default="[]")
     leetcode_id = Column(Integer, nullable=True)
     order_index = Column(Integer, nullable=True, index=True)
@@ -53,6 +56,34 @@ class Problem(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    starter_codes = relationship(
+        "ProblemStarterCode",
+        back_populates="problem",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class ProblemStarterCode(Base):
+    """Per-(problem, programming-language) starter stub.
+
+    Generated from ``Problem.signature_json``; ``is_custom`` marks rows that
+    were manually edited so a regeneration pass leaves them untouched.
+    """
+
+    __tablename__ = "problem_starter_codes"
+    __table_args__ = (
+        UniqueConstraint("problem_id", "language", name="uq_problem_starter_lang"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    problem_id = Column(String(36), ForeignKey("problems.id", ondelete="CASCADE"), nullable=False)
+    language = Column(String(20), nullable=False)
+    code = Column(Text, nullable=False)
+    is_custom = Column(Boolean, nullable=False, default=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    problem = relationship("Problem", back_populates="starter_codes")
 
 
 class TestCase(Base):

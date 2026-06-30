@@ -10,7 +10,7 @@ from app.models.schemas import (
     CaseResult,
 )
 from app.models.user import User
-from app.models.problem import Problem, TestCase
+from app.models.problem import Problem, ProblemStarterCode, TestCase
 from app.models.problem_translation import ProblemTranslation
 from app.models.engagement import StreakHistory, DailyChallenge
 from app.models.rating import UserRating, RatingHistory
@@ -28,6 +28,7 @@ __all__ = [
     "CaseResult",
     "User",
     "Problem",
+    "ProblemStarterCode",
     "TestCase",
     "StreakHistory",
     "DailyChallenge",
