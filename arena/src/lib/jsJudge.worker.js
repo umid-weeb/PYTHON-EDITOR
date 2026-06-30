@@ -11,15 +11,6 @@
  * JSON-encoded argument. Output is compared canonically (JSON deep-equal).
  */
 
-function heapUsed() {
-  // Chrome-only, non-standard. 0 elsewhere (then we estimate).
-  try {
-    return (self.performance && self.performance.memory && self.performance.memory.usedJSHeapSize) || 0;
-  } catch {
-    return 0;
-  }
-}
-
 function byteSize(value) {
   try {
     return JSON.stringify(value)?.length || 0;
@@ -98,7 +89,6 @@ self.onmessage = (event) => {
 
     let actual;
     let error = null;
-    const heapBefore = heapUsed();
     const started = performance.now();
     try {
       actual = fn(...args.map((a) => (Array.isArray(a) ? a.slice() : a)));
@@ -106,17 +96,14 @@ self.onmessage = (event) => {
       error = String((err && err.stack) || err);
     }
     const runtimeMs = performance.now() - started; // keep sub-ms precision
-    const heapAfter = heapUsed();
     console.log = originalLog;
 
     const expected = parseValue(testcase.expected_output);
     const passed = error === null && deepEqual(actual, expected);
 
-    // Memory: take the larger of the real JS-heap delta (Chrome) and a
-    // data-size estimate. The estimate has a ~1KB floor so the value is always
-    // reported in KB (not a tiny, noisy byte count).
-    const estimate = 1024 + byteSize(args) + byteSize(actual) + logs.join("\n").length;
-    const memoryBytes = Math.max(heapAfter - heapBefore, estimate);
+    // Memory in bytes: size of the data the solution touched (args + result +
+    // stdout). Small values are reported in B, as requested.
+    const memoryBytes = byteSize(args) + byteSize(actual) + logs.join("\n").length;
 
     results.push({
       name: testcase.name || `Test ${i + 1}`,
