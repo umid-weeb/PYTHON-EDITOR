@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { arenaApi } from "../lib/apiClient.js";
 import { useAuth } from "./AuthContext.jsx";
 import { buildResultState } from "../lib/formatters.js";
+import { isClientSideLanguage, runClientSide } from "../lib/clientJudge.js";
 import TimeoutWarningModal from "../components/common/TimeoutWarningModal.tsx";
 import {
   clearPendingSubmission,
@@ -220,6 +221,28 @@ export function ArenaProvider({ children }) {
         language,
         lastNonSqlLanguageRef.current || "python"
       );
+
+      // Client-side judging (runs in the user's browser, no server round-trip).
+      // Phase 2 pilot: JavaScript. Uses the problem's VISIBLE test cases.
+      if (isClientSideLanguage(submissionLanguage)) {
+        const cases = (selectedProblem?.visible_testcases || []).map((tc) => ({
+          name: tc.name,
+          input: tc.input,
+          expected_output: tc.expected_output,
+        }));
+        const functionName =
+          selectedProblem?.signature?.function_name || selectedProblem?.function_name || "solve";
+        const clientPayload = await runClientSide(submissionLanguage, {
+          code,
+          functionName,
+          cases,
+          timeLimitMs: isExtended ? 10000 : 5000,
+        });
+        const formattedClient = buildResultState(clientPayload, "run");
+        setResult(formattedClient);
+        return formattedClient;
+      }
+
       const submission = await arenaApi.runSolution(submissionProblemKey, code, submissionLanguage, isExtended);
       if (!submission) {
         throw new Error("Serverdan javob kelmadi.");
