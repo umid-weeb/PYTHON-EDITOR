@@ -20,7 +20,10 @@ class Judge0Settings:
 def get_judge0_settings() -> Judge0Settings:
   base_url = os.getenv("JUDGE0_BASE_URL", "https://ce.judge0.com").rstrip("/")
   api_key = os.getenv("JUDGE0_API_KEY") or None
-  enabled = bool(base_url)
+  # Only treat Judge0 as enabled when explicitly configured. Otherwise these
+  # languages are judged client-side (in the browser), not via the unreliable
+  # public CE endpoint — which previously returned false "Accepted" verdicts.
+  enabled = bool(api_key) or os.getenv("JUDGE0_ENABLED", "").strip().lower() in {"1", "true", "yes"}
   return Judge0Settings(base_url=base_url, api_key=api_key, enabled=enabled)
 
 

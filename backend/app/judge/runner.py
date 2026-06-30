@@ -334,7 +334,11 @@ class JudgeRunner:
                     "runtime_ms": 0,
                     "memory_kb": 0,
                     "actual_output": "",
-                    "error": "Bu til hozircha qo'llab-quvvatlanmaydi. Faqat Python ishlaydi.",
+                    "error": (
+                        "Bu til brauzeringizda ishga tushiriladi. Agar shu xabarni "
+                        "ko'rsangiz, sahifani yangilang (Ctrl+Shift+R). Hozircha "
+                        "serverda faqat Python va SQL baholanadi."
+                    ),
                 }
 
             # Judge0 integration scaffold – choose a language_id mapping here.
@@ -419,9 +423,13 @@ class JudgeRunner:
                     "error": stderr or status,
                 }
 
+            # Judge0 "accepted" only means the program ran without crashing — it
+            # does NOT mean the output is correct. Compare stdout to the expected
+            # output so we never report a false "Accepted".
+            passed = compare_expected_to_actual(testcase.get("expected_output", ""), stdout)
             return {
-                "verdict": "Accepted",
-                "passed": True,
+                "verdict": "Accepted" if passed else "Wrong Answer",
+                "passed": passed,
                 "runtime_ms": time_ms,
                 "memory_bytes": memory_bytes,
                 "memory_kb": memory_kb,
