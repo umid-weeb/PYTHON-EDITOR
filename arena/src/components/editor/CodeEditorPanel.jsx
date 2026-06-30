@@ -72,7 +72,7 @@ export default function CodeEditorPanel({
         <div className="flex items-center gap-2 rounded-[var(--radius-xs)] border border-[color:var(--border)] bg-[var(--bg-input)] px-2 h-[var(--h-input)]">
           <LanguageMark language={language} />
           <select
-            className="bg-transparent text-[12px] text-[var(--text-primary)] outline-none"
+            className="cursor-pointer bg-transparent text-[12px] text-[var(--text-primary)] outline-none [&>option]:bg-[#0f1930] [&>option]:text-[#edf2ff]"
             value={language}
             onChange={(event) => onLanguageChange(event.target.value)}
           >
