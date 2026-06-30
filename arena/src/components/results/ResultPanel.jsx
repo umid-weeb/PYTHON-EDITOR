@@ -192,10 +192,10 @@ export default function ResultPanel({ result, busy = false }) {
                 )}
 
                 {activeCase.stdout && (
-                    <CodeBlock 
-                        label="Stdout (Harness)" 
-                        value={activeCase.stdout} 
-                        placeholder="Natija mavjud emas" 
+                    <CodeBlock
+                        label="Konsol chiqishi (print)"
+                        value={activeCase.stdout}
+                        placeholder="Natija mavjud emas"
                     />
                 )}
                 

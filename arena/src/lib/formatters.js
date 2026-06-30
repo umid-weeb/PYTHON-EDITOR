@@ -61,6 +61,7 @@ export function formatCaseResults(cases = []) {
       input: entry.input,
       expected: entry.expected_output,
       actual: entry.actual_output,
+      stdout: entry.stdout,
       passed: entry.passed,
       error: entry.error,
     };

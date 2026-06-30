@@ -678,11 +678,11 @@ class JudgeRunner:
             execution_result["actual_output"] = actual_output_str
             return execution_result
 
-        return {
-            "verdict": "Wrong Answer",
-            "passed": False,
-            "runtime_ms": execution_result.get("runtime_ms", 0),
-            "memory_kb": execution_result.get("memory_kb", 0),
-            "actual_output": actual_output_str,
-            "error": None,
-        }
+        # Wrong Answer: mutate the existing result so debug-relevant fields
+        # (stdout/print output, memory, execution_mode, ...) are preserved
+        # instead of being dropped by building a fresh dict.
+        execution_result["verdict"] = "Wrong Answer"
+        execution_result["passed"] = False
+        execution_result["actual_output"] = actual_output_str
+        execution_result["error"] = None
+        return execution_result
