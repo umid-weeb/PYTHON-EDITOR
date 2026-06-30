@@ -87,7 +87,7 @@ self.onmessage = (event) => {
     } catch (err) {
       error = String((err && err.stack) || err);
     }
-    const runtimeMs = Math.round(performance.now() - started);
+    const runtimeMs = performance.now() - started; // keep sub-ms precision
     console.log = originalLog;
 
     const expected = parseValue(testcase.expected_output);
