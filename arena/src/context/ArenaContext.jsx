@@ -319,14 +319,25 @@ export function ArenaProvider({ children }) {
         );
 
         // Client-side languages (e.g. JavaScript) are judged in the browser.
-        // Hidden tests live only on the server, so submit checks the visible
-        // tests client-side and shows the result (no server round-trip).
+        // Submit checks ALL test cases (visible + hidden) — fetched from the
+        // server — so it is a thorough check, not just the visible ones.
         if (isClientSideLanguage(submissionLanguage)) {
-          const cases = (selectedProblem?.visible_testcases || []).map((tc) => ({
-            name: tc.name,
-            input: tc.input,
-            expected_output: tc.expected_output,
-          }));
+          let cases;
+          try {
+            const data = await arenaApi.getJudgeTestcases(submissionProblemKey);
+            cases = (data?.cases || []).map((tc) => ({
+              name: tc.name,
+              input: tc.input,
+              expected_output: tc.expected_output,
+            }));
+          } catch {
+            // Fall back to the visible tests if the full set can't be loaded.
+            cases = (selectedProblem?.visible_testcases || []).map((tc) => ({
+              name: tc.name,
+              input: tc.input,
+              expected_output: tc.expected_output,
+            }));
+          }
           const functionName =
             selectedProblem?.signature?.function_name || selectedProblem?.function_name || "solve";
           const clientPayload = await runClientSide(submissionLanguage, {

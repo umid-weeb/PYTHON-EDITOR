@@ -20,6 +20,7 @@ function summarize(results) {
   const total = results.length;
   const passed = results.filter((r) => r.passed).length;
   const runtimeMs = results.reduce((sum, r) => sum + (r.runtime_ms || 0), 0);
+  const memoryBytes = results.reduce((peak, r) => Math.max(peak, r.memory_bytes || 0), 0);
   const firstFail = results.find((r) => !r.passed);
   const verdict = total === 0
     ? "Accepted"
@@ -33,7 +34,7 @@ function summarize(results) {
     passed_count: passed,
     total_count: total,
     runtime_ms: runtimeMs,
-    memory_bytes: null,
+    memory_bytes: memoryBytes || null,
     error_text: firstFail?.error || null,
     case_results: results,
   };

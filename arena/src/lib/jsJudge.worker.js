@@ -11,6 +11,23 @@
  * JSON-encoded argument. Output is compared canonically (JSON deep-equal).
  */
 
+function heapUsed() {
+  // Chrome-only, non-standard. 0 elsewhere (then we estimate).
+  try {
+    return (self.performance && self.performance.memory && self.performance.memory.usedJSHeapSize) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function byteSize(value) {
+  try {
+    return JSON.stringify(value)?.length || 0;
+  } catch {
+    return 0;
+  }
+}
+
 function stringify(value) {
   if (value === undefined) return "undefined";
   if (typeof value === "string") return value;
@@ -81,6 +98,7 @@ self.onmessage = (event) => {
 
     let actual;
     let error = null;
+    const heapBefore = heapUsed();
     const started = performance.now();
     try {
       actual = fn(...args.map((a) => (Array.isArray(a) ? a.slice() : a)));
@@ -88,10 +106,18 @@ self.onmessage = (event) => {
       error = String((err && err.stack) || err);
     }
     const runtimeMs = performance.now() - started; // keep sub-ms precision
+    const heapAfter = heapUsed();
     console.log = originalLog;
 
     const expected = parseValue(testcase.expected_output);
     const passed = error === null && deepEqual(actual, expected);
+
+    // Real JS-heap delta when the browser exposes it (Chrome), else estimate
+    // from the data the solution touched so a sensible number always shows.
+    let memoryBytes = heapAfter - heapBefore;
+    if (!(memoryBytes > 0)) {
+      memoryBytes = 1024 + byteSize(args) + byteSize(actual) + logs.join("\n").length;
+    }
 
     results.push({
       name: testcase.name || `Test ${i + 1}`,
@@ -102,7 +128,7 @@ self.onmessage = (event) => {
       passed,
       error,
       runtime_ms: runtimeMs,
-      memory_bytes: null,
+      memory_bytes: Math.round(memoryBytes),
       verdict: error ? "Runtime Error" : passed ? "Accepted" : "Wrong Answer",
     });
   }

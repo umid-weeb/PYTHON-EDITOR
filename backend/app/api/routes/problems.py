@@ -196,6 +196,35 @@ async def get_problem_legacy(
     return await get_problem(problem_slug=problem_key, refresh=refresh, service=service)
 
 
+@router.get("/problems/{problem_slug}/judge-testcases")
+async def get_judge_testcases(
+    problem_slug: str,
+    service: ProblemService = Depends(get_problem_service),
+):
+    """All test cases (visible + hidden) for in-browser judging.
+
+    Client-side languages (e.g. JavaScript) run in the user's browser, so the
+    full test set must be sent to the client. Note: this exposes hidden test
+    cases — acceptable because client-side execution cannot keep them secret.
+    """
+    try:
+        bundle = await service.get_problem_bundle(problem_slug)
+    except ProblemNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Problem topilmadi.") from error
+
+    cases = list(bundle.get("visible_testcases", [])) + list(bundle.get("hidden_testcases", []))
+    return {
+        "cases": [
+            {
+                "name": case.get("name"),
+                "input": case.get("input"),
+                "expected_output": case.get("expected_output"),
+            }
+            for case in cases
+        ]
+    }
+
+
 @router.get("/problems/{problem_slug}/solutions")
 async def get_problem_solutions(
     problem_slug: str,

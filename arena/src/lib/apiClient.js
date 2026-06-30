@@ -148,6 +148,11 @@ export const arenaApi = {
       throw error;
     }
   },
+  // All test cases (visible + hidden) for in-browser judging of client-side
+  // languages. Returns { cases: [{name, input, expected_output}] }.
+  async getJudgeTestcases(problemSlug) {
+    return request(`/api/problems/${encodeURIComponent(problemSlug)}/judge-testcases`);
+  },
   runSolution(problemSlug, code, language, isExtended = false) {
     return request("/api/run", {
       method: "POST",
