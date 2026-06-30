@@ -317,6 +317,30 @@ export function ArenaProvider({ children }) {
           language,
           lastNonSqlLanguageRef.current || "python"
         );
+
+        // Client-side languages (e.g. JavaScript) are judged in the browser.
+        // Hidden tests live only on the server, so submit checks the visible
+        // tests client-side and shows the result (no server round-trip).
+        if (isClientSideLanguage(submissionLanguage)) {
+          const cases = (selectedProblem?.visible_testcases || []).map((tc) => ({
+            name: tc.name,
+            input: tc.input,
+            expected_output: tc.expected_output,
+          }));
+          const functionName =
+            selectedProblem?.signature?.function_name || selectedProblem?.function_name || "solve";
+          const clientPayload = await runClientSide(submissionLanguage, {
+            code,
+            functionName,
+            cases,
+            timeLimitMs: isExtended ? 10000 : 5000,
+          });
+          clearPendingSubmission();
+          const formattedClient = buildResultState(clientPayload, "submit");
+          setResult(formattedClient);
+          return formattedClient;
+        }
+
         const submission = await arenaApi.submitSolution(submissionProblemKey, code, submissionLanguage, isExtended);
         if (!submission) {
           throw new Error("Serverdan javob kelmadi.");
