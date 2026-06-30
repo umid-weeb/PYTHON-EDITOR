@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { arenaApi } from "../lib/apiClient.js";
 import { useAuth } from "./AuthContext.jsx";
 import { buildResultState } from "../lib/formatters.js";
-import { isClientSideLanguage, runClientSide } from "../lib/clientJudge.js";
+import { isClientRunLanguage, isClientSideLanguage, runClientSide } from "../lib/clientJudge.js";
 import TimeoutWarningModal from "../components/common/TimeoutWarningModal.tsx";
 import {
   clearPendingSubmission,
@@ -247,8 +247,9 @@ export function ArenaProvider({ children }) {
       );
 
       // Client-side judging (runs in the user's browser, no server round-trip).
-      // Phase 2 pilot: JavaScript. Uses the problem's VISIBLE test cases.
-      if (isClientSideLanguage(submissionLanguage)) {
+      // JavaScript/TypeScript run directly; Python runs via Pyodide. Uses the
+      // problem's VISIBLE test cases.
+      if (isClientRunLanguage(submissionLanguage)) {
         const cases = (selectedProblem?.visible_testcases || []).map((tc) => ({
           name: tc.name,
           input: tc.input,
@@ -260,7 +261,8 @@ export function ArenaProvider({ children }) {
           code,
           functionName,
           cases,
-          timeLimitMs: isExtended ? 10000 : 5000,
+          // Python loads Pyodide first (not counted here); give execution more room.
+          timeLimitMs: submissionLanguage === "python" ? (isExtended ? 15000 : 10000) : (isExtended ? 10000 : 5000),
         });
         const formattedClient = buildResultState(clientPayload, "run");
         setResult(formattedClient);

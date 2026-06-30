@@ -2,34 +2,45 @@
  * Client-side judging orchestrator.
  *
  * Runs supported languages directly in the user's browser (no server round
- * trip) against the problem's VISIBLE test cases, and returns a payload shaped
- * exactly like the backend judge so the existing result formatting/UI is reused.
+ * trip), and returns a payload shaped exactly like the backend judge so the
+ * existing result formatting/UI is reused.
  *
- * Languages: JavaScript runs directly; TypeScript is transpiled to JS first
- * (sucrase) and then judged by the same JS worker. More plug in here (python ->
- * pyodide, ...).
+ * Languages:
+ *  - JavaScript: runs directly in a Web Worker.
+ *  - TypeScript: transpiled to JS (sucrase) then judged by the JS worker.
+ *  - Python: runs in a persistent Pyodide (WASM) worker — Run only; Submit stays
+ *    server-side so submissions are recorded and hidden tests stay secret.
  */
 
-// Languages judged in the browser. Everything else still goes to the backend.
+// Judged fully in the browser (Run AND Submit). Others submit to the backend.
 export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript"]);
+// Judged in the browser for "Run" (Sinash). Python runs here but submits to the
+// server, so CLIENT_RUN ⊇ CLIENT_SIDE.
+export const CLIENT_RUN_LANGUAGES = new Set(["javascript", "typescript", "python"]);
+
+const lower = (l) => String(l || "").toLowerCase();
 
 export function isClientSideLanguage(language) {
-  return CLIENT_SIDE_LANGUAGES.has(String(language || "").toLowerCase());
+  return CLIENT_SIDE_LANGUAGES.has(lower(language));
+}
+export function isClientRunLanguage(language) {
+  return CLIENT_RUN_LANGUAGES.has(lower(language));
 }
 
+// --------------------------------------------------------------------------- #
+// Payload helpers (backend-shaped)
+// --------------------------------------------------------------------------- #
 function summarize(results) {
   const total = results.length;
   const passed = results.filter((r) => r.passed).length;
   const runtimeMs = results.reduce((sum, r) => sum + (r.runtime_ms || 0), 0);
   const memoryBytes = results.reduce((peak, r) => Math.max(peak, r.memory_bytes || 0), 0);
   const firstFail = results.find((r) => !r.passed);
-  const verdict = total === 0
+  const verdict = total === 0 || passed === total
     ? "Accepted"
-    : passed === total
-      ? "Accepted"
-      : firstFail?.error
-        ? "Runtime Error"
-        : "Wrong Answer";
+    : firstFail?.error
+      ? "Runtime Error"
+      : "Wrong Answer";
   return {
     verdict,
     passed_count: passed,
@@ -41,15 +52,37 @@ function summarize(results) {
   };
 }
 
-/**
- * Run the user's solution against the given visible test cases in a worker.
- * @returns backend-shaped payload: {verdict, passed_count, total_count, case_results, ...}
- */
+function errorPayload(cases, message) {
+  return {
+    verdict: "Runtime Error",
+    passed_count: 0,
+    total_count: (cases || []).length,
+    runtime_ms: 0,
+    memory_bytes: null,
+    error_text: message || "Kodni bajarishda xatolik.",
+    case_results: [],
+  };
+}
+
+function timeoutPayload(cases, timeLimitMs) {
+  return {
+    verdict: "TIME_LIMIT_EXCEEDED",
+    passed_count: 0,
+    total_count: (cases || []).length,
+    runtime_ms: timeLimitMs || 0,
+    memory_bytes: null,
+    error_text: "Kod juda uzoq ishladi (vaqt limiti). Cheksiz sikl bo'lishi mumkin.",
+    case_results: [],
+  };
+}
+
+// --------------------------------------------------------------------------- #
+// JavaScript (fresh worker per run)
+// --------------------------------------------------------------------------- #
 export function runJavascript({ code, functionName, cases, timeLimitMs = 5000 }) {
   return new Promise((resolve) => {
     const worker = new Worker(new URL("./jsJudge.worker.js", import.meta.url));
     let settled = false;
-
     const finish = (payload) => {
       if (settled) return;
       settled = true;
@@ -57,56 +90,21 @@ export function runJavascript({ code, functionName, cases, timeLimitMs = 5000 })
       worker.terminate();
       resolve(payload);
     };
-
-    const timer = setTimeout(() => {
-      finish({
-        verdict: "TIME_LIMIT_EXCEEDED",
-        passed_count: 0,
-        total_count: (cases || []).length,
-        runtime_ms: timeLimitMs,
-        memory_bytes: null,
-        error_text: "Kod juda uzoq ishladi (vaqt limiti). Cheksiz sikl bo'lishi mumkin.",
-        case_results: [],
-      });
-    }, timeLimitMs);
+    const timer = setTimeout(() => finish(timeoutPayload(cases, timeLimitMs)), timeLimitMs);
 
     worker.onmessage = (event) => {
       const { type, results, error } = event.data || {};
-      if (type === "done") {
-        finish(summarize(results || []));
-      } else if (type === "compile_error") {
-        finish({
-          verdict: "Runtime Error",
-          passed_count: 0,
-          total_count: (cases || []).length,
-          runtime_ms: 0,
-          memory_bytes: null,
-          error_text: error || "Kodni bajarishda xatolik.",
-          case_results: [],
-        });
-      }
+      if (type === "done") finish(summarize(results || []));
+      else if (type === "compile_error") finish(errorPayload(cases, error));
     };
-
-    worker.onerror = (err) => {
-      finish({
-        verdict: "Runtime Error",
-        passed_count: 0,
-        total_count: (cases || []).length,
-        runtime_ms: 0,
-        memory_bytes: null,
-        error_text: String(err?.message || "Worker xatosi"),
-        case_results: [],
-      });
-    };
-
+    worker.onerror = (err) => finish(errorPayload(cases, String(err?.message || "Worker xatosi")));
     worker.postMessage({ code, functionName, cases: cases || [] });
   });
 }
 
-/**
- * TypeScript: strip types to JavaScript (sucrase, lazy-loaded) then judge it
- * with the same JS worker.
- */
+// --------------------------------------------------------------------------- #
+// TypeScript (transpile -> JS)
+// --------------------------------------------------------------------------- #
 export async function runTypescript(args) {
   let jsCode;
   try {
@@ -116,22 +114,86 @@ export async function runTypescript(args) {
       disableESTransforms: true,
     }).code;
   } catch (err) {
-    return {
-      verdict: "Runtime Error",
-      passed_count: 0,
-      total_count: (args.cases || []).length,
-      runtime_ms: 0,
-      memory_bytes: null,
-      error_text: `TypeScript xatosi: ${String((err && err.message) || err)}`,
-      case_results: [],
-    };
+    return errorPayload(args.cases, `TypeScript xatosi: ${String((err && err.message) || err)}`);
   }
   return runJavascript({ ...args, code: jsCode });
 }
 
+// --------------------------------------------------------------------------- #
+// Python (persistent Pyodide worker, reused across runs)
+// --------------------------------------------------------------------------- #
+let pyWorker = null;
+let pyReady = null;
+let pySeq = 0;
+const pyPending = new Map();
+
+function ensurePyWorker() {
+  if (pyReady) return pyReady;
+  const worker = new Worker(new URL("./pyJudge.worker.js", import.meta.url));
+  pyWorker = worker;
+  pyReady = new Promise((resolve, reject) => {
+    worker.onmessage = (event) => {
+      const data = event.data || {};
+      if (data.type === "ready") return resolve(worker);
+      if (data.type === "init_error") {
+        pyReady = null;
+        pyWorker = null;
+        return reject(new Error(data.error));
+      }
+      const pending = pyPending.get(data.id);
+      if (!pending) return;
+      pyPending.delete(data.id);
+      if (data.type === "result") pending.resolve(summarize(data.results || []));
+      else if (data.type === "compile_error") pending.resolve(errorPayload(pending.cases, data.error));
+      else pending.resolve(errorPayload(pending.cases, data.error || "Python xatosi"));
+    };
+    worker.onerror = (err) => {
+      pyReady = null;
+      pyWorker = null;
+      reject(err);
+    };
+  });
+  worker.postMessage({ type: "init" });
+  return pyReady;
+}
+
+export function runPython({ code, functionName, cases, timeLimitMs = 10000 }) {
+  return new Promise((resolve) => {
+    ensurePyWorker()
+      .then((worker) => {
+        const id = ++pySeq;
+        let settled = false;
+        const done = (payload) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          pyPending.delete(id);
+          resolve(payload);
+        };
+        // Pyodide can't be interrupted — on a hang, terminate and recreate it.
+        const timer = setTimeout(() => {
+          try { worker.terminate(); } catch { /* noop */ }
+          pyWorker = null;
+          pyReady = null;
+          pyPending.clear();
+          done(timeoutPayload(cases, timeLimitMs));
+        }, timeLimitMs);
+        pyPending.set(id, { resolve: done, cases });
+        worker.postMessage({ type: "run", id, code, functionName, cases: cases || [] });
+      })
+      .catch(() => resolve(errorPayload(cases, "Python muhitini yuklab bo'lmadi.")));
+  });
+}
+
 export function runClientSide(language, args) {
-  const lang = String(language || "").toLowerCase();
-  if (lang === "javascript") return runJavascript(args);
-  if (lang === "typescript") return runTypescript(args);
-  return Promise.reject(new Error(`Client-side execution not supported for: ${language}`));
+  switch (lower(language)) {
+    case "javascript":
+      return runJavascript(args);
+    case "typescript":
+      return runTypescript(args);
+    case "python":
+      return runPython(args);
+    default:
+      return Promise.reject(new Error(`Client-side execution not supported for: ${language}`));
+  }
 }
