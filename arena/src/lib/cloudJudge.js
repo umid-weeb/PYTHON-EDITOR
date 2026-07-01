@@ -17,8 +17,9 @@ const WANDBOX_URL = "https://wandbox.org/api/compile.json";
 const COMPILERS = {
   cpp: {
     compiler: "gcc-13.2.0",
+    // -O0 (default) compiles faster; judging inputs are small so no need for -O2.
     // Wandbox splits compiler-option-raw by newlines, not spaces.
-    optionRaw: "-std=gnu++17\n-O2",
+    optionRaw: "-std=gnu++17",
     genSource: generateCppSource,
   },
 };

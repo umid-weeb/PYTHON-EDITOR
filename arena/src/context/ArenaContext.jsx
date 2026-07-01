@@ -256,6 +256,9 @@ export function ArenaProvider({ children }) {
       // JavaScript/TypeScript run directly; Python runs via Pyodide. Uses the
       // problem's VISIBLE test cases.
       if (isClientRunLanguage(submissionLanguage)) {
+        if (submissionLanguage === "cpp") {
+          setResult({ tone: "info", chip: "Kompilyatsiya", summary: "Bulutda kompilyatsiya qilinmoqda (bir necha soniya)...", details: [] });
+        }
         const cases = (selectedProblem?.visible_testcases || []).map((tc) => ({
           name: tc.name,
           input: tc.input,
@@ -355,6 +358,9 @@ export function ArenaProvider({ children }) {
         // Submit checks ALL test cases (visible + hidden) — fetched from the
         // server — so it is a thorough check, not just the visible ones.
         if (isClientSideLanguage(submissionLanguage)) {
+          if (submissionLanguage === "cpp") {
+            setResult({ tone: "info", chip: "Kompilyatsiya", summary: "Bulutda kompilyatsiya qilinmoqda (bir necha soniya)...", details: [] });
+          }
           let cases;
           try {
             const data = await arenaApi.getJudgeTestcases(submissionProblemKey);
