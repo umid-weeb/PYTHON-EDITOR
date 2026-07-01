@@ -12,6 +12,7 @@
  * Pilot: C++. Other compiled languages plug in via COMPILERS + their own driver.
  */
 import { buildStdin, generateCppSource } from "./drivers/cppDriver.js";
+import { generateJavaSource } from "./drivers/javaDriver.js";
 
 const GODBOLT_URL = "https://godbolt.org/api/compiler";
 
@@ -19,8 +20,15 @@ const GODBOLT_URL = "https://godbolt.org/api/compiler";
 const COMPILERS = {
   cpp: {
     compilerId: "g132", // gcc 13.2
+    lang: "c++",
     userArguments: "-std=gnu++17 -O0",
     genSource: generateCppSource,
+  },
+  java: {
+    compilerId: "java2202",
+    lang: "java",
+    userArguments: "",
+    genSource: generateJavaSource,
   },
 };
 
@@ -143,7 +151,7 @@ const joinText = (arr) => (Array.isArray(arr) ? arr.map((l) => l.text ?? "").joi
 // Godbolt colourises compiler diagnostics; strip ANSI escapes for clean display.
 const stripAnsi = (s) => String(s || "").replace(/\x1b\[[0-9;]*m/g, "");
 
-async function runViaGodbolt({ compilerId, userArguments, source, stdin, cases, timeLimitMs }) {
+async function runViaGodbolt({ compilerId, lang, userArguments, source, stdin, cases, timeLimitMs }) {
   let data;
   const controller = new AbortController();
   const abortTimer = setTimeout(() => controller.abort(), Math.max(30000, (timeLimitMs || 0) + 20000));
@@ -159,7 +167,7 @@ async function runViaGodbolt({ compilerId, userArguments, source, stdin, cases, 
           filters: { execute: true },
           compilerOptions: { executorRequest: true },
         },
-        lang: "c++",
+        lang: lang || "c++",
       }),
       signal: controller.signal,
     });
@@ -193,7 +201,7 @@ export async function runCompiled(language, { code, signature, cases, timeLimitM
   if (!signature) return errorPayload(cases, "Imzo ma'lumoti topilmadi.");
   const source = cfg.genSource(signature, code || "");
   const stdin = buildStdin(cases);
-  return runViaGodbolt({ compilerId: cfg.compilerId, userArguments: cfg.userArguments, source, stdin, cases, timeLimitMs });
+  return runViaGodbolt({ compilerId: cfg.compilerId, lang: cfg.lang, userArguments: cfg.userArguments, source, stdin, cases, timeLimitMs });
 }
 
 export const CLOUD_COMPILED_LANGUAGES = new Set(Object.keys(COMPILERS));
