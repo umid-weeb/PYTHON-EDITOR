@@ -13,6 +13,7 @@
  */
 import { buildStdin, generateCppSource } from "./drivers/cppDriver.js";
 import { generateJavaSource } from "./drivers/javaDriver.js";
+import { generateGoSource } from "./drivers/goDriver.js";
 
 const GODBOLT_URL = "https://godbolt.org/api/compiler";
 
@@ -29,6 +30,12 @@ const COMPILERS = {
     lang: "java",
     userArguments: "",
     genSource: generateJavaSource,
+  },
+  go: {
+    compilerId: "gl1210", // go 1.21
+    lang: "go",
+    userArguments: "",
+    genSource: generateGoSource,
   },
 };
 
