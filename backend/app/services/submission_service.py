@@ -96,6 +96,28 @@ class SubmissionService:
         )
         return submission_id
 
+    def record_client_result(
+        self,
+        payload: SubmissionRequest,
+        user_id: int,
+        result: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Persist a submission that was judged IN THE BROWSER (client-side).
+
+        Creates the submission row and finalizes it with the client-reported
+        verdict — triggering the same solved / rating / streak side effects as a
+        server-judged submit — without running the server judge.
+        """
+        submission_id = self.create_submission(payload, mode="submit", user_id=user_id)
+        self._finalize_success(int(submission_id), result)
+        self.logger.info(
+            "submission.client_recorded id=%s problem=%s verdict=%s",
+            submission_id,
+            payload.problem_id,
+            result.get("verdict"),
+        )
+        return self.get_submission(submission_id)
+
     def enqueue_submission(self, submission_id: str) -> None:
         if self.settings.use_inline_execution:
             self._schedule_processing(submission_id, reason="inline")

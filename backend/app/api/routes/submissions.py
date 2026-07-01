@@ -117,6 +117,58 @@ async def submit_code(
         ) from error
 
 
+class ClientResultRequest(BaseModel):
+    problem_id: str
+    code: str = ""
+    language: str = "python"
+    verdict: str
+    passed_count: int = 0
+    total_count: int = 0
+    runtime_ms: int = 0
+    memory_bytes: int = 0
+    is_extended: bool = False
+
+
+@router.post("/client-result", response_model=SubmissionStatusResponse, status_code=status.HTTP_201_CREATED)
+async def record_client_result(
+    request: ClientResultRequest,
+    current_user: User = Depends(get_current_user),
+    service: SubmissionService = Depends(get_submission_service),
+) -> SubmissionStatusResponse:
+    """Record a submission that was judged in the user's browser (client-side).
+
+    The verdict is computed on the client; the server persists it so the problem
+    is marked solved and history/rating update.
+    """
+    try:
+        sub_request = SubmissionRequest(
+            problem_id=request.problem_id,
+            code=request.code,
+            language=request.language if request.language in {"python", "javascript", "cpp", "sql"} else "python",
+            is_extended=request.is_extended,
+        )
+        result = {
+            "verdict": request.verdict,
+            "runtime_ms": int(request.runtime_ms or 0),
+            "memory_kb": int(request.memory_bytes or 0),
+            "error_text": None,
+            "passed_count": int(request.passed_count or 0),
+            "total_count": int(request.total_count or 0),
+            "case_results": [],
+        }
+        payload = service.record_client_result(sub_request, current_user.id, result)
+        if payload is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Yozib bo'lmadi")
+        return SubmissionStatusResponse.model_validate(payload)
+    except SubmissionProblemNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Problem topilmadi") from error
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.exception("Error recording client result: %s", error)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Natijani yozishda xatolik") from error
+
+
 @router.get("/submission/{submission_id}", response_model=SubmissionStatusResponse)
 async def get_submission_status(
     submission_id: str,

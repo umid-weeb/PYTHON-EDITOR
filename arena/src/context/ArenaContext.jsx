@@ -381,6 +381,57 @@ export function ArenaProvider({ children }) {
           clearPendingSubmission();
           const formattedClient = buildResultState(clientPayload, "submit");
           setResult(formattedClient);
+
+          // Persist the browser-judged submission so the problem is marked
+          // solved and history/rating update (server records the verdict).
+          const cAccepted = String(clientPayload?.verdict || "").trim().toLowerCase() === "accepted";
+          const cAttempted = cAccepted || (clientPayload?.total_count || 0) > 0;
+          try {
+            await arenaApi.recordClientResult(
+              {
+                problem_id: submissionProblemKey,
+                code,
+                language: submissionLanguage,
+                verdict: clientPayload.verdict,
+                passed_count: clientPayload.passed_count || 0,
+                total_count: clientPayload.total_count || 0,
+                runtime_ms: Math.round(clientPayload.runtime_ms || 0),
+                memory_bytes: Math.round(clientPayload.memory_bytes || 0),
+              },
+              token
+            );
+          } catch (recordError) {
+            console.warn("recordClientResult failed", recordError);
+          }
+
+          const targetKey = selectedProblemId || submissionProblemKey;
+          if (targetKey) {
+            setProblems((current) =>
+              current.map((problem) => {
+                const matches =
+                  problem.id === targetKey ||
+                  problem.slug === targetKey ||
+                  (problem.id && problem.id === selectedProblem?.id) ||
+                  (problem.slug && problem.slug === selectedProblem?.slug);
+                return matches
+                  ? {
+                      ...problem,
+                      is_attempted: problem.is_attempted || cAttempted,
+                      is_solved: problem.is_solved || cAccepted,
+                    }
+                  : problem;
+              })
+            );
+            setSelectedProblem((current) =>
+              current
+                ? {
+                    ...current,
+                    is_attempted: current.is_attempted || cAttempted,
+                    is_solved: current.is_solved || cAccepted,
+                  }
+                : current
+            );
+          }
           return formattedClient;
         }
 

@@ -164,6 +164,15 @@ export const arenaApi = {
   async getJudgeTestcases(problemSlug) {
     return request(`/api/problems/${encodeURIComponent(problemSlug)}/judge-testcases`);
   },
+  // Persist a browser-judged submission so the problem is marked solved and
+  // history/rating update. Requires auth.
+  async recordClientResult(payload, token) {
+    return request("/api/client-result", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      token,
+    });
+  },
   runSolution(problemSlug, code, language, isExtended = false) {
     return request("/api/run", {
       method: "POST",
