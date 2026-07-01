@@ -48,6 +48,7 @@ vector<bool> asVecBool(const JVal&v){ vector<bool> r; for(auto&x:v.arr) r.push_b
 vector<string> asVecString(const JVal&v){ vector<string> r; for(auto&x:v.arr) r.push_back(asString(x)); return r; }
 vector<vector<int>> asVecVecInt(const JVal&v){ vector<vector<int>> r; for(auto&x:v.arr) r.push_back(asVecInt(x)); return r; }
 vector<vector<string>> asVecVecString(const JVal&v){ vector<vector<string>> r; for(auto&x:v.arr) r.push_back(asVecString(x)); return r; }
+string parseStr(const string&line){ size_t a=line.find_first_not_of(" \t\r\n"); if(a==string::npos) return ""; size_t b=line.find_last_not_of(" \t\r\n"); string s=line.substr(a,b-a+1); if(!s.empty()&&s[0]=='"'){ JP p(s); JVal v=p.parse(); if(v.t==3) return v.str; } return s; }
 string jesc(const string&s){ string r="\""; for(char c:s){ if(c=='"')r+="\\\""; else if(c=='\\')r+="\\\\";
   else if(c=='\n')r+="\\n"; else if(c=='\t')r+="\\t"; else if(c=='\r')r+="\\r"; else r+=c; } r+="\""; return r; }
 string tj(int x){ return to_string(x); }
@@ -109,6 +110,11 @@ export function generateCppSource(signature, userCode) {
 
   const reads = params
     .map((p, i) => {
+      const t = String(p.type || "").trim().toLowerCase().replace(/\s+/g, "");
+      // A bare `string` arg may be unquoted (e.g. abcabcbb) — read it raw.
+      if (t === "string" || t === "char") {
+        return `    string __l${i}; getline(cin, __l${i}); string arg${i} = pz::parseStr(__l${i});`;
+      }
       const [decl, extract] = cppTypeInfo(p.type);
       return `    string __l${i}; getline(cin, __l${i}); ${decl} arg${i} = pz::${extract}(pz::parseJson(__l${i}));`;
     })
