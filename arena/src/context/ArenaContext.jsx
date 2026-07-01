@@ -266,6 +266,7 @@ export function ArenaProvider({ children }) {
         const clientPayload = await runClientSide(submissionLanguage, {
           code,
           functionName,
+          signature: selectedProblem?.signature,
           cases,
           // Python loads Pyodide first (not counted here); give execution more room.
           timeLimitMs: submissionLanguage === "python" ? (isExtended ? 15000 : 10000) : (isExtended ? 10000 : 5000),
@@ -375,6 +376,7 @@ export function ArenaProvider({ children }) {
           const clientPayload = await runClientSide(submissionLanguage, {
             code,
             functionName,
+            signature: selectedProblem?.signature,
             cases,
             timeLimitMs: submissionLanguage === "python" ? (isExtended ? 20000 : 12000) : (isExtended ? 10000 : 5000),
           });

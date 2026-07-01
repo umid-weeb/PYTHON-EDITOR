@@ -8,15 +8,16 @@
  * Languages:
  *  - JavaScript: runs directly in a Web Worker.
  *  - TypeScript: transpiled to JS (sucrase) then judged by the JS worker.
- *  - Python: runs in a persistent Pyodide (WASM) worker — Run only; Submit stays
- *    server-side so submissions are recorded and hidden tests stay secret.
+ *  - Python: runs in a persistent Pyodide (WASM) worker.
+ *  - C++: compiled + run via the Wandbox cloud (free, CORS, per-user rate limit).
  */
+import { runCompiled } from "./cloudJudge.js";
 
-// Judged fully in the browser — both Run and Submit. Everything else (compiled
-// languages, SQL) still goes to the backend.
-export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript", "python"]);
-// Languages that Run in the browser (currently identical to the full set).
-export const CLIENT_RUN_LANGUAGES = new Set(["javascript", "typescript", "python"]);
+// Judged in the browser / client-driven — both Run and Submit. Everything else
+// (remaining compiled languages, SQL) still goes to the backend.
+export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript", "python", "cpp"]);
+// Languages that Run client-side (currently identical to the full set).
+export const CLIENT_RUN_LANGUAGES = new Set(["javascript", "typescript", "python", "cpp"]);
 
 const lower = (l) => String(l || "").toLowerCase();
 
@@ -193,6 +194,8 @@ export function runClientSide(language, args) {
       return runTypescript(args);
     case "python":
       return runPython(args);
+    case "cpp":
+      return runCompiled("cpp", args);
     default:
       return Promise.reject(new Error(`Client-side execution not supported for: ${language}`));
   }
