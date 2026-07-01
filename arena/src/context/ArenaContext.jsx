@@ -376,7 +376,7 @@ export function ArenaProvider({ children }) {
             code,
             functionName,
             cases,
-            timeLimitMs: isExtended ? 10000 : 5000,
+            timeLimitMs: submissionLanguage === "python" ? (isExtended ? 20000 : 12000) : (isExtended ? 10000 : 5000),
           });
           clearPendingSubmission();
           const formattedClient = buildResultState(clientPayload, "submit");

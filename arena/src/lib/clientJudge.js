@@ -12,10 +12,10 @@
  *    server-side so submissions are recorded and hidden tests stay secret.
  */
 
-// Judged fully in the browser (Run AND Submit). Others submit to the backend.
-export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript"]);
-// Judged in the browser for "Run" (Sinash). Python runs here but submits to the
-// server, so CLIENT_RUN ⊇ CLIENT_SIDE.
+// Judged fully in the browser — both Run and Submit. Everything else (compiled
+// languages, SQL) still goes to the backend.
+export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript", "python"]);
+// Languages that Run in the browser (currently identical to the full set).
 export const CLIENT_RUN_LANGUAGES = new Set(["javascript", "typescript", "python"]);
 
 const lower = (l) => String(l || "").toLowerCase();
