@@ -136,6 +136,7 @@ async def get_problem(
     lang: str = Query("uz", description="Language code (uz for Uzbek, en for English)"),
     refresh: bool = False,
     service: ProblemService = Depends(get_problem_service),
+    current_user: User | None = Depends(get_optional_user),
 ) -> ProblemDetail:
     started_at = perf_counter()
     cache_hit = False
@@ -162,7 +163,21 @@ async def get_problem(
         else:
             # Fallback to original method for backward compatibility
             problem = await service.get_problem(problem_slug, force_refresh=refresh)
-        
+
+        # Per-user solved status so the "solved" badge persists across reloads.
+        if current_user is not None:
+            with SessionLocal() as db:
+                solved_row = (
+                    db.query(SolvedProblem)
+                    .filter(
+                        SolvedProblem.user_id == current_user.id,
+                        SolvedProblem.problem_id == problem.id,
+                    )
+                    .first()
+                )
+            problem.is_solved = solved_row is not None
+            problem.is_attempted = problem.is_attempted or problem.is_solved
+
         logger.info(
             "problems.detail problem=%s lang=%s source=%s refresh=%s cache=%s visible=%s hidden=%s latency_ms=%.2f",
             problem_slug,

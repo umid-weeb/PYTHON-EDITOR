@@ -24,6 +24,7 @@ type Problem = {
   constraints?: string[];
   visible_testcases?: VisibleTestcase[];
   view_count?: number;
+  is_solved?: boolean;
 };
 
 type Props = {
@@ -145,9 +146,23 @@ export default function ProblemDescription({ problem, loading, embedded = false,
                   {localizeDifficultyLabel(problem.difficulty)}
                 </span>
                 <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Masala {problem.order_index || ""}</span>
+                {problem.is_solved && (
+                  <span className="inline-flex h-4 items-center gap-1 rounded-[var(--radius-xs)] bg-[var(--success-bg)] px-1.5 text-[9px] font-bold uppercase tracking-[0.05em] text-[var(--success)]">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Yechilgan
+                  </span>
+                )}
               </div>
-              <h1 className="truncate text-sm font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
-                {formatProblemTitle(problem)}
+              <h1 className="flex items-center gap-1.5 truncate text-sm font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+                {problem.is_solved && (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="shrink-0 text-[var(--success)]" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="12" cy="12" r="10" className="opacity-30" />
+                    <path d="M8 12l2.5 2.5L16 9" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+                <span className="truncate">{formatProblemTitle(problem)}</span>
               </h1>
             </div>
           </div>
