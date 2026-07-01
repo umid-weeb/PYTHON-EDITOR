@@ -25,7 +25,7 @@ async function ensurePyodide() {
 
 // Pure-Python judging harness (no Pyodide-specific calls — testable in CPython).
 const HARNESS = `
-import json, io, contextlib, traceback, ast, time, tracemalloc
+import json, io, contextlib, traceback, ast, time
 
 def _parse_value(line):
     s = str(line).strip()
@@ -87,7 +87,6 @@ def judge(user_code, function_name, cases_json):
         buf = io.StringIO()
         err = None
         actual = None
-        tracemalloc.start()
         t0 = time.perf_counter()
         try:
             with contextlib.redirect_stdout(buf):
@@ -95,8 +94,6 @@ def judge(user_code, function_name, cases_json):
         except Exception as e:
             err = _err(e)
         runtime_ms = (time.perf_counter() - t0) * 1000.0
-        _cur, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
 
         expected = _parse_value(c.get("expected_output", ""))
         passed = err is None and _norm(actual) == _norm(expected)
@@ -109,7 +106,7 @@ def judge(user_code, function_name, cases_json):
             "passed": passed,
             "error": err,
             "runtime_ms": runtime_ms,
-            "memory_bytes": int(peak),
+            "memory_bytes": len(_stringify(args)) + len(_stringify(actual)) + len(buf.getvalue()),
             "verdict": "Runtime Error" if err is not None else ("Accepted" if passed else "Wrong Answer"),
         })
     return json.dumps(results)
