@@ -46,13 +46,24 @@ async function request(path, options = {}) {
     : null;
 
   if (!response.ok) {
-    const message =
-      (typeof data === "object" && data && (data.detail || data.message)) ||
-      (typeof data === "string" && data) ||
-      `HTTP ${response.status}`;
+    // Gateway/proxy errors (Cloudflare 502/503/504) return an HTML page, not
+    // JSON — never surface that raw HTML to the user.
+    const isHtml =
+      contentType.includes("text/html") ||
+      (typeof raw === "string" && raw.trimStart().startsWith("<"));
+    let message;
+    if (typeof data === "object" && data && (data.detail || data.message)) {
+      message = data.detail || data.message;
+    } else if (!isHtml && typeof data === "string" && data.trim()) {
+      message = data;
+    } else if (response.status >= 502 && response.status <= 504) {
+      message = "Server vaqtincha javob bermadi (gateway timeout). Bir ozdan keyin qayta urinib ko'ring.";
+    } else {
+      message = `Server xatosi (HTTP ${response.status}).`;
+    }
     const error = new Error(message);
     error.status = response.status;
-    error.data = data;
+    error.data = isHtml ? null : data;
     throw error;
   }
 
