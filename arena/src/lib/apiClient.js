@@ -53,7 +53,15 @@ async function request(path, options = {}) {
       (typeof raw === "string" && raw.trimStart().startsWith("<"));
     let message;
     if (typeof data === "object" && data && (data.detail || data.message)) {
-      message = data.detail || data.message;
+      const detail = data.detail ?? data.message;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        // FastAPI 422: array of {loc, msg, type} — surface the messages.
+        message = detail.map((e) => e?.msg || (typeof e === "string" ? e : JSON.stringify(e))).join("; ");
+      } else {
+        message = JSON.stringify(detail);
+      }
     } else if (!isHtml && typeof data === "string" && data.trim()) {
       message = data;
     } else if (response.status >= 502 && response.status <= 504) {
