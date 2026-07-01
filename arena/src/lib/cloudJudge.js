@@ -14,6 +14,7 @@
 import { buildStdin, generateCppSource } from "./drivers/cppDriver.js";
 import { generateJavaSource } from "./drivers/javaDriver.js";
 import { generateGoSource } from "./drivers/goDriver.js";
+import { generateCsharpSource } from "./drivers/csharpDriver.js";
 
 const GODBOLT_URL = "https://godbolt.org/api/compiler";
 
@@ -36,6 +37,12 @@ const COMPILERS = {
     lang: "go",
     userArguments: "",
     genSource: generateGoSource,
+  },
+  csharp: {
+    compilerId: "dotnet100csharpcoreclr", // .NET 10 CoreCLR
+    lang: "csharp",
+    userArguments: "",
+    genSource: generateCsharpSource,
   },
 };
 

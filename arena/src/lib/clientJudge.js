@@ -15,9 +15,9 @@ import { runCompiled } from "./cloudJudge.js";
 
 // Judged in the browser / client-driven — both Run and Submit. Everything else
 // (remaining compiled languages, SQL) still goes to the backend.
-export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript", "python", "cpp", "java", "go"]);
+export const CLIENT_SIDE_LANGUAGES = new Set(["javascript", "typescript", "python", "cpp", "java", "go", "csharp"]);
 // Languages that Run client-side (currently identical to the full set).
-export const CLIENT_RUN_LANGUAGES = new Set(["javascript", "typescript", "python", "cpp", "java", "go"]);
+export const CLIENT_RUN_LANGUAGES = new Set(["javascript", "typescript", "python", "cpp", "java", "go", "csharp"]);
 
 const lower = (l) => String(l || "").toLowerCase();
 
@@ -200,6 +200,8 @@ export function runClientSide(language, args) {
       return runCompiled("java", args);
     case "go":
       return runCompiled("go", args);
+    case "csharp":
+      return runCompiled("csharp", args);
     default:
       return Promise.reject(new Error(`Client-side execution not supported for: ${language}`));
   }
