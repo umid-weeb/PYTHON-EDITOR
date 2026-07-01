@@ -1,25 +1,25 @@
 /**
- * Compiled-language judging via Wandbox (wandbox.org) — a free, no-auth public
- * compile+run service (CORS-enabled, so the browser calls it directly; rate
- * limits are per-user by IP, and there is no server infra to run).
+ * Compiled-language judging via Godbolt / Compiler Explorer (godbolt.org) — a
+ * free, no-auth public compile+run service. CORS-enabled, so the browser calls
+ * it directly (per-user rate limits by IP, no server infra). It's faster than
+ * Wandbox (~3s) and, crucially, returns `execTime` — the program's real run time
+ * — so "Vaqt" shows the code's actual speed (ms), not compile+network overhead.
  *
  * The browser sends (user code + generated driver) + a stdin payload containing
- * every test case; Wandbox compiles & runs once and returns stdout. We split the
+ * every test case; it compiles & runs once and returns stdout. We split the
  * driver's marked output into per-case results and compare canonically.
  *
  * Pilot: C++. Other compiled languages plug in via COMPILERS + their own driver.
  */
 import { buildStdin, generateCppSource } from "./drivers/cppDriver.js";
 
-const WANDBOX_URL = "https://wandbox.org/api/compile.json";
+const GODBOLT_URL = "https://godbolt.org/api/compiler";
 
-// language -> Wandbox compiler + flags + driver source generator.
+// language -> Godbolt compiler id + flags + driver source generator.
 const COMPILERS = {
   cpp: {
-    compiler: "gcc-13.2.0",
-    // -O0 (default) compiles faster; judging inputs are small so no need for -O2.
-    // Wandbox splits compiler-option-raw by newlines, not spaces.
-    optionRaw: "-std=gnu++17",
+    compilerId: "g132", // gcc 13.2
+    userArguments: "-std=gnu++17 -O0",
     genSource: generateCppSource,
   },
 };
@@ -139,20 +139,27 @@ function parseDriverOutput(stdout, programError, cases, runtimeMs) {
   return summarize(caseResults, runtimeMs);
 }
 
-async function runViaWandbox({ compiler, optionRaw, source, stdin, cases, timeLimitMs }) {
-  const started = performance.now();
+const joinText = (arr) => (Array.isArray(arr) ? arr.map((l) => l.text ?? "").join("\n") : "");
+// Godbolt colourises compiler diagnostics; strip ANSI escapes for clean display.
+const stripAnsi = (s) => String(s || "").replace(/\x1b\[[0-9;]*m/g, "");
+
+async function runViaGodbolt({ compilerId, userArguments, source, stdin, cases, timeLimitMs }) {
   let data;
   const controller = new AbortController();
   const abortTimer = setTimeout(() => controller.abort(), Math.max(30000, (timeLimitMs || 0) + 20000));
   try {
-    const res = await fetch(WANDBOX_URL, {
+    const res = await fetch(`${GODBOLT_URL}/${compilerId}/compile`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        compiler,
-        code: source,
-        stdin,
-        "compiler-option-raw": optionRaw || "",
+        source,
+        options: {
+          userArguments,
+          executeParameters: { args: [], stdin },
+          filters: { execute: true },
+          compilerOptions: { executorRequest: true },
+        },
+        lang: "c++",
       }),
       signal: controller.signal,
     });
@@ -165,15 +172,19 @@ async function runViaWandbox({ compiler, optionRaw, source, stdin, cases, timeLi
   } finally {
     clearTimeout(abortTimer);
   }
-  const wall = performance.now() - started;
 
-  const compileError = (data.compiler_error || "").trim();
-  const programOutput = data.program_output || "";
-  // Compilation failed: no program output and compiler complained.
-  if (!programOutput && compileError) {
-    return errorPayload(cases, `Kompilyatsiya xatosi:\n${compileError}`);
+  // Compilation failed.
+  const buildCode = data.buildResult?.code ?? data.code;
+  if (buildCode !== 0 && !data.didExecute) {
+    const msg = joinText(data.buildResult?.stderr) || joinText(data.stderr) || "Noma'lum xato.";
+    return errorPayload(cases, `Kompilyatsiya xatosi:\n${stripAnsi(msg).trim()}`);
   }
-  return parseDriverOutput(programOutput, data.program_error, cases, wall);
+
+  const stdout = joinText(data.stdout);
+  const stderr = joinText(data.stderr);
+  // Godbolt reports execTime (ms) — the program's real run time.
+  const execTime = Number(data.execTime) || 0;
+  return parseDriverOutput(stdout, stderr, cases, execTime);
 }
 
 export async function runCompiled(language, { code, signature, cases, timeLimitMs = 20000 }) {
@@ -182,7 +193,7 @@ export async function runCompiled(language, { code, signature, cases, timeLimitM
   if (!signature) return errorPayload(cases, "Imzo ma'lumoti topilmadi.");
   const source = cfg.genSource(signature, code || "");
   const stdin = buildStdin(cases);
-  return runViaWandbox({ compiler: cfg.compiler, optionRaw: cfg.optionRaw, source, stdin, cases, timeLimitMs });
+  return runViaGodbolt({ compilerId: cfg.compilerId, userArguments: cfg.userArguments, source, stdin, cases, timeLimitMs });
 }
 
 export const CLOUD_COMPILED_LANGUAGES = new Set(Object.keys(COMPILERS));
