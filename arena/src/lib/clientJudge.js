@@ -197,3 +197,15 @@ export function runClientSide(language, args) {
       return Promise.reject(new Error(`Client-side execution not supported for: ${language}`));
   }
 }
+
+/**
+ * Warm up a client-side runtime in the background so the first Run is instant.
+ * For Python this pre-loads Pyodide (the ~10MB WASM download) while the user is
+ * still reading/writing code. No-op / cheap for JS & TS. Safe to call often.
+ */
+export function warmupClientRuntime(language) {
+  const lang = lower(language);
+  if (lang === "python") {
+    ensurePyWorker().catch(() => { /* will retry on actual run */ });
+  }
+}

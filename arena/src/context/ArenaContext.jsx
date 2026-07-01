@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { arenaApi } from "../lib/apiClient.js";
 import { useAuth } from "./AuthContext.jsx";
 import { buildResultState } from "../lib/formatters.js";
-import { isClientRunLanguage, isClientSideLanguage, runClientSide } from "../lib/clientJudge.js";
+import { isClientRunLanguage, isClientSideLanguage, runClientSide, warmupClientRuntime } from "../lib/clientJudge.js";
 import TimeoutWarningModal from "../components/common/TimeoutWarningModal.tsx";
 import {
   clearPendingSubmission,
@@ -99,6 +99,12 @@ export function ArenaProvider({ children }) {
       setShowAuthModal(false);
     }
   }, [token]);
+
+  // Pre-load the Python runtime (Pyodide) in the background so the first "Sinash"
+  // is instant instead of waiting ~10s for the WASM download.
+  useEffect(() => {
+    warmupClientRuntime(language);
+  }, [language]);
 
 
   const getSubmissionProblemKey = useCallback(
