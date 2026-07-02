@@ -15,6 +15,7 @@ import { buildStdin, generateCppSource } from "./drivers/cppDriver.js";
 import { generateJavaSource } from "./drivers/javaDriver.js";
 import { generateGoSource } from "./drivers/goDriver.js";
 import { generateCsharpSource } from "./drivers/csharpDriver.js";
+import { generateCSource } from "./drivers/cDriver.js";
 
 const GODBOLT_URL = "https://godbolt.org/api/compiler";
 
@@ -43,6 +44,12 @@ const COMPILERS = {
     lang: "csharp",
     userArguments: "",
     genSource: generateCsharpSource,
+  },
+  c: {
+    compilerId: "cg132", // gcc 13.2 (C)
+    lang: "c",
+    userArguments: "-std=gnu11 -O0 -lm",
+    genSource: generateCSource,
   },
 };
 
@@ -162,8 +169,8 @@ function parseDriverOutput(stdout, programError, cases, runtimeMs) {
 }
 
 const joinText = (arr) => (Array.isArray(arr) ? arr.map((l) => l.text ?? "").join("\n") : "");
-// Godbolt colourises compiler diagnostics; strip ANSI escapes for clean display.
-const stripAnsi = (s) => String(s || "").replace(/\x1b\[[0-9;]*m/g, "");
+// Godbolt colourises compiler diagnostics; strip ALL ANSI/CSI escapes.
+const stripAnsi = (s) => String(s || "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
 
 async function runViaGodbolt({ compilerId, lang, userArguments, source, stdin, cases, timeLimitMs }) {
   let data;
