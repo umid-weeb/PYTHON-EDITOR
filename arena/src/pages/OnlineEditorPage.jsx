@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "../providers/ThemeProvider.tsx";
 import TimeoutWarningModal from "../components/common/TimeoutWarningModal.tsx";
+import { offlineStorage } from "../lib/offlineStorage.js";
 
-const DEFAULT_CODE = `# Onlayn Python muharriri
-# Bu yerda kod yozishingiz va natijani ko'rishingiz mumkin
+const DEFAULT_CODE = `# Onlayn Python muharriri (100% Oflayn rejim)
+# Bu yerda kod yozishingiz va internetsiz ham bajarishingiz mumkin
 
-print("Salom, Pyzone!")
+print("Salom, PyZone Oflayn!")
 
 for i in range(5):
     print(f"Qadam: {i}")
@@ -15,7 +16,7 @@ for i in range(5):
 export default function OnlineEditorPage() {
   const { theme } = useTheme();
   const [code, setCode] = useState(() => {
-    return localStorage.getItem("pyzone-online-editor-code") || DEFAULT_CODE;
+    return offlineStorage.loadCode(DEFAULT_CODE);
   });
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -40,12 +41,15 @@ export default function OnlineEditorPage() {
         setIsLoading(false);
       } else if (type === "success") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setOutput(stdout || "Dastur muvaffaqiyatli yakunlandi.");
+        const resultText = stdout || "Dastur muvaffaqiyatli yakunlandi.";
+        setOutput(resultText);
         setIsRunning(false);
+        offlineStorage.saveHistoryEntry({ code, output: resultText, stderr, status: "success" });
       } else if (type === "error") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setOutput(error);
         setIsRunning(false);
+        offlineStorage.saveHistoryEntry({ code, output: error, stderr: error, status: "error" });
       } else if (type === "init_error") {
         setIsLoading(false);
         setOutput("Xatolik: Python muhitini yuklab bo'lmadi: " + error);
@@ -54,7 +58,7 @@ export default function OnlineEditorPage() {
 
     workerRef.current = worker;
     worker.postMessage({ type: "init" });
-  }, []);
+  }, [code]);
 
   useEffect(() => {
     initWorker();
@@ -62,10 +66,10 @@ export default function OnlineEditorPage() {
       if (workerRef.current) workerRef.current.terminate();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [initWorker]);
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem("pyzone-online-editor-code", code);
+    offlineStorage.saveCode(code);
   }, [code]);
 
   const handleRun = (isExtended = false) => {
@@ -105,7 +109,7 @@ export default function OnlineEditorPage() {
           {isLoading && (
             <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
               <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-              Python yuklanmoqda...
+              Python (WASM) yuklanmoqda...
             </div>
           )}
         </div>

@@ -1,4 +1,16 @@
-importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js");
+const getPyodideBasePath = () => {
+  if (typeof self !== 'undefined' && self.location) {
+    return self.location.origin + '/pyodide/';
+  }
+  return 'https://cdn.jsdelivr.net/pyodide/v0.23.4/full/';
+};
+
+const pyodideBasePath = getPyodideBasePath();
+try {
+  importScripts(pyodideBasePath + "pyodide.js");
+} catch (e) {
+  importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js");
+}
 
 let pyodide = null;
 
@@ -131,7 +143,7 @@ def auto_fix_code(code):
 async function init() {
     try {
         self.postMessage({ type: "status", message: "Python yuklanmoqda..." });
-        pyodide = await loadPyodide();
+        pyodide = await loadPyodide({ indexURL: pyodideBasePath });
         self.postMessage({ type: "status", message: "Xavfsiz muhit sozlanmoqda..." });
         await pyodide.runPythonAsync(SAFE_EXEC_CODE);
         self.postMessage({ type: "ready" });

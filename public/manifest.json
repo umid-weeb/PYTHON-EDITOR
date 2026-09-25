@@ -1,0 +1,22 @@
+{
+  "name": "PyZone Online Editor",
+  "short_name": "PyZone Editor",
+  "description": "100% Internetsiz ishlovchi Python, JS, C++, Java va Go Onlayn Muharriri",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09111d",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/python_icon_round.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/ryempo.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

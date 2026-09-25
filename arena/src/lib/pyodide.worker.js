@@ -2,7 +2,27 @@
  * Pyodide Web Worker for isolated code execution.
  * This prevents the main UI thread from hanging during long-running or infinite loops.
  */
-importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js");
+// Load Pyodide from local assets for offline capability
+const getPyodideBasePath = () => {
+  if (typeof self !== 'undefined' && self.location) {
+    // Determine base path depending on base URL or fallback to origin + /pyodide/
+    const origin = self.location.origin;
+    const pathname = self.location.pathname;
+    if (pathname.includes('/zone/')) {
+      return origin + '/zone/pyodide/';
+    }
+    return origin + '/pyodide/';
+  }
+  return 'https://cdn.jsdelivr.net/pyodide/v0.23.4/full/';
+};
+
+const pyodideBasePath = getPyodideBasePath();
+try {
+  importScripts(pyodideBasePath + "pyodide.js");
+} catch (e) {
+  // Fallback to CDN if local import failed
+  importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js");
+}
 
 let pyodide = null;
 
@@ -10,11 +30,8 @@ async function initPyodide() {
   if (pyodide) return pyodide;
   
   pyodide = await loadPyodide({
-    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/",
+    indexURL: pyodideBasePath,
   });
-  
-  // Optional: Load common packages like numpy or pandas if needed
-  // await pyodide.loadPackage(["numpy"]);
   
   return pyodide;
 }

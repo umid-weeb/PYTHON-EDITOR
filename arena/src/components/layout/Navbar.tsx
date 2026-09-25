@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import UserMenu from "../UserMenu.tsx";
+import OfflineStatusBadge from "../common/OfflineStatusBadge.jsx";
 
 const NAV_ITEMS = [
   { to: "/online-editor", label: "Editor" },
@@ -58,7 +59,8 @@ export default function Navbar() {
           ) : null}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-3">
+          <OfflineStatusBadge />
           {showExitToMain ? (
             <a
               href="/"

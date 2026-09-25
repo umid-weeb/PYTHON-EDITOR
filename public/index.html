@@ -93,46 +93,71 @@
         border-color: #243247 !important;
       }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/eclipse.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/foldgutter.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.css">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./vendor/codemirror/lib/codemirror.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css';">
+    <link rel="stylesheet" href="./vendor/codemirror/theme/eclipse.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/eclipse.min.css';">
+    <link rel="stylesheet" href="./vendor/codemirror/theme/monokai.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css';">
+    <link rel="stylesheet" href="./vendor/codemirror/addon/hint/show-hint.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.css';">
+    <link rel="stylesheet" href="./vendor/codemirror/addon/fold/foldgutter.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/foldgutter.min.css';">
+    <link rel="stylesheet" href="./vendor/codemirror/addon/dialog/dialog.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.css';">
     <link rel="stylesheet" href="./style.css">
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/python-hint.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/anyword-hint.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/active-line.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/searchcursor.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/search.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/foldcode.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/foldgutter.min.js"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/fold/indent-fold.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+    
+    <!-- CodeMirror Local JS Scripts with CDN fallback -->
+    <script defer src="./vendor/codemirror/lib/codemirror.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js';"></script>
+    <script defer src="./vendor/codemirror/mode/python/python.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js';"></script>
+    <script defer src="./vendor/codemirror/mode/javascript/javascript.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js';"></script>
+    <script defer src="./vendor/codemirror/mode/clike/clike.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js';"></script>
+    <script defer src="./vendor/codemirror/mode/go/go.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js';"></script>
+    <script defer src="./vendor/codemirror/addon/hint/show-hint.js"></script>
+    <script defer src="./vendor/codemirror/addon/hint/python-hint.js"></script>
+    <script defer src="./vendor/codemirror/addon/hint/anyword-hint.js"></script>
+    <script defer src="./vendor/codemirror/addon/edit/matchbrackets.js"></script>
+    <script defer src="./vendor/codemirror/addon/edit/closebrackets.js"></script>
+    <script defer src="./vendor/codemirror/addon/edit/active-line.js"></script>
+    <script defer src="./vendor/codemirror/addon/dialog/dialog.js"></script>
+    <script defer src="./vendor/codemirror/addon/search/searchcursor.js"></script>
+    <script defer src="./vendor/codemirror/addon/search/search.js"></script>
+    <script defer src="./vendor/codemirror/addon/fold/foldcode.js"></script>
+    <script defer src="./vendor/codemirror/addon/fold/foldgutter.js"></script>
+    <script defer src="./vendor/codemirror/addon/fold/indent-fold.js"></script>
+    <script defer src="./pyodide/pyodide.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js';"></script>
     <script defer src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
     <script defer src="https://unpkg.com/prettier@2.8.8/parser-babel.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.1/beautify.min.js"></script>
     <script src="./real.js" defer></script>
     <script src="./editor-ai.js" defer></script>
+
+    <!-- Register Root Service Worker for 100% Offline PWA Capability -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            console.log('[PyZone SW] Root Service Worker active:', reg.scope);
+          }).catch(function(err) {
+            console.warn('[PyZone SW] Service Worker error:', err);
+          });
+        });
+      }
+    </script>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>
-                <span class="status-indicator">
-                <img id="editor-language-brand" class="editor-brand-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original.svg" alt="Python logo" title="Python">
-                </span>
-                Online Editor
-            </h1>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h1>
+                    <span class="status-indicator">
+                    <img id="editor-language-brand" class="editor-brand-icon" src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original.svg" alt="Python logo" title="Python">
+                    </span>
+                    Online Editor
+                </h1>
+                <div id="offline-status-badge" class="offline-status-badge" title="PyZone 100% oflayn ishlaydi">
+                    <span class="offline-status-dot"></span>
+                    <span id="offline-status-text">Oflayn rejim tayyor</span>
+                </div>
+                <button id="pwa-install-btn" class="pwa-install-btn" style="display: none;" onclick="triggerPwaInstall()">
+                    <span>App-ni o'rnatish</span>
+                </button>
+            </div>
             <div class="header-buttons">
                 <button class="btn-run" onclick="runCode()" type="button">
                     <span class="btn-icon" aria-hidden="true">

@@ -4305,3 +4305,51 @@ window.addEventListener("load", () => {
         setTimeout(preloadPythonEnvironment, 200);
     }
 });
+
+// --- OFFLINE PWA STATUS & INSTALLATION HANDLER ---
+let deferredPwaPrompt = null;
+
+function updateOfflineStatusBadge() {
+    const badge = document.getElementById("offline-status-badge");
+    const statusText = document.getElementById("offline-status-text");
+    if (!badge || !statusText) return;
+
+    if (navigator.onLine) {
+        badge.classList.remove("offline-mode");
+        badge.title = "PyZone 100% oflayn ishlashga tayyor";
+        statusText.textContent = "Oflayn rejim tayyor";
+    } else {
+        badge.classList.add("offline-mode");
+        badge.title = "Internet aloqasi yo'q. PyZone 100% oflayn rejimda ishlamoqda!";
+        statusText.textContent = "Internetsiz rejim";
+    }
+}
+
+window.addEventListener("online", updateOfflineStatusBadge);
+window.addEventListener("offline", updateOfflineStatusBadge);
+
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPwaPrompt = e;
+    const installBtn = document.getElementById("pwa-install-btn");
+    if (installBtn) {
+        installBtn.style.display = "inline-flex";
+    }
+});
+
+async function triggerPwaInstall() {
+    if (!deferredPwaPrompt) return;
+    deferredPwaPrompt.prompt();
+    const { outcome } = await deferredPwaPrompt.userChoice;
+    if (outcome === "accepted") {
+        deferredPwaPrompt = null;
+        const installBtn = document.getElementById("pwa-install-btn");
+        if (installBtn) installBtn.style.display = "none";
+    }
+}
+
+window.triggerPwaInstall = triggerPwaInstall;
+
+window.addEventListener("load", () => {
+    updateOfflineStatusBadge();
+});

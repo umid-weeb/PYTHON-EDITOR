@@ -9,7 +9,24 @@
  *
  * Used for the Arena's "Sinash" (Run) on Python; Submit stays server-side.
  */
-importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js");
+const getPyodideBasePath = () => {
+  if (typeof self !== 'undefined' && self.location) {
+    const origin = self.location.origin;
+    const pathname = self.location.pathname;
+    if (pathname.includes('/zone/')) {
+      return origin + '/zone/pyodide/';
+    }
+    return origin + '/pyodide/';
+  }
+  return 'https://cdn.jsdelivr.net/pyodide/v0.23.4/full/';
+};
+
+const pyodideBasePath = getPyodideBasePath();
+try {
+  importScripts(pyodideBasePath + "pyodide.js");
+} catch (e) {
+  importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js");
+}
 
 let pyodide = null;
 let loadingPromise = null;
@@ -17,7 +34,7 @@ let loadingPromise = null;
 async function ensurePyodide() {
   if (pyodide) return pyodide;
   if (!loadingPromise) {
-    loadingPromise = loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/" });
+    loadingPromise = loadPyodide({ indexURL: pyodideBasePath });
   }
   pyodide = await loadingPromise;
   return pyodide;

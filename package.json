@@ -7,7 +7,7 @@
     "start": "serve .",
     "arena:dev": "npm --prefix arena run dev",
     "arena:build": "npm --prefix arena run build",
-    "build": "npm --prefix arena install && npm --prefix arena run build && node scripts/sync-arena-build.mjs",
+    "build": "node scripts/prepare-root-offline-assets.mjs && npm --prefix arena install && npm --prefix arena run build && node scripts/sync-arena-build.mjs",
     "vercel-build": "npm run build",
     "seed:problems": "tsx scripts/seedProblems.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -15,6 +15,8 @@
   "author": "Sizning Ismingiz",
   "license": "MIT",
   "dependencies": {
+    "codemirror": "^5.65.18",
+    "pyodide": "^314.0.7",
     "python": "^0.0.4",
     "react": "^19.2.4",
     "react-router-dom": "^7.13.2",
