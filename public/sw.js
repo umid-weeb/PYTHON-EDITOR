@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pyzone-root-v1';
+const CACHE_NAME = 'pyzone-root-v2';
 
 const PRECACHE_URLS = [
   '/',
@@ -11,8 +11,10 @@ const PRECACHE_URLS = [
   '/ryempo.ico',
   '/python_icon_round.png',
   '/pyodide/pyodide.js',
-  '/pyodide/pyodide.asm.js',
+  '/pyodide/pyodide.mjs',
   '/pyodide/pyodide.asm.wasm',
+  '/pyodide/pyodide.asm.mjs',
+  '/pyodide/pyodide-lock.json',
   '/pyodide/python_stdlib.zip',
   '/vendor/codemirror/lib/codemirror.css',
   '/vendor/codemirror/lib/codemirror.js',
@@ -21,22 +23,49 @@ const PRECACHE_URLS = [
   '/vendor/codemirror/mode/python/python.js',
   '/vendor/codemirror/mode/javascript/javascript.js',
   '/vendor/codemirror/mode/clike/clike.js',
-  '/vendor/codemirror/mode/go/go.js'
+  '/vendor/codemirror/mode/go/go.js',
+  '/vendor/codemirror/addon/hint/show-hint.css',
+  '/vendor/codemirror/addon/hint/show-hint.js',
+  '/vendor/codemirror/addon/hint/python-hint.js',
+  '/vendor/codemirror/addon/hint/anyword-hint.js',
+  '/vendor/codemirror/addon/edit/matchbrackets.js',
+  '/vendor/codemirror/addon/edit/closebrackets.js',
+  '/vendor/codemirror/addon/edit/active-line.js',
+  '/vendor/codemirror/addon/dialog/dialog.css',
+  '/vendor/codemirror/addon/dialog/dialog.js',
+  '/vendor/codemirror/addon/search/searchcursor.js',
+  '/vendor/codemirror/addon/search/search.js',
+  '/vendor/codemirror/addon/fold/foldcode.js',
+  '/vendor/codemirror/addon/fold/foldgutter.css',
+  '/vendor/codemirror/addon/fold/foldgutter.js',
+  '/vendor/codemirror/addon/fold/indent-fold.js'
 ];
 
-// Install Event - Pre-cache core assets
+// Install Event - Pre-cache core assets individually so single 404 won't break the cache
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-caching core PyZone root assets...');
-      return cache.addAll(PRECACHE_URLS).catch((err) => {
-        console.warn('[SW] Some precache items failed to load, continuing:', err);
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('[SW] Resiliently pre-caching PyZone root assets...');
+      await Promise.all(
+        PRECACHE_URLS.map(async (url) => {
+          try {
+            const res = await fetch(url, { cache: 'no-cache' });
+            if (res.ok) {
+              await cache.put(url, res);
+            } else {
+              console.warn(`[SW] Precache item returned status ${res.status}: ${url}`);
+            }
+          } catch (err) {
+            console.warn(`[SW] Precache fetch error for ${url}:`, err);
+          }
+        })
+      );
+    })
   );
 });
 
-// Activate Event - Clean up old caches
+// Activate Event - Clean up old caches and claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -52,39 +81,59 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - CacheFirst for assets, NetworkFirst with cache fallback for navigation
+// Fetch Event - Serve from Cache when available, fallback to network, fallback to /index.html for HTML navigations
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // Ignore non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Handle local assets and CDN requests
+  const request = event.request;
+  const url = new URL(request.url);
+
+  // Is this an HTML navigation request?
+  const isHtmlNavigation = request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+
+      // 1. Check direct cache match
+      const cachedResponse = await cache.match(request, { ignoreSearch: true });
       if (cachedResponse) {
-        // Return cached resource immediately
+        // Fetch in background to keep cache fresh if online
+        if (navigator.onLine) {
+          fetch(request).then((networkRes) => {
+            if (networkRes && networkRes.ok) {
+              cache.put(request, networkRes);
+            }
+          }).catch(() => {});
+        }
         return cachedResponse;
       }
 
-      // Fetch from network and cache for offline
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type === 'opaque') {
-          return networkResponse;
+      // 2. Try network fetch
+      try {
+        const networkResponse = await fetch(request);
+        if (networkResponse && networkResponse.ok) {
+          cache.put(request, networkResponse.clone());
         }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
         return networkResponse;
-      }).catch(() => {
-        // If network fails (Offline) and navigating HTML, serve offline index.html
-        if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('/index.html') || caches.match('/');
+      } catch (networkError) {
+        console.warn(`[SW] Network fetch failed for ${request.url}:`, networkError);
+
+        // 3. Fallback for HTML navigations when offline
+        if (isHtmlNavigation) {
+          const fallbackHtml = (await cache.match('/index.html')) || (await cache.match('/'));
+          if (fallbackHtml) {
+            return fallbackHtml;
+          }
         }
-      });
-    })
+
+        // Return generic offline response or error
+        return new Response('Network error and no offline cache available', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+    })()
   );
 });

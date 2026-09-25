@@ -130,12 +130,10 @@
     <!-- Register Root Service Worker for 100% Offline PWA Capability -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js').then(function(reg) {
-            console.log('[PyZone SW] Root Service Worker active:', reg.scope);
-          }).catch(function(err) {
-            console.warn('[PyZone SW] Service Worker error:', err);
-          });
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function(reg) {
+          console.log('[PyZone SW] Root Service Worker active:', reg.scope);
+        }).catch(function(err) {
+          console.warn('[PyZone SW] Service Worker error:', err);
         });
       }
     </script>
