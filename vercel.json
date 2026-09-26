@@ -1,5 +1,39 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        },
+        {
+          "key": "Content-Type",
+          "value": "application/javascript; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json; charset=utf-8"
+        }
+      ]
+    }
+  ],
   "redirects": [
     {
       "source": "/arena",
