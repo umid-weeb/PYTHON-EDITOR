@@ -23,7 +23,7 @@ backend/.tmp_tests/
 __pycache__/
 *.pyc
 
-# Generated offline assets (generated dynamically during npm run build)
+# Generated build output
 public/pyodide/
 public/vendor/
 public/zone/
