@@ -54,7 +54,7 @@
       "destination": "http://16.16.26.138/uploads/$1"
     },
     {
-      "source": "/zone/(.*)",
+      "source": "/zone/((?!.*\\.).*)",
       "destination": "/zone/index.html"
     },
     {
